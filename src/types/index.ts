@@ -1,0 +1,43 @@
+import { Shipment } from "../components/ShipmentList";
+
+// Расширенный интерфейс отгрузки с поддержкой стеков
+export interface ExtendedShipment extends Shipment {
+  stacks?: {
+    stackId: string;
+    name: string;
+    equipmentIds: string[];
+    quantity: number;
+  }[];
+}
+
+// Интерфейс для статистики приложения
+export interface AppStats {
+  totalEquipment: number;
+  availableEquipment: number;
+  inUseEquipment: number;
+  maintenanceEquipment: number;
+  categories: number;
+  totalStacks: number;
+  totalShipments: number;
+}
+
+// Тип для активных видов приложения
+export type ActiveView = 
+  | "dashboard"
+  | "equipment"
+  | "stacks"
+  | "shipments"
+  | "categories"
+  | "locations"
+  | "add-equipment"
+  | "add-stack"
+  | "add-shipment"
+  | "edit-equipment"
+  | "edit-stack"
+  | "edit-shipment"
+  | "view-equipment";
+
+// Интерфейс для подсчета по категориям/местоположениям
+export interface CountMap {
+  [key: string]: number;
+}
