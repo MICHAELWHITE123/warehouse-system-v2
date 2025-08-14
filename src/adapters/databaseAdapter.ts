@@ -2,6 +2,7 @@
 
 import type { Equipment } from '../components/EquipmentList';
 import type { EquipmentStack } from '../components/StackManagement';
+import type { Shipment } from '../components/ShipmentList';
 
 import type { 
   EquipmentWithRelations, 
@@ -84,21 +85,21 @@ export function adaptStackToDB(
 
 // Преобразование отгрузки из БД в интерфейс компонента
 export function adaptShipmentFromDB(dbShipment: ShipmentWithDetails): ExtendedShipment {
-  const equipment = dbShipment.equipment.map(eq => ({
+  const equipment = (dbShipment.equipment || []).map(eq => ({
     equipmentId: eq.uuid,
     name: eq.name,
     serialNumber: eq.serial_number || '',
-    quantity: eq.quantity
+    quantity: eq.quantity || 1
   }));
 
-  const stacks = dbShipment.stacks.map(stack => ({
+  const stacks = (dbShipment.stacks || []).map(stack => ({
     stackId: stack.uuid,
     name: stack.name,
-    equipmentIds: stack.equipment.map(eq => eq.uuid),
-    quantity: stack.quantity
+    equipmentIds: (stack.equipment || []).map(eq => eq.uuid),
+    quantity: stack.quantity || 1
   }));
 
-  const checklist = dbShipment.checklist.map(item => ({
+  const checklist = (dbShipment.checklist || []).map(item => ({
     id: item.uuid,
     title: item.title,
     description: item.description || '',
@@ -108,7 +109,7 @@ export function adaptShipmentFromDB(dbShipment: ShipmentWithDetails): ExtendedSh
     isRequired: item.is_required
   }));
 
-  const rental = dbShipment.rental.map(item => ({
+  const rental = (dbShipment.rental || []).map(item => ({
     id: item.uuid,
     equipment: item.equipment_name,
     quantity: item.quantity,
@@ -121,7 +122,7 @@ export function adaptShipmentFromDB(dbShipment: ShipmentWithDetails): ExtendedSh
     date: dbShipment.date,
     recipient: dbShipment.recipient,
     recipientAddress: dbShipment.recipient_address,
-    status: dbShipment.status as any, // приведение типов
+    status: dbShipment.status as any,
     responsiblePerson: dbShipment.responsible_person,
     equipment,
     stacks,
@@ -152,6 +153,8 @@ export function adaptShipmentToDB(
     delivered_at: shipment.deliveredAt
   };
 }
+
+
 
 // Преобразование категорий
 export function adaptCategoriesFromDB(dbCategories: DbCategory[]): string[] {

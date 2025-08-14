@@ -106,6 +106,80 @@ export class ShipmentService {
     return this.db.insert('shipments', newShipment) as DbShipment;
   }
 
+  // Создать отгрузку с полными данными (оборудование, стеки, аренда, чек-лист)
+  createShipmentWithDetails(shipmentData: any): DbShipment {
+    const now = new Date().toISOString();
+    
+    // Создаем основную отгрузку
+    const basicShipment = {
+      uuid: shipmentData.uuid || Date.now().toString(),
+      number: shipmentData.number,
+      date: shipmentData.date,
+      recipient: shipmentData.recipient,
+      recipient_address: shipmentData.recipient_address,
+      status: shipmentData.status,
+      responsible_person: shipmentData.responsible_person,
+      total_items: shipmentData.total_items,
+      comments: shipmentData.comments,
+      delivered_at: shipmentData.delivered_at,
+      created_at: now,
+      updated_at: now
+    };
+
+    const createdShipment = this.db.insert('shipments', basicShipment) as DbShipment;
+    
+    // Добавляем оборудование
+    if (shipmentData.equipment && shipmentData.equipment.length > 0) {
+      shipmentData.equipment.forEach((eq: any) => {
+        // Находим ID оборудования по UUID
+        const equipmentRecord = this.db.selectWhere('equipment', e => e.uuid === eq.equipmentId)[0];
+        if (equipmentRecord) {
+          this.addEquipmentToShipment(createdShipment.id, equipmentRecord.id, eq.quantity || 1);
+        }
+      });
+    }
+
+    // Добавляем стеки
+    if (shipmentData.stacks && shipmentData.stacks.length > 0) {
+      shipmentData.stacks.forEach((stack: any) => {
+        // Находим ID стека по UUID
+        const stackRecord = this.db.selectWhere('equipment_stacks', s => s.uuid === stack.stackId)[0];
+        if (stackRecord) {
+          this.addStackToShipment(createdShipment.id, stackRecord.id, stack.quantity || 1);
+        }
+      });
+    }
+
+    // Добавляем аренду
+    if (shipmentData.rental && shipmentData.rental.length > 0) {
+      shipmentData.rental.forEach((rental: any) => {
+        this.createRentalItem({
+          shipment_id: createdShipment.id,
+          equipment_name: rental.equipment,
+          quantity: rental.quantity,
+          link: rental.link
+        });
+      });
+    }
+
+    // Добавляем чек-лист
+    if (shipmentData.checklist && shipmentData.checklist.length > 0) {
+      shipmentData.checklist.forEach((item: any) => {
+        this.createChecklistItem({
+          shipment_id: createdShipment.id,
+          title: item.title,
+          description: item.description,
+          is_required: item.isRequired,
+          is_completed: item.isCompleted,
+          completed_by: item.completedBy,
+          completed_at: item.completedAt
+        });
+      });
+    }
+
+    return createdShipment;
+  }
+
   // Обновить отгрузку
   updateShipment(shipment: UpdateShipment): DbShipment | null {
     const now = new Date().toISOString();

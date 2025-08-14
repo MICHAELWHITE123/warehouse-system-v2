@@ -102,6 +102,19 @@ export function ShipmentList({ shipments, equipment, onEdit, onCreate }: Shipmen
     return equipmentNames.join(", ") + (stack.equipmentIds.length > 3 ? ` +${stack.equipmentIds.length - 3}` : "");
   };
 
+  // Функция для расчета прогресса чек-листа
+  const getChecklistProgress = (shipment: Shipment) => {
+    if (!shipment.checklist || shipment.checklist.length === 0) {
+      return { completed: 0, total: 0, percentage: 0 };
+    }
+    
+    const completed = shipment.checklist.filter(item => item.isCompleted).length;
+    const total = shipment.checklist.length;
+    const percentage = Math.round((completed / total) * 100);
+    
+    return { completed, total, percentage };
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pending":
@@ -122,21 +135,27 @@ export function ShipmentList({ shipments, equipment, onEdit, onCreate }: Shipmen
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "pending":
-        return <Clock className="h-4 w-4" />;
+        return <Clock className="h-6 w-6 text-yellow-600" />;
       case "in-progress":
-        return <Package className="h-4 w-4" />;
+        return <Package className="h-6 w-6 text-blue-600" />;
       case "in-transit":
-        return <Truck className="h-4 w-4" />;
+        return <Truck className="h-6 w-6 text-purple-600" />;
       case "delivered":
-        return <CheckCircle className="h-4 w-4" />;
+        return <CheckCircle className="h-6 w-6 text-green-600" />;
       case "cancelled":
-        return <XCircle className="h-4 w-4" />;
+        return <XCircle className="h-6 w-6 text-red-600" />;
       default:
-        return <Package className="h-4 w-4" />;
+        return <Package className="h-6 w-6 text-gray-600" />;
     }
   };
 
   const handleViewShipment = (shipment: Shipment) => {
+    console.log('=== handleViewShipment Debug ===');
+    console.log('clicking on shipment:', shipment);
+    console.log('shipment.equipment:', shipment.equipment);
+    console.log('shipment.stacks:', shipment.stacks);
+    console.log('shipment.rental:', shipment.rental);
+    console.log('================================');
     setSelectedShipment(shipment);
     setIsViewDialogOpen(true);
   };
@@ -264,156 +283,151 @@ export function ShipmentList({ shipments, equipment, onEdit, onCreate }: Shipmen
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredShipments.map((shipment) => (
-            <Card key={shipment.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg mb-1 flex items-center gap-2">
-                      {getStatusIcon(shipment.status)}
-                      {shipment.number}
-                    </CardTitle>
-                    <CardDescription className="text-sm">
-                      {shipment.recipient}
-                    </CardDescription>
-                  </div>
-                  {getStatusBadge(shipment.status)}
-                </div>
-              </CardHeader>
-
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Основная информация */}
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Дата отгрузки</p>
-                      <p className="font-medium">{new Date(shipment.date).toLocaleDateString('ru-RU')}</p>
+        <div className="space-y-4">
+          {filteredShipments.map((shipment) => {
+            const checklistProgress = getChecklistProgress(shipment);
+            return (
+              <Card key={shipment.id} className="hover:shadow-lg transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    {/* Левая часть - основная информация */}
+                    <div className="flex items-center gap-4 flex-1">
+                      {/* Иконка статуса */}
+                      <div className="flex-shrink-0">
+                        {getStatusIcon(shipment.status)}
+                      </div>
+                      
+                      {/* Номер и получатель */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold text-lg">{shipment.number}</h3>
+                          {getStatusBadge(shipment.status)}
+                        </div>
+                        <p className="text-muted-foreground text-sm">{shipment.recipient}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-muted-foreground">Всего позиций</p>
-                      <p className="font-medium">{shipment.totalItems}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-muted-foreground">Ответственный</p>
-                      <p className="font-medium">{shipment.responsiblePerson}</p>
-                    </div>
-                  </div>
 
-                  <Separator />
+                    {/* Центральная часть - дата и статистика */}
+                    <div className="flex items-center gap-8 flex-shrink-0">
+                      {/* Дата отгрузки */}
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">Дата отгрузки</p>
+                        <p className="font-medium">{new Date(shipment.date).toLocaleDateString('ru-RU')}</p>
+                      </div>
 
-                  {/* Содержимое отгрузки */}
-                  <div className="space-y-3">
-                    {/* Отдельное оборудование */}
-                    {shipment.equipment.length > 0 && (
-                      <div>
-                        <p className="text-sm font-medium mb-2 flex items-center gap-1">
-                          <Package className="h-4 w-4" />
-                          Оборудование ({shipment.equipment.length})
-                        </p>
-                        <div className="space-y-1">
-                          {shipment.equipment.slice(0, 2).map((item, index) => (
-                            <div key={index} className="text-sm flex items-center justify-between">
-                              <span className="truncate">{item.name}</span>
-                              <Badge variant="outline" className="text-xs ml-2">
-                                x{item.quantity}
-                              </Badge>
-                            </div>
-                          ))}
-                          {shipment.equipment.length > 2 && (
-                            <p className="text-sm text-muted-foreground">
-                              +{shipment.equipment.length - 2} позиций
-                            </p>
-                          )}
+                      {/* Всего позиций */}
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">Всего позиций</p>
+                        <p className="font-medium text-lg">{shipment.totalItems}</p>
+                      </div>
+
+                      {/* Прогресс погрузки */}
+                      <div className="text-center min-w-[120px]">
+                        <p className="text-sm text-muted-foreground">Прогресс погрузки</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="font-medium">{checklistProgress.completed}/{checklistProgress.total}</span>
+                          <div className="w-16 bg-muted rounded-full h-2">
+                            <div 
+                              className={`h-2 rounded-full transition-all ${
+                                checklistProgress.percentage === 100 ? 'bg-green-500' : 'bg-blue-500'
+                              }`}
+                              style={{ width: `${checklistProgress.percentage}%` }}
+                            />
+                          </div>
+                          <span className="text-sm text-muted-foreground">{checklistProgress.percentage}%</span>
                         </div>
                       </div>
-                    )}
 
-                    {/* Стеки техники */}
-                    {shipment.stacks && shipment.stacks.length > 0 && (
-                      <div>
-                        <p className="text-sm font-medium mb-2 flex items-center gap-1">
-                          <Users className="h-4 w-4" />
-                          Стеки ({shipment.stacks.length})
-                        </p>
-                        <div className="space-y-1">
-                          {shipment.stacks.slice(0, 2).map((stack, index) => (
-                            <div key={index} className="text-sm">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="font-medium truncate">{stack.name}</span>
-                                <Badge variant="outline" className="text-xs ml-2">
-                                  x{stack.quantity}
-                                </Badge>
-                              </div>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {getStackEquipmentNames(stack)}
-                              </p>
-                            </div>
-                          ))}
-                          {shipment.stacks.length > 2 && (
-                            <p className="text-sm text-muted-foreground">
-                              +{shipment.stacks.length - 2} стеков
-                            </p>
-                          )}
-                        </div>
+                      {/* Ответственный */}
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">Ответственный</p>
+                        <p className="font-medium">{shipment.responsiblePerson}</p>
                       </div>
-                    )}
+                    </div>
 
-                    {/* Аренда */}
-                    {shipment.rental && shipment.rental.length > 0 && (
-                      <div>
-                        <p className="text-sm font-medium mb-2">
-                          Аренда ({shipment.rental.length})
-                        </p>
-                        <div className="space-y-1">
-                          {shipment.rental.slice(0, 1).map((item, index) => (
-                            <div key={index} className="text-sm flex items-center justify-between">
-                              <span className="truncate">{item.equipment}</span>
-                              <Badge variant="outline" className="text-xs ml-2">
-                                x{item.quantity}
-                              </Badge>
+                    {/* Правая часть - содержимое и действия */}
+                    <div className="flex items-center gap-6 flex-shrink-0">
+                      {/* Краткое содержимое */}
+                      <div className="text-sm">
+                        {/* Оборудование */}
+                        {shipment.equipment.length > 0 && (
+                          <div className="flex items-center gap-1 mb-1">
+                            <Package className="h-4 w-4 text-muted-foreground" />
+                            <span>Оборудование ({shipment.equipment.length})</span>
+                          </div>
+                        )}
+                        
+                        {/* Первая единица оборудования */}
+                        {shipment.equipment.length > 0 && (
+                          <div className="text-xs text-muted-foreground">
+                            {shipment.equipment[0].name}
+                            {shipment.equipment.length > 1 && ` +${shipment.equipment.length - 1}`}
+                          </div>
+                        )}
+
+                        {/* Стеки */}
+                        {shipment.stacks && shipment.stacks.length > 0 && (
+                          <div className="flex items-center gap-1 mt-2">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                            <span>Стеки техники ({shipment.stacks.length})</span>
+                          </div>
+                        )}
+
+                        {/* Первый стек */}
+                        {shipment.stacks && shipment.stacks.length > 0 && (
+                          <div className="text-xs text-muted-foreground">
+                            {shipment.stacks[0].name}
+                            <br />
+                            <span>{getStackEquipmentNames(shipment.stacks[0]).split(',').slice(0,1)}</span>
+                            {shipment.stacks[0].equipmentIds && shipment.stacks[0].equipmentIds.length > 1 && 
+                              ` +${shipment.stacks[0].equipmentIds.length - 1} позиций`}
+                          </div>
+                        )}
+
+                        {/* Аренда */}
+                        {shipment.rental && shipment.rental.length > 0 && (
+                          <div className="mt-2">
+                            <span className="text-xs">Аренда ({shipment.rental.length})</span>
+                            <div className="text-xs text-muted-foreground">
+                              {shipment.rental[0].equipment}
+                              {shipment.rental.length > 1 && ` +${shipment.rental.length - 1} позиций`}
                             </div>
-                          ))}
-                          {shipment.rental.length > 1 && (
-                            <p className="text-sm text-muted-foreground">
-                              +{shipment.rental.length - 1} позиций
-                            </p>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
 
-                  {/* Кнопки действий */}
-                  <div className="flex items-center justify-between pt-3 border-t">
-                    <div className="flex space-x-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewShipment(shipment)}
-                        className="h-8 px-3"
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        Просмотр
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onEdit(shipment)}
-                        className="h-8 px-3"
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Редактировать
-                      </Button>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {new Date(shipment.createdAt).toLocaleDateString('ru-RU')}
+                      {/* Кнопки действий */}
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewShipment(shipment)}
+                          className="h-8 px-3"
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Просмотр
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onEdit(shipment)}
+                          className="h-8 px-3"
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Редактировать
+                        </Button>
+                      </div>
+
+                      {/* Дата создания */}
+                      <div className="text-xs text-muted-foreground text-right">
+                        {new Date(shipment.createdAt).toLocaleDateString('ru-RU')}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 

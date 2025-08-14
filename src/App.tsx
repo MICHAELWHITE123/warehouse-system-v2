@@ -44,7 +44,7 @@ export default function App() {
   const { categories: dbCategories } = useCategories();
   const { locations: dbLocations } = useLocations();
   const { stacks: dbStacks, createStack, updateStack } = useStacks();
-  const { shipments: dbShipments, createShipment, updateShipment } = useShipments();
+  const { shipments: dbShipments, createShipmentWithDetails, updateShipment } = useShipments();
   const { stats: dbStats } = useStatistics();
   
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
@@ -64,7 +64,14 @@ export default function App() {
   const categories: string[] = adaptCategoriesFromDB(dbCategories);
   const locations: string[] = adaptLocationsFromDB(dbLocations);
   const stacks: EquipmentStack[] = dbStacks.map(adaptStackFromDB);
+  
+  console.log('=== App.tsx Debug ===');
+  console.log('dbShipments from database:', dbShipments);
+  
   const shipments: ExtendedShipment[] = dbShipments.map(adaptShipmentFromDB);
+  
+  console.log('shipments after adaptation:', shipments);
+  console.log('=====================');
 
   // Используем статистику из БД или рассчитываем локально как fallback
   const stats = dbStats || calculateStats(equipment, stacks, shipments);
@@ -195,10 +202,39 @@ export default function App() {
   // Обработчики для отгрузок
   const handleAddShipment = async (newShipment: Omit<ExtendedShipment, 'id'>) => {
     try {
-      const shipmentData = adaptShipmentToDB(newShipment);
-      await createShipment(shipmentData);
+      console.log('=== handleAddShipment Debug ===');
+      console.log('newShipment from form:', newShipment);
+      console.log('newShipment.equipment:', newShipment.equipment);
+      console.log('newShipment.stacks:', newShipment.stacks);
+      console.log('newShipment.rental:', newShipment.rental);
+      console.log('newShipment.checklist:', newShipment.checklist);
+      
+      // Создаем данные для БД, включая связанные записи
+      const fullShipmentData = {
+        uuid: Date.now().toString(),
+        number: newShipment.number,
+        date: newShipment.date,
+        recipient: newShipment.recipient,
+        recipient_address: newShipment.recipientAddress,
+        status: newShipment.status,
+        responsible_person: newShipment.responsiblePerson,
+        total_items: newShipment.totalItems,
+        comments: newShipment.comments,
+        delivered_at: newShipment.deliveredAt,
+        equipment: newShipment.equipment,
+        stacks: newShipment.stacks,
+        rental: newShipment.rental,
+        checklist: newShipment.checklist
+      };
+      
+      console.log('fullShipmentData for DB:', fullShipmentData);
+      
+      // Используем новый метод для создания отгрузки со всеми связанными данными
+      await createShipmentWithDetails(fullShipmentData);
+      
       setIsShipmentFormVisible(false);
       toast.success("Отгрузка успешно создана");
+      console.log('===============================');
     } catch (error) {
       toast.error("Ошибка при создании отгрузки");
       console.error(error);

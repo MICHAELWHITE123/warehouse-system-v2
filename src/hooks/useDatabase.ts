@@ -307,6 +307,15 @@ export function useShipments() {
     }
   }, [loadShipments]);
 
+  const createShipmentWithDetails = useCallback(async (data: any) => {
+    try {
+      await shipmentService.createShipmentWithDetails(data);
+      await loadShipments();
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : 'Failed to create shipment with details');
+    }
+  }, [loadShipments]);
+
   const updateShipment = useCallback(async (data: any) => {
     try {
       await shipmentService.updateShipment(data);
@@ -335,6 +344,7 @@ export function useShipments() {
     error,
     loadShipments,
     createShipment,
+    createShipmentWithDetails,
     updateShipment,
     deleteShipment
   };
