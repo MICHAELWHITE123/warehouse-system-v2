@@ -245,6 +245,11 @@ export default function App() {
     setActiveView("shipments");
   };
 
+  // Обработчик для выбора оборудования из Dashboard QR сканера
+  const handleDashboardEquipmentSelect = (equipment: Equipment) => {
+    handleViewEquipment(equipment);
+  };
+
   // Общие обработчики
   const handleViewChange = (view: string) => {
     const typedView = view as ActiveView;
@@ -327,7 +332,7 @@ export default function App() {
 
     switch (activeView) {
       case "dashboard":
-        return <Dashboard stats={stats} />;
+        return <Dashboard stats={stats} onEquipmentSelect={handleDashboardEquipmentSelect} />;
       case "equipment":
         return (
           <EquipmentList
@@ -375,7 +380,7 @@ export default function App() {
       case "admin":
         return <AdminPanel user={user} />;
       default:
-        return <Dashboard stats={stats} />;
+        return <Dashboard stats={stats} onEquipmentSelect={handleDashboardEquipmentSelect} />;
     }
   };
 

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Download, QrCode, X } from "lucide-react";
 import { Equipment } from "./EquipmentList";
 import { toast } from "sonner";
+import { QRCodeSVG } from "qrcode.react";
 
 interface QRCodeModalProps {
   equipment: Equipment | null;
@@ -32,107 +33,16 @@ const statusMap = {
   }
 };
 
-// Простая функция для генерации QR-кода на canvas
-function generateQRCode(canvas: HTMLCanvasElement, text: string) {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
 
-  const size = 256;
-  canvas.width = size;
-  canvas.height = size;
-
-  // Очищаем canvas
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, size, size);
-
-  // Генерируем простую матрицу QR-кода (имитация)
-  const moduleCount = 21; // Размер матрицы QR-кода
-  const moduleSize = size / moduleCount;
-  
-  ctx.fillStyle = '#000000';
-  
-  // Создаем псевдо QR-код на основе хэша текста
-  let hash = 0;
-  for (let i = 0; i < text.length; i++) {
-    const char = text.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-
-  // Рисуем паттерн на основе хэша
-  for (let row = 0; row < moduleCount; row++) {
-    for (let col = 0; col < moduleCount; col++) {
-      const seedValue = hash + row * moduleCount + col;
-      
-      // Области поиска (углы)
-      const isFinderPattern = 
-        (row < 9 && col < 9) || 
-        (row < 9 && col >= moduleCount - 8) || 
-        (row >= moduleCount - 8 && col < 9);
-
-      // Временные паттерны
-      const isTimingPattern = 
-        (row === 6) || (col === 6);
-
-      if (isFinderPattern) {
-        // Рисуем паттерны поиска
-        const isInner = 
-          (row >= 2 && row <= 6 && col >= 2 && col <= 6) ||
-          (row >= 2 && row <= 6 && col >= moduleCount - 6 && col <= moduleCount - 2) ||
-          (row >= moduleCount - 6 && row <= moduleCount - 2 && col >= 2 && col <= 6);
-        
-        const isBorder = 
-          (row <= 1 || row >= 7 || col <= 1 || col >= 7) &&
-          (row < 9 && col < 9) ||
-          (row <= 1 || row >= 7 || col >= moduleCount - 8 || col <= moduleCount - 2) &&
-          (row < 9 && col >= moduleCount - 8) ||
-          (row >= moduleCount - 8 || row <= moduleCount - 2 || col <= 1 || col >= 7) &&
-          (row >= moduleCount - 8 && col < 9);
-
-        if (isBorder || (isInner && (row % 2 === 0 || col % 2 === 0))) {
-          ctx.fillRect(col * moduleSize, row * moduleSize, moduleSize, moduleSize);
-        }
-      } else if (isTimingPattern) {
-        // Рисуем временные паттерны
-        if ((row + col) % 2 === 0) {
-          ctx.fillRect(col * moduleSize, row * moduleSize, moduleSize, moduleSize);
-        }
-      } else {
-        // Рисуем данные на основе хэша
-        if (Math.abs(seedValue) % 3 === 0) {
-          ctx.fillRect(col * moduleSize, row * moduleSize, moduleSize, moduleSize);
-        }
-      }
-    }
-  }
-
-  // Добавляем центральный квадрат
-  const centerStart = Math.floor((moduleCount - 5) / 2);
-  const centerEnd = centerStart + 5;
-  for (let row = centerStart; row < centerEnd; row++) {
-    for (let col = centerStart; col < centerEnd; col++) {
-      const isBorder = row === centerStart || row === centerEnd - 1 || 
-                      col === centerStart || col === centerEnd - 1;
-      const isCenter = row >= centerStart + 2 && row <= centerEnd - 3 && 
-                      col >= centerStart + 2 && col <= centerEnd - 3;
-      
-      if (isBorder || isCenter) {
-        ctx.fillRect(col * moduleSize, row * moduleSize, moduleSize, moduleSize);
-      }
-    }
-  }
-}
 
 export function QRCodeModal({ equipment, isOpen, onClose }: QRCodeModalProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const qrRef = useRef<SVGSVGElement>(null);
+  const [qrData, setQrData] = useState<string>("");
 
   useEffect(() => {
-    if (equipment && canvasRef.current && isOpen) {
-      setIsGenerating(true);
-      
+    if (equipment && isOpen) {
       // Формируем данные для QR-кода
-      const qrData = JSON.stringify({
+      const data = JSON.stringify({
         id: equipment.id,
         name: equipment.name,
         serial: equipment.serialNumber,
@@ -140,17 +50,12 @@ export function QRCodeModal({ equipment, isOpen, onClose }: QRCodeModalProps) {
         location: equipment.location,
         status: equipment.status
       });
-
-      // Генерируем QR-код через небольшую задержку для UI
-      setTimeout(() => {
-        generateQRCode(canvasRef.current!, qrData);
-        setIsGenerating(false);
-      }, 500);
+      setQrData(data);
     }
   }, [equipment, isOpen]);
 
   const handleDownload = () => {
-    if (!canvasRef.current || !equipment) return;
+    if (!qrRef.current || !equipment) return;
 
     try {
       // Создаем новый canvas для финального изображения с информацией
@@ -169,47 +74,59 @@ export function QRCodeModal({ equipment, isOpen, onClose }: QRCodeModalProps) {
       finalCtx.fillStyle = '#ffffff';
       finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
-      // Копируем QR-код
-      finalCtx.drawImage(canvasRef.current, padding, padding);
+      // Преобразуем SVG в изображение
+      const svgData = new XMLSerializer().serializeToString(qrRef.current);
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      const img = new Image();
 
-      // Добавляем текстовую информацию
-      finalCtx.fillStyle = '#000000';
-      finalCtx.font = '16px Arial';
-      finalCtx.textAlign = 'center';
+      img.onload = () => {
+        // Рисуем QR-код
+        finalCtx.drawImage(img, padding, padding, qrSize, qrSize);
 
-      const centerX = finalCanvas.width / 2;
-      let textY = padding + qrSize + 30;
+        // Добавляем текстовую информацию
+        finalCtx.fillStyle = '#000000';
+        finalCtx.font = '16px Arial';
+        finalCtx.textAlign = 'center';
 
-      finalCtx.fillText(equipment.name, centerX, textY);
-      textY += 25;
-      
-      finalCtx.font = '14px Arial';
-      finalCtx.fillText(`S/N: ${equipment.serialNumber}`, centerX, textY);
-      textY += 20;
-      
-      finalCtx.fillText(`Категория: ${equipment.category}`, centerX, textY);
-      textY += 20;
-      
-      finalCtx.fillText(`Местоположение: ${equipment.location}`, centerX, textY);
-      textY += 20;
-      
-      finalCtx.fillText(`Статус: ${statusMap[equipment.status].label}`, centerX, textY);
+        const centerX = finalCanvas.width / 2;
+        let textY = padding + qrSize + 30;
 
-      // Скачиваем изображение
-      finalCanvas.toBlob((blob) => {
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `QR_${equipment.serialNumber}_${equipment.name.replace(/\s+/g, '_')}.png`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          
-          toast.success('QR-код успешно скачан');
-        }
-      }, 'image/png');
+        finalCtx.fillText(equipment.name, centerX, textY);
+        textY += 25;
+        
+        finalCtx.font = '14px Arial';
+        finalCtx.fillText(`S/N: ${equipment.serialNumber}`, centerX, textY);
+        textY += 20;
+        
+        finalCtx.fillText(`Категория: ${equipment.category}`, centerX, textY);
+        textY += 20;
+        
+        finalCtx.fillText(`Местоположение: ${equipment.location}`, centerX, textY);
+        textY += 20;
+        
+        finalCtx.fillText(`Статус: ${statusMap[equipment.status].label}`, centerX, textY);
+
+        // Скачиваем изображение
+        finalCanvas.toBlob((blob) => {
+          if (blob) {
+            const downloadUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `QR_${equipment.serialNumber}_${equipment.name.replace(/\s+/g, '_')}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(downloadUrl);
+            
+            toast.success('QR-код успешно скачан');
+          }
+        }, 'image/png');
+        
+        URL.revokeObjectURL(url);
+      };
+
+      img.src = url;
     } catch (error) {
       console.error('Ошибка при создании QR-кода:', error);
       toast.error('Ошибка при скачивании QR-кода');
@@ -234,16 +151,17 @@ export function QRCodeModal({ equipment, isOpen, onClose }: QRCodeModalProps) {
         <div className="space-y-6">
           {/* QR-код */}
           <div className="flex justify-center">
-            <div className="relative">
-              <canvas
-                ref={canvasRef}
-                className="border rounded-lg shadow-sm"
-                style={{ width: '256px', height: '256px' }}
-              />
-              {isGenerating && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
+            <div className="border rounded-lg shadow-sm p-4 bg-white">
+              {qrData && (
+                <QRCodeSVG
+                  ref={qrRef}
+                  value={qrData}
+                  size={256}
+                  level="M"
+                  includeMargin={true}
+                  bgColor="#ffffff"
+                  fgColor="#000000"
+                />
               )}
             </div>
           </div>
@@ -279,7 +197,7 @@ export function QRCodeModal({ equipment, isOpen, onClose }: QRCodeModalProps) {
             <Button 
               onClick={handleDownload} 
               className="flex-1"
-              disabled={isGenerating}
+              disabled={!qrData}
             >
               <Download className="h-4 w-4 mr-2" />
               Скачать QR-код

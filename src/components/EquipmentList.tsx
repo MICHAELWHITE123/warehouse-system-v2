@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Search, Eye, Edit, Filter, Package, AlertTriangle, CheckCircle, Wrench } from "lucide-react";
+import { Search, Eye, Edit, Filter, Package, AlertTriangle, CheckCircle, Wrench, QrCode } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { QRScanner } from "./QRScanner";
 
 export interface Equipment {
   id: string;
@@ -29,6 +30,7 @@ export function EquipmentList({ equipment, onEdit, onView }: EquipmentListProps)
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [locationFilter, setLocationFilter] = useState<string>("all");
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
 
   // Получаем уникальные значения для фильтров
   const categories = Array.from(new Set(equipment.map(item => item.category)));
@@ -74,14 +76,40 @@ export function EquipmentList({ equipment, onEdit, onView }: EquipmentListProps)
     }
   };
 
+  const handleQRScanSuccess = (scannedEquipment: Equipment) => {
+    // Ищем оборудование в нашем списке по серийному номеру
+    const foundEquipment = equipment.find(item => 
+      item.serialNumber === scannedEquipment.serialNumber || 
+      item.id === scannedEquipment.id
+    );
+    
+    if (foundEquipment) {
+      onView(foundEquipment);
+      setIsQRScannerOpen(false);
+    } else {
+      // Если оборудование не найдено в списке, все равно показываем его данные
+      onView(scannedEquipment);
+      setIsQRScannerOpen(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Заголовок */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Оборудование</h1>
-        <p className="text-muted-foreground mt-2">
-          Управление техникой на складе
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Оборудование</h1>
+          <p className="text-muted-foreground mt-2">
+            Управление техникой на складе
+          </p>
+        </div>
+        <Button 
+          onClick={() => setIsQRScannerOpen(true)}
+          className="sm:w-auto"
+        >
+          <QrCode className="h-4 w-4 mr-2" />
+          Сканировать QR-код
+        </Button>
       </div>
 
       {/* Поиск и фильтры */}
@@ -227,6 +255,13 @@ export function EquipmentList({ equipment, onEdit, onView }: EquipmentListProps)
           ))}
         </div>
       )}
+
+      {/* QR Scanner */}
+      <QRScanner
+        isOpen={isQRScannerOpen}
+        onClose={() => setIsQRScannerOpen(false)}
+        onScanSuccess={handleQRScanSuccess}
+      />
     </div>
   );
 }

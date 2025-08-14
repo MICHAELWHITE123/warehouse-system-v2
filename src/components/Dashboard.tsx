@@ -1,6 +1,10 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { Package, AlertCircle, TrendingUp, Building } from "lucide-react";
+import { Button } from "./ui/button";
+import { Package, AlertCircle, TrendingUp, Building, QrCode } from "lucide-react";
+import { QRScanner } from "./QRScanner";
+import { Equipment } from "./EquipmentList";
 
 interface DashboardStats {
   totalEquipment: number;
@@ -12,10 +16,19 @@ interface DashboardStats {
 
 interface DashboardProps {
   stats: DashboardStats;
+  onEquipmentSelect?: (equipment: Equipment) => void;
 }
 
-export function Dashboard({ stats }: DashboardProps) {
+export function Dashboard({ stats, onEquipmentSelect }: DashboardProps) {
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
   const utilizationRate = Math.round((stats.inUseEquipment / stats.totalEquipment) * 100);
+
+  const handleQRScanSuccess = (equipment: Equipment) => {
+    setIsQRScannerOpen(false);
+    if (onEquipmentSelect) {
+      onEquipmentSelect(equipment);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -123,8 +136,17 @@ export function Dashboard({ stats }: DashboardProps) {
               Часто используемые операции
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid gap-2">
+          <CardContent className="space-y-4">
+            <Button 
+              onClick={() => setIsQRScannerOpen(true)}
+              className="w-full"
+              size="sm"
+            >
+              <QrCode className="h-4 w-4 mr-2" />
+              Сканировать QR-код
+            </Button>
+            
+            <div className="grid gap-2 pt-2 border-t">
               <div className="text-sm">
                 <strong>Категорий:</strong> {stats.categories}
               </div>
@@ -138,6 +160,13 @@ export function Dashboard({ stats }: DashboardProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* QR Scanner */}
+      <QRScanner
+        isOpen={isQRScannerOpen}
+        onClose={() => setIsQRScannerOpen(false)}
+        onScanSuccess={handleQRScanSuccess}
+      />
     </div>
   );
 }
