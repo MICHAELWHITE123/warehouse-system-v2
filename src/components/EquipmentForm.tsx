@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
-import { Textarea } from "./ui/textarea";
+
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Badge } from "./ui/badge";
@@ -28,11 +28,20 @@ export function EquipmentForm({
   categories,
   locations
 }: EquipmentFormProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    category: string;
+    serialNumber: string;
+    status: "available" | "in-use" | "maintenance";
+    location: string;
+    purchaseDate: string;
+    lastMaintenance: string;
+    assignedTo: string;
+  }>({
     name: "",
     category: "",
     serialNumber: "",
-    status: "available" as const,
+    status: "available",
     location: "",
     purchaseDate: "",
     lastMaintenance: "",

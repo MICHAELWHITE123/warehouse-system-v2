@@ -5,11 +5,12 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
 import { Badge } from "./ui/badge";
-import { Separator } from "./ui/separator";
+
 import { ArrowLeft, Plus, Trash2, Package, Users, Search } from "lucide-react";
 import { Equipment } from "./EquipmentList";
 import { Shipment, ShipmentEquipment, RentalItem } from "./ShipmentList";
 import { EquipmentStack } from "./StackManagement";
+import { InventoryOverview } from "./InventoryOverview";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Checkbox } from "./ui/checkbox";
@@ -20,6 +21,7 @@ interface ShipmentFormProps {
   stacks: EquipmentStack[];
   onSave: (shipment: Omit<Shipment, 'id'>) => void;
   onCancel: () => void;
+  onEquipmentView?: (equipment: Equipment) => void;
   isEditing: boolean;
 }
 
@@ -36,16 +38,25 @@ export function ShipmentForm({
   stacks,
   onSave,
   onCancel,
+  onEquipmentView,
   isEditing
 }: ShipmentFormProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    number: string;
+    date: string;
+    recipient: string;
+    recipientAddress: string;
+    responsiblePerson: string;
+    comments: string;
+    status: "pending" | "in-progress" | "in-transit" | "delivered" | "cancelled";
+  }>({
     number: "",
     date: new Date().toISOString().split('T')[0],
     recipient: "",
     recipientAddress: "",
     responsiblePerson: "",
     comments: "",
-    status: "pending" as const
+    status: "pending"
   });
 
   const [shipmentEquipment, setShipmentEquipment] = useState<ShipmentEquipment[]>([]);
@@ -415,7 +426,7 @@ export function ShipmentForm({
               </CardContent>
             </Card>
 
-            {/* Статистика */}
+            {/* Статистика отгрузки */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -447,6 +458,13 @@ export function ShipmentForm({
                 </div>
               </CardContent>
             </Card>
+
+            {/* Остатки на складе */}
+            <InventoryOverview 
+              equipment={equipment} 
+              onEquipmentView={onEquipmentView}
+              compactMode={true}
+            />
           </div>
 
           {/* Правая колонка - Содержимое отгрузки */}

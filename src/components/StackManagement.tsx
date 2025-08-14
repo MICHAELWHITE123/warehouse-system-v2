@@ -4,7 +4,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Equipment } from "./EquipmentList";
 import { toast } from "sonner";
@@ -50,11 +50,7 @@ export function StackManagement({
     return equipment.filter(item => stack.equipmentIds.includes(item.id));
   };
 
-  // Проверяем доступность стека (все ли единицы техники доступны)
-  const isStackAvailable = (stack: EquipmentStack) => {
-    const stackEquipment = getStackEquipment(stack);
-    return stackEquipment.every(item => item.status === "available");
-  };
+
 
   // Получаем статус стека
   const getStackStatus = (stack: EquipmentStack) => {

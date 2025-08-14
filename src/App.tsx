@@ -10,67 +10,96 @@ import { StackForm } from "./components/StackForm";
 import { ShipmentList } from "./components/ShipmentList";
 import { ShipmentForm } from "./components/ShipmentForm";
 import { AuthForm } from "./components/AuthForm";
+import { AdminPanel } from "./components/AdminPanel";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
 
-// Импорты созданных модулей
-import { mockEquipment, mockStacks, mockShipments } from "./data/mockData";
+// Импорты для работы с базой данных
 import { ExtendedShipment, ActiveView } from "./types";
-import { DEFAULT_CATEGORIES, DEFAULT_LOCATIONS } from "./constants/defaults";
 import { calculateStats, calculateEquipmentCountByCategory, calculateEquipmentCountByLocation } from "./utils/statistics";
 import { useTheme } from "./hooks/useTheme";
 import { useAuth } from "./hooks/useAuth";
+import { useDatabase, useEquipment, useCategories, useLocations, useStacks, useShipments, useStatistics } from "./hooks/useDatabase";
+import { 
+  adaptEquipmentFromDB, 
+  adaptStackFromDB, 
+  adaptShipmentFromDB,
+  adaptEquipmentToDB,
+  adaptStackToDB,
+  adaptShipmentToDB,
+  adaptCategoriesFromDB,
+  adaptLocationsFromDB
+} from "./adapters/databaseAdapter";
+import { stackService } from "./database/services";
 
 export default function App() {
   const { user, handleLogin, handleLogout } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
   
+  // Инициализация базы данных
+  const { isInitialized, error: dbError } = useDatabase();
+  
+  // Хуки для работы с данными из БД
+  const { equipment: dbEquipment, createEquipment, updateEquipment } = useEquipment();
+  const { categories: dbCategories } = useCategories();
+  const { locations: dbLocations } = useLocations();
+  const { stacks: dbStacks, createStack, updateStack } = useStacks();
+  const { shipments: dbShipments, createShipment, updateShipment } = useShipments();
+  const { stats: dbStats } = useStatistics();
+  
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
-  const [equipment, setEquipment] = useState<Equipment[]>(mockEquipment);
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [isFormVisible, setIsFormVisible] = useState(false);
-  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
-  const [locations, setLocations] = useState<string[]>(DEFAULT_LOCATIONS);
   
   // Состояние для стеков
-  const [stacks, setStacks] = useState<EquipmentStack[]>(mockStacks);
   const [selectedStack, setSelectedStack] = useState<EquipmentStack | null>(null);
   const [isStackFormVisible, setIsStackFormVisible] = useState(false);
   
   // Состояние для отгрузок
-  const [shipments, setShipments] = useState<ExtendedShipment[]>(mockShipments);
   const [selectedShipment, setSelectedShipment] = useState<ExtendedShipment | null>(null);
   const [isShipmentFormVisible, setIsShipmentFormVisible] = useState(false);
 
-  // Вычисляем статистику и счетчики
-  const stats = calculateStats(equipment, stacks, shipments);
+  // Преобразуем данные из БД в формат компонентов
+  const equipment: Equipment[] = dbEquipment.map(adaptEquipmentFromDB);
+  const categories: string[] = adaptCategoriesFromDB(dbCategories);
+  const locations: string[] = adaptLocationsFromDB(dbLocations);
+  const stacks: EquipmentStack[] = dbStacks.map(adaptStackFromDB);
+  const shipments: ExtendedShipment[] = dbShipments.map(adaptShipmentFromDB);
+
+  // Используем статистику из БД или рассчитываем локально как fallback
+  const stats = dbStats || calculateStats(equipment, stacks, shipments);
   const equipmentCountByCategory = calculateEquipmentCountByCategory(equipment);
   const equipmentCountByLocation = calculateEquipmentCountByLocation(equipment);
   const notificationCount = stats.maintenanceEquipment;
 
   // Обработчики для оборудования
-  const handleAddEquipment = (newEquipment: Omit<Equipment, 'id'>) => {
-    const equipment_item: Equipment = {
-      ...newEquipment,
-      id: Date.now().toString()
-    };
-    setEquipment(prev => [...prev, equipment_item]);
-    setIsFormVisible(false);
-    toast.success("Оборудование успешно добавлено");
+  const handleAddEquipment = async (newEquipment: Omit<Equipment, 'id'>) => {
+    try {
+      const equipmentData = adaptEquipmentToDB(newEquipment, dbCategories, dbLocations);
+      await createEquipment(equipmentData);
+      setIsFormVisible(false);
+      toast.success("Оборудование успешно добавлено");
+    } catch (error) {
+      toast.error("Ошибка при добавлении оборудования");
+      console.error(error);
+    }
   };
 
-  const handleEditEquipment = (updatedEquipment: Omit<Equipment, 'id'>) => {
+  const handleEditEquipment = async (updatedEquipment: Omit<Equipment, 'id'>) => {
     if (selectedEquipment) {
-      setEquipment(prev => 
-        prev.map(item => 
-          item.id === selectedEquipment.id 
-            ? { ...updatedEquipment, id: selectedEquipment.id }
-            : item
-        )
-      );
-      setSelectedEquipment(null);
-      setIsFormVisible(false);
-      toast.success("Оборудование успешно обновлено");
+      try {
+        const dbEquipmentItem = dbEquipment.find(eq => eq.uuid === selectedEquipment.id);
+        if (dbEquipmentItem) {
+          const equipmentData = adaptEquipmentToDB(updatedEquipment, dbCategories, dbLocations, selectedEquipment.id);
+          await updateEquipment({ ...equipmentData, id: dbEquipmentItem.id });
+          setSelectedEquipment(null);
+          setIsFormVisible(false);
+          toast.success("Оборудование успешно обновлено");
+        }
+      } catch (error) {
+        toast.error("Ошибка при обновлении оборудования");
+        console.error(error);
+      }
     }
   };
 
@@ -87,28 +116,56 @@ export default function App() {
   };
 
   // Обработчики для стеков
-  const handleAddStack = (newStack: Omit<EquipmentStack, 'id'>) => {
-    const stack: EquipmentStack = {
-      ...newStack,
-      id: Date.now().toString()
-    };
-    setStacks(prev => [...prev, stack]);
-    setIsStackFormVisible(false);
-    toast.success("Стек успешно создан");
+  const handleAddStack = async (newStack: Omit<EquipmentStack, 'id'>) => {
+    try {
+      const stackData = adaptStackToDB(newStack);
+      await createStack(stackData);
+      
+      // После создания стека, получаем его из БД для получения ID
+      const dbStack = stackService.getStackByUuid(stackData.uuid);
+      
+      // Добавляем оборудование в стек
+      if (newStack.equipmentIds.length > 0 && dbStack) {
+        const equipmentDbIds = newStack.equipmentIds
+          .map(uuid => dbEquipment.find(eq => eq.uuid === uuid)?.id)
+          .filter(Boolean) as number[];
+        
+        if (equipmentDbIds.length > 0) {
+          stackService.addEquipmentToStack(dbStack.id, equipmentDbIds);
+        }
+      }
+      
+      setIsStackFormVisible(false);
+      toast.success("Стек успешно создан");
+    } catch (error) {
+      toast.error("Ошибка при создании стека");
+      console.error(error);
+    }
   };
 
-  const handleEditStack = (updatedStack: Omit<EquipmentStack, 'id'>) => {
+  const handleEditStack = async (updatedStack: Omit<EquipmentStack, 'id'>) => {
     if (selectedStack) {
-      setStacks(prev => 
-        prev.map(item => 
-          item.id === selectedStack.id 
-            ? { ...updatedStack, id: selectedStack.id }
-            : item
-        )
-      );
-      setSelectedStack(null);
-      setIsStackFormVisible(false);
-      toast.success("Стек успешно обновлен");
+      try {
+        const dbStackItem = dbStacks.find(stack => stack.uuid === selectedStack.id);
+        if (dbStackItem) {
+          const stackData = adaptStackToDB(updatedStack, selectedStack.id);
+          await updateStack({ ...stackData, id: dbStackItem.id });
+          
+          // Обновляем оборудование в стеке
+          const equipmentDbIds = updatedStack.equipmentIds
+            .map(uuid => dbEquipment.find(eq => eq.uuid === uuid)?.id)
+            .filter(Boolean) as number[];
+          
+          stackService.replaceStackEquipment(dbStackItem.id, equipmentDbIds);
+          
+          setSelectedStack(null);
+          setIsStackFormVisible(false);
+          toast.success("Стек успешно обновлен");
+        }
+      } catch (error) {
+        toast.error("Ошибка при обновлении стека");
+        console.error(error);
+      }
     }
   };
 
@@ -130,33 +187,39 @@ export default function App() {
     setActiveView("stacks");
   };
 
-  const handleStacksChange = (newStacks: EquipmentStack[]) => {
-    setStacks(newStacks);
+  const handleStacksChange = () => {
+    // Этот метод больше не нужен, так как мы работаем напрямую с БД
+    console.log("StacksChange called but ignored - using database directly");
   };
 
   // Обработчики для отгрузок
-  const handleAddShipment = (newShipment: Omit<ExtendedShipment, 'id'>) => {
-    const shipment: ExtendedShipment = {
-      ...newShipment,
-      id: Date.now().toString()
-    };
-    setShipments(prev => [...prev, shipment]);
-    setIsShipmentFormVisible(false);
-    toast.success("Отгрузка успешно создана");
+  const handleAddShipment = async (newShipment: Omit<ExtendedShipment, 'id'>) => {
+    try {
+      const shipmentData = adaptShipmentToDB(newShipment);
+      await createShipment(shipmentData);
+      setIsShipmentFormVisible(false);
+      toast.success("Отгрузка успешно создана");
+    } catch (error) {
+      toast.error("Ошибка при создании отгрузки");
+      console.error(error);
+    }
   };
 
-  const handleEditShipment = (updatedShipment: Omit<ExtendedShipment, 'id'>) => {
+  const handleEditShipment = async (updatedShipment: Omit<ExtendedShipment, 'id'>) => {
     if (selectedShipment) {
-      setShipments(prev => 
-        prev.map(item => 
-          item.id === selectedShipment.id 
-            ? { ...updatedShipment, id: selectedShipment.id }
-            : item
-        )
-      );
-      setSelectedShipment(null);
-      setIsShipmentFormVisible(false);
-      toast.success("Отгрузка успешно обновлена");
+      try {
+        const dbShipmentItem = dbShipments.find(shipment => shipment.uuid === selectedShipment.id);
+        if (dbShipmentItem) {
+          const shipmentData = adaptShipmentToDB(updatedShipment, selectedShipment.id);
+          await updateShipment({ ...shipmentData, id: dbShipmentItem.id });
+          setSelectedShipment(null);
+          setIsShipmentFormVisible(false);
+          toast.success("Отгрузка успешно обновлена");
+        }
+      } catch (error) {
+        toast.error("Ошибка при обновлении отгрузки");
+        console.error(error);
+      }
     }
   };
 
@@ -212,12 +275,14 @@ export default function App() {
     setActiveView("equipment");
   };
 
-  const handleCategoriesChange = (newCategories: string[]) => {
-    setCategories(newCategories);
+  const handleCategoriesChange = async () => {
+    // Этот метод теперь работает через компонент CategoryManagement напрямую с БД
+    console.log("CategoriesChange called but handled by CategoryManagement component");
   };
 
-  const handleLocationsChange = (newLocations: string[]) => {
-    setLocations(newLocations);
+  const handleLocationsChange = async () => {
+    // Этот метод теперь работает через компонент LocationManagement напрямую с БД
+    console.log("LocationsChange called but handled by LocationManagement component");
   };
 
   const renderContent = () => {
@@ -254,6 +319,7 @@ export default function App() {
           stacks={stacks}
           onSave={selectedShipment ? handleEditShipment : handleAddShipment}
           onCancel={handleShipmentFormCancel}
+          onEquipmentView={handleViewEquipment}
           isEditing={!!selectedShipment}
         />
       );
@@ -306,6 +372,8 @@ export default function App() {
             equipmentCount={equipmentCountByLocation}
           />
         );
+      case "admin":
+        return <AdminPanel user={user} />;
       default:
         return <Dashboard stats={stats} />;
     }
@@ -325,6 +393,38 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [notificationCount, activeView]);
+
+  // Показываем ошибку базы данных, если есть
+  if (dbError) {
+    return (
+      <div className="min-h-screen bg-background transition-colors duration-300 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Ошибка базы данных</h1>
+          <p className="text-gray-600">{dbError}</p>
+        </div>
+        <Toaster 
+          position="top-right"
+          theme={isDarkMode ? "dark" : "light"}
+        />
+      </div>
+    );
+  }
+
+  // Показываем загрузку, пока база данных не инициализирована
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen bg-background transition-colors duration-300 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-lg text-gray-600">Инициализация базы данных...</p>
+        </div>
+        <Toaster 
+          position="top-right"
+          theme={isDarkMode ? "dark" : "light"}
+        />
+      </div>
+    );
+  }
 
   // Если пользователь не авторизован, показываем форму входа
   if (!user) {

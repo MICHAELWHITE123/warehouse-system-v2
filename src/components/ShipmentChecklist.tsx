@@ -9,7 +9,7 @@ import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { CheckCircle2, Circle, Plus, Trash2, Edit, AlertTriangle, User, Clock } from "lucide-react";
+import { CheckCircle2, Plus, Trash2, Edit, AlertTriangle, User, Clock } from "lucide-react";
 import { ChecklistItem } from "./ShipmentList";
 import { toast } from "sonner";
 
@@ -57,8 +57,7 @@ const defaultTemplates = [
 export function ShipmentChecklist({ 
   checklist, 
   onChecklistChange, 
-  isEditable = true,
-  responsiblePersons = []
+  isEditable = true
 }: ShipmentChecklistProps) {
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ChecklistItem | null>(null);
@@ -304,7 +303,7 @@ export function ShipmentChecklist({
             </div>
           ) : (
             <div className="space-y-3">
-              {checklist.map((item, index) => (
+              {checklist.map((item) => (
                 <div 
                   key={item.id} 
                   className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${

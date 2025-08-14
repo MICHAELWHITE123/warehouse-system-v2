@@ -4,7 +4,6 @@ import {
   Package, 
   Plus, 
   Truck, 
-  Settings, 
   Bell, 
   Moon, 
   Sun, 
@@ -13,7 +12,8 @@ import {
   MapPin,
   FolderOpen,
   Menu,
-  X
+  X,
+  Shield
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -94,6 +94,15 @@ export function Navigation({
       label: "Местоположения",
       icon: MapPin,
       description: "Управление местами хранения"
+    }
+  ];
+
+  const adminItems = [
+    {
+      id: "admin",
+      label: "Админ-панель",
+      icon: Shield,
+      description: "Панель администратора системы"
     }
   ];
 
@@ -195,6 +204,38 @@ export function Navigation({
           );
         })}
       </div>
+
+      {/* Администрирование - только для админов */}
+      {user?.role === "admin" && (
+        <>
+          <Separator className="my-4" />
+          <div className="space-y-1">
+            <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Администрирование
+            </div>
+            {adminItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeView === item.id;
+              
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleNavItemClick(item.id)}
+                  className={`w-full flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                  title={item.description}
+                >
+                  <Icon className="mr-3 h-4 w-4" />
+                  <span className="flex-1 text-left">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
     </>
   );
 

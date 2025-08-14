@@ -1,3 +1,7 @@
+// Реэкспорт типов из базы данных
+export * from '../database/types';
+
+// Импорт интерфейса отгрузки из компонента (для обратной совместимости)
 import { Shipment } from "../components/ShipmentList";
 
 // Расширенный интерфейс отгрузки с поддержкой стеков
@@ -35,7 +39,8 @@ export type ActiveView =
   | "edit-equipment"
   | "edit-stack"
   | "edit-shipment"
-  | "view-equipment";
+  | "view-equipment"
+  | "admin";
 
 // Интерфейс для подсчета по категориям/местоположениям
 export interface CountMap {

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
+
 import { Separator } from "./ui/separator";
 import { Equipment } from "./EquipmentList";
 import { ShipmentDetailsModal } from "./ShipmentDetailsModal";
@@ -27,7 +27,7 @@ export interface RentalItem {
 export interface ChecklistItem {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   isCompleted: boolean;
   completedBy?: string;
   completedAt?: string;
@@ -67,7 +67,7 @@ interface ShipmentListProps {
   onCreate: () => void;
 }
 
-export function ShipmentList({ shipments, equipment, onEdit, onView, onCreate }: ShipmentListProps) {
+export function ShipmentList({ shipments, equipment, onEdit, onCreate }: ShipmentListProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
