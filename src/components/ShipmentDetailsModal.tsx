@@ -6,6 +6,7 @@ import { Equipment } from "./EquipmentList";
 import { Shipment } from "./ShipmentList";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { ShipmentPDFGenerator } from "./ShipmentPDFGenerator";
 
 interface ShipmentDetailsModalProps {
   shipment: Shipment | null;
@@ -187,13 +188,22 @@ export function ShipmentDetailsModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Truck className="h-5 w-5" />
-            Отгрузка {shipment.number}
-          </DialogTitle>
-          <DialogDescription>
-            Подробная информация об отгрузке
-          </DialogDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle className="flex items-center gap-2">
+                <Truck className="h-5 w-5" />
+                Отгрузка {shipment.number}
+              </DialogTitle>
+              <DialogDescription>
+                Подробная информация об отгрузке
+              </DialogDescription>
+            </div>
+            <ShipmentPDFGenerator 
+              shipment={shipment} 
+              equipment={equipment}
+              className="ml-4"
+            />
+          </div>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-6 p-1">

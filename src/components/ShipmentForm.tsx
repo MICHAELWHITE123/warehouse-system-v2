@@ -14,6 +14,7 @@ import { InventoryOverview } from "./InventoryOverview";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Checkbox } from "./ui/checkbox";
+import { ShipmentPDFGenerator } from "./ShipmentPDFGenerator";
 
 interface ShipmentFormProps {
   shipment?: Shipment;
@@ -328,18 +329,27 @@ export function ShipmentForm({
   return (
     <div className="space-y-6">
       {/* Заголовок */}
-      <div className="flex items-center space-x-4">
-        <Button variant="outline" size="sm" onClick={onCancel}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {isEditing ? "Редактировать отгрузку" : "Новая отгрузка"}
-          </h1>
-          <p className="text-muted-foreground">
-            {isEditing ? "Измените параметры отгрузки" : "Создайте новый отгрузочный лист"}
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <Button variant="outline" size="sm" onClick={onCancel}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              {isEditing ? "Редактировать отгрузку" : "Новая отгрузка"}
+            </h1>
+            <p className="text-muted-foreground">
+              {isEditing ? "Измените параметры отгрузки" : "Создайте новый отгрузочный лист"}
+            </p>
+          </div>
         </div>
+        {isEditing && shipment && (
+          <ShipmentPDFGenerator 
+            shipment={shipment} 
+            equipment={equipment}
+            className="ml-4"
+          />
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">

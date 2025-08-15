@@ -154,6 +154,7 @@ export class ShipmentService {
     if (shipmentData.rental && shipmentData.rental.length > 0) {
       shipmentData.rental.forEach((rental: any) => {
         this.createRentalItem({
+          uuid: crypto.randomUUID(),
           shipment_id: createdShipment.id,
           equipment_name: rental.equipment,
           quantity: rental.quantity,
@@ -166,6 +167,7 @@ export class ShipmentService {
     if (shipmentData.checklist && shipmentData.checklist.length > 0) {
       shipmentData.checklist.forEach((item: any) => {
         this.createChecklistItem({
+          uuid: crypto.randomUUID(),
           shipment_id: createdShipment.id,
           title: item.title,
           description: item.description,

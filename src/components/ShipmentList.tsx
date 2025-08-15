@@ -7,6 +7,7 @@ import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 import { ShipmentDetailsModal } from "./ShipmentDetailsModal";
+import { ShipmentPDFGenerator } from "./ShipmentPDFGenerator";
 
 export interface ShipmentEquipment {
   equipmentId: string;
@@ -467,6 +468,11 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
                     <div className="flex flex-col items-end gap-4 flex-shrink-0">
                       {/* Кнопки действий */}
                       <div className="flex gap-2">
+                        <ShipmentPDFGenerator 
+                          shipment={shipment} 
+                          equipment={[]}
+                          className="h-8 px-3"
+                        />
                         <Button
                           variant="outline"
                           size="sm"

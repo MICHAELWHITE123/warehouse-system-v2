@@ -12,12 +12,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { CheckCircle2, Plus, Trash2, Edit, AlertTriangle, User, Clock } from "lucide-react";
 import { ChecklistItem } from "./ShipmentList";
 import { toast } from "sonner";
+import { ShipmentPDFGenerator } from "./ShipmentPDFGenerator";
+import { Shipment } from "./ShipmentList";
 
 interface ShipmentChecklistProps {
   checklist: ChecklistItem[];
   onChecklistChange: (checklist: ChecklistItem[]) => void;
   isEditable?: boolean;
   responsiblePersons?: string[];
+  shipment?: Shipment;
 }
 
 const defaultTemplates = [
@@ -57,7 +60,8 @@ const defaultTemplates = [
 export function ShipmentChecklist({ 
   checklist, 
   onChecklistChange, 
-  isEditable = true
+  isEditable = true,
+  shipment
 }: ShipmentChecklistProps) {
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ChecklistItem | null>(null);
@@ -181,27 +185,35 @@ export function ShipmentChecklist({
               <CheckCircle2 className="h-5 w-5" />
               Чек-лист погрузки
             </CardTitle>
-            {isEditable && (
-              <div className="flex gap-2">
-                <Select onValueChange={handleLoadTemplate}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Загрузить шаблон" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {defaultTemplates.map(template => (
-                      <SelectItem key={template.name} value={template.name}>
-                        {template.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Добавить пункт
-                    </Button>
-                  </DialogTrigger>
+            <div className="flex gap-2">
+              {shipment && (
+                <ShipmentPDFGenerator 
+                  shipment={shipment} 
+                  equipment={[]}
+                  className="h-8 px-3"
+                />
+              )}
+              {isEditable && (
+                <>
+                  <Select onValueChange={handleLoadTemplate}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Загрузить шаблон" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {defaultTemplates.map(template => (
+                        <SelectItem key={template.name} value={template.name}>
+                          {template.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Добавить пункт
+                      </Button>
+                    </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>
@@ -262,8 +274,9 @@ export function ShipmentChecklist({
                     </div>
                   </DialogContent>
                 </Dialog>
-              </div>
-            )}
+                </>
+              )}
+            </div>
           </div>
           
           {/* Прогресс выполнения */}
