@@ -1,7 +1,6 @@
 import { Truck, Package, Users, CheckCircle2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Badge } from "./ui/badge";
-import { Progress } from "./ui/progress";
 import { Checkbox } from "./ui/checkbox";
 import { Equipment } from "./EquipmentList";
 import { Shipment } from "./ShipmentList";
@@ -10,7 +9,7 @@ import { toast } from "sonner";
 
 interface ShipmentDetailsModalProps {
   shipment: Shipment | null;
-  equipment: Equipment[];
+  equipment?: Equipment[];
   isOpen: boolean;
   onClose: () => void;
   onToggleLoadingStatus?: (shipment: Shipment) => void;
@@ -118,11 +117,11 @@ export function ShipmentDetailsModal({
   console.log('================================');
 
   const getEquipmentInfo = (equipmentId: string) => {
-    return equipment.find(item => item.id === equipmentId);
+    return equipment?.find(item => item.id === equipmentId);
   };
 
   const getStackEquipment = (stackIds: string[]) => {
-    return equipment.filter(item => stackIds.includes(item.id));
+    return equipment?.filter(item => stackIds.includes(item.id)) || [];
   };
 
   const getStatusBadge = (status: string) => {

@@ -263,32 +263,6 @@ export default function App() {
     // Просмотр обрабатывается в компоненте ShipmentList
   };
 
-  const handleToggleLoadingStatus = (shipment: ExtendedShipment) => {
-    // Логика для переключения статуса загрузки отгрузки
-    console.log('Переключение статуса загрузки для отгрузки:', shipment.number);
-  };
-
-  // Обработчик изменения статуса техники
-  const handleEquipmentStatusChange = (equipmentId: string, newStatus: string) => {
-    console.log('=== App.tsx: handleEquipmentStatusChange ===');
-    console.log('equipmentId:', equipmentId);
-    console.log('newStatus:', newStatus);
-    
-    // Обновляем статус техники в локальном состоянии
-    const updatedEquipment = equipment.map(eq => 
-      eq.id === equipmentId 
-        ? { ...eq, status: newStatus as Equipment['status'] }
-        : eq
-    );
-    
-    // Здесь можно добавить логику для обновления базы данных
-    console.log('Обновленное оборудование:', updatedEquipment);
-    console.log('===============================');
-    
-    // Показываем уведомление
-    toast.success(`Статус техники изменен на: ${newStatus === 'in-use' ? 'В работе' : newStatus}`);
-  };
-
   const handleEditShipmentClick = (shipment: ExtendedShipment) => {
     setSelectedShipment(shipment);
     setIsShipmentFormVisible(true);
@@ -417,12 +391,9 @@ export default function App() {
         return (
           <ShipmentList
             shipments={shipments}
-            equipment={equipment}
             onEdit={handleEditShipmentClick}
             onView={handleViewShipment}
             onCreate={handleCreateShipment}
-            onToggleLoadingStatus={handleToggleLoadingStatus}
-            onEquipmentStatusChange={handleEquipmentStatusChange}
           />
         );
       case "categories":
@@ -442,7 +413,7 @@ export default function App() {
           />
         );
       case "admin":
-        return <AdminPanel user={user} />;
+        return user ? <AdminPanel user={user} /> : null;
       default:
         return <Dashboard stats={stats} onEquipmentSelect={handleDashboardEquipmentSelect} />;
     }

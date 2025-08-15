@@ -1,13 +1,11 @@
 import { useState } from "react";
-import { Plus, Search, Eye, Edit, Truck, Package, Clock, CheckCircle, XCircle, Users, Filter } from "lucide-react";
+import { Plus, Search, Eye, Edit, Truck, Clock, CheckCircle, XCircle, Filter, Package, Users } from "lucide-react";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
-import { Separator } from "./ui/separator";
-import { Equipment } from "./EquipmentList";
 import { ShipmentDetailsModal } from "./ShipmentDetailsModal";
 
 export interface ShipmentEquipment {
@@ -61,19 +59,73 @@ export interface Shipment {
 
 interface ShipmentListProps {
   shipments: Shipment[];
-  equipment: Equipment[];
   onEdit: (shipment: Shipment) => void;
   onView: (shipment: Shipment) => void;
   onCreate: () => void;
-  onToggleLoadingStatus?: (shipment: Shipment) => void;
-  onEquipmentStatusChange?: (equipmentId: string, newStatus: string) => void;
 }
 
-export function ShipmentList({ shipments, equipment, onEdit, onCreate, onToggleLoadingStatus, onEquipmentStatusChange }: ShipmentListProps) {
+// Компонент для отображения краткой информации об оборудовании и стеках
+function ShipmentSummary({ 
+  shipment, 
+  loadedEquipment, 
+  loadedStacks, 
+  onEquipmentLoaded, 
+  onStackLoaded 
+}: { 
+  shipment: Shipment;
+  loadedEquipment: Set<string>;
+  loadedStacks: Set<string>;
+  onEquipmentLoaded: (equipmentId: string, checked: boolean) => void;
+  onStackLoaded: (stackId: string, checked: boolean) => void;
+}) {
+  const equipmentCount = shipment.equipment.length;
+  const stacksCount = shipment.stacks?.length || 0;
+  
+  // Получаем названия первых нескольких единиц оборудования
+  const firstEquipment = shipment.equipment.slice(0, 2);
+  const equipmentNames = firstEquipment.map(item => item.name).join(', ');
+  const remainingEquipment = equipmentCount > 2 ? ` +${equipmentCount - 2}` : '';
+  
+  // Получаем названия стеков
+  const stackNames = shipment.stacks?.map(stack => stack.name).join(', ') || '';
+  
+  return (
+    <div className="text-sm">
+      <div className="flex items-center gap-1 mb-1">
+        <Package className="h-4 w-4 text-muted-foreground" />
+        <span>Оборудование ({equipmentCount})</span>
+        {equipmentCount > 0 && (
+          <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800">
+            Погружено: {loadedEquipment.size}/{equipmentCount}
+          </Badge>
+        )}
+      </div>
+      <div className="text-xs text-muted-foreground">
+        {equipmentNames}{remainingEquipment}
+      </div>
+      <div className="flex items-center gap-1 mt-2">
+        <Users className="h-4 w-4 text-muted-foreground" />
+        <span>Стеки техники ({stacksCount})</span>
+        {stacksCount > 0 && (
+          <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800">
+            Погружено: {loadedStacks.size}/{stacksCount}
+          </Badge>
+        )}
+      </div>
+      <div className="text-xs text-muted-foreground">
+        {stackNames || 'Стеки не добавлены'}
+      </div>
+    </div>
+  );
+}
+
+export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [loadedEquipment, setLoadedEquipment] = useState<Set<string>>(new Set());
+  const [loadedStacks, setLoadedStacks] = useState<Set<string>>(new Set());
 
   // Фильтрация отгрузок
   const filteredShipments = shipments.filter(shipment => {
@@ -86,36 +138,6 @@ export function ShipmentList({ shipments, equipment, onEdit, onCreate, onToggleL
     
     return matchesSearch && matchesStatus;
   });
-
-  // Получение информации об оборудовании
-  const getEquipmentInfo = (equipmentId: string) => {
-    return equipment.find(item => item.id === equipmentId);
-  };
-
-  // Получение информации о стеке
-  const getStackEquipmentNames = (stack: ShipmentStack) => {
-    const equipmentNames = stack.equipmentIds
-      .map(id => {
-        const item = getEquipmentInfo(id);
-        return item ? item.name : "Неизвестное оборудование";
-      })
-      .slice(0, 3);
-    
-    return equipmentNames.join(", ") + (stack.equipmentIds.length > 3 ? ` +${stack.equipmentIds.length - 3}` : "");
-  };
-
-  // Функция для расчета прогресса чек-листа
-  const getChecklistProgress = (shipment: Shipment) => {
-    if (!shipment.checklist || shipment.checklist.length === 0) {
-      return { completed: 0, total: 0, percentage: 0 };
-    }
-    
-    const completed = shipment.checklist.filter(item => item.isCompleted).length;
-    const total = shipment.checklist.length;
-    const percentage = Math.round((completed / total) * 100);
-    
-    return { completed, total, percentage };
-  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -139,7 +161,7 @@ export function ShipmentList({ shipments, equipment, onEdit, onCreate, onToggleL
       case "pending":
         return <Clock className="h-6 w-6 text-yellow-600" />;
       case "in-progress":
-        return <Package className="h-6 w-6 text-blue-600" />;
+        return <Truck className="h-6 w-6 text-blue-600" />;
       case "in-transit":
         return <Truck className="h-6 w-6 text-purple-600" />;
       case "delivered":
@@ -147,7 +169,7 @@ export function ShipmentList({ shipments, equipment, onEdit, onCreate, onToggleL
       case "cancelled":
         return <XCircle className="h-6 w-6 text-red-600" />;
       default:
-        return <Package className="h-6 w-6 text-gray-600" />;
+        return <Clock className="h-6 w-6 text-gray-600" />;
     }
   };
 
@@ -160,6 +182,30 @@ export function ShipmentList({ shipments, equipment, onEdit, onCreate, onToggleL
     console.log('================================');
     setSelectedShipment(shipment);
     setIsViewDialogOpen(true);
+  };
+
+  const handleEquipmentLoaded = (equipmentId: string, checked: boolean) => {
+    if (checked) {
+      setLoadedEquipment(prev => new Set([...prev, equipmentId]));
+    } else {
+      setLoadedEquipment(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(equipmentId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleStackLoaded = (stackId: string, checked: boolean) => {
+    if (checked) {
+      setLoadedStacks(prev => new Set([...prev, stackId]));
+    } else {
+      setLoadedStacks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(stackId);
+        return newSet;
+      });
+    }
   };
 
   // Вычисление статистики
@@ -189,7 +235,7 @@ export function ShipmentList({ shipments, equipment, onEdit, onCreate, onToggleL
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center space-x-2">
-              <Package className="h-5 w-5 text-blue-600" />
+              <Truck className="h-5 w-5 text-blue-600" />
               <div>
                 <p className="text-sm text-muted-foreground">Всего отгрузок</p>
                 <p className="text-2xl font-bold">{totalShipments}</p>
@@ -287,21 +333,20 @@ export function ShipmentList({ shipments, equipment, onEdit, onCreate, onToggleL
       ) : (
         <div className="space-y-4">
           {filteredShipments.map((shipment) => {
-            const checklistProgress = getChecklistProgress(shipment);
             return (
               <Card key={shipment.id} className="hover:shadow-lg transition-shadow">
                 <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-start justify-between gap-6">
                     {/* Левая часть - основная информация */}
-                    <div className="flex items-center gap-4 flex-1">
+                    <div className="flex items-start gap-4 flex-1">
                       {/* Иконка статуса */}
-                      <div className="flex-shrink-0">
+                      <div className="flex-shrink-0 mt-1">
                         {getStatusIcon(shipment.status)}
                       </div>
                       
                       {/* Номер и получатель */}
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-2">
                           <h3 className="font-semibold text-lg">{shipment.number}</h3>
                           {getStatusBadge(shipment.status)}
                         </div>
@@ -309,35 +354,12 @@ export function ShipmentList({ shipments, equipment, onEdit, onCreate, onToggleL
                       </div>
                     </div>
 
-                    {/* Центральная часть - дата и статистика */}
-                    <div className="flex items-center gap-8 flex-shrink-0">
-                      {/* Дата отгрузки */}
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Дата отгрузки</p>
-                        <p className="font-medium">{new Date(shipment.date).toLocaleDateString('ru-RU')}</p>
-                      </div>
-
+                    {/* Центральная часть - статистика */}
+                    <div className="flex flex-col gap-6 flex-shrink-0">
                       {/* Всего позиций */}
                       <div className="text-center">
                         <p className="text-sm text-muted-foreground">Всего позиций</p>
                         <p className="font-medium text-lg">{shipment.totalItems}</p>
-                      </div>
-
-                      {/* Прогресс погрузки */}
-                      <div className="text-center min-w-[120px]">
-                        <p className="text-sm text-muted-foreground">Прогресс погрузки</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="font-medium">{checklistProgress.completed}/{checklistProgress.total}</span>
-                          <div className="w-16 bg-muted rounded-full h-2">
-                            <div 
-                              className={`h-2 rounded-full transition-all ${
-                                checklistProgress.percentage === 100 ? 'bg-green-500' : 'bg-blue-500'
-                              }`}
-                              style={{ width: `${checklistProgress.percentage}%` }}
-                            />
-                          </div>
-                          <span className="text-sm text-muted-foreground">{checklistProgress.percentage}%</span>
-                        </div>
                       </div>
 
                       {/* Ответственный */}
@@ -347,57 +369,19 @@ export function ShipmentList({ shipments, equipment, onEdit, onCreate, onToggleL
                       </div>
                     </div>
 
-                    {/* Правая часть - содержимое и действия */}
-                    <div className="flex items-center gap-6 flex-shrink-0">
-                      {/* Краткое содержимое */}
-                      <div className="text-sm">
-                        {/* Оборудование */}
-                        {shipment.equipment.length > 0 && (
-                          <div className="flex items-center gap-1 mb-1">
-                            <Package className="h-4 w-4 text-muted-foreground" />
-                            <span>Оборудование ({shipment.equipment.length})</span>
-                          </div>
-                        )}
-                        
-                        {/* Первая единица оборудования */}
-                        {shipment.equipment.length > 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            {shipment.equipment[0].name}
-                            {shipment.equipment.length > 1 && ` +${shipment.equipment.length - 1}`}
-                          </div>
-                        )}
+                    {/* Информация об оборудовании и стеках */}
+                    <div className="flex-shrink-0 min-w-[200px]">
+                      <ShipmentSummary 
+                        shipment={shipment}
+                        loadedEquipment={loadedEquipment}
+                        loadedStacks={loadedStacks}
+                        onEquipmentLoaded={handleEquipmentLoaded}
+                        onStackLoaded={handleStackLoaded}
+                      />
+                    </div>
 
-                        {/* Стеки */}
-                        {shipment.stacks && shipment.stacks.length > 0 && (
-                          <div className="flex items-center gap-1 mt-2">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            <span>Стеки техники ({shipment.stacks.length})</span>
-                          </div>
-                        )}
-
-                        {/* Первый стек */}
-                        {shipment.stacks && shipment.stacks.length > 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            {shipment.stacks[0].name}
-                            <br />
-                            <span>{getStackEquipmentNames(shipment.stacks[0]).split(',').slice(0,1)}</span>
-                            {shipment.stacks[0].equipmentIds && shipment.stacks[0].equipmentIds.length > 1 && 
-                              ` +${shipment.stacks[0].equipmentIds.length - 1} позиций`}
-                          </div>
-                        )}
-
-                        {/* Аренда */}
-                        {shipment.rental && shipment.rental.length > 0 && (
-                          <div className="mt-2">
-                            <span className="text-xs">Аренда ({shipment.rental.length})</span>
-                            <div className="text-xs text-muted-foreground">
-                              {shipment.rental[0].equipment}
-                              {shipment.rental.length > 1 && ` +${shipment.rental.length - 1} позиций`}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
+                    {/* Правая часть - действия */}
+                    <div className="flex flex-col items-end gap-4 flex-shrink-0">
                       {/* Кнопки действий */}
                       <div className="flex gap-2">
                         <Button
@@ -421,7 +405,7 @@ export function ShipmentList({ shipments, equipment, onEdit, onCreate, onToggleL
                       </div>
 
                       {/* Дата создания */}
-                      <div className="text-xs text-muted-foreground text-right">
+                      <div className="text-xs text-muted-foreground">
                         {new Date(shipment.createdAt).toLocaleDateString('ru-RU')}
                       </div>
                     </div>
@@ -436,11 +420,9 @@ export function ShipmentList({ shipments, equipment, onEdit, onCreate, onToggleL
       {/* Модальное окно просмотра отгрузки */}
       <ShipmentDetailsModal
         shipment={selectedShipment}
-        equipment={equipment}
+        equipment={[]}
         isOpen={isViewDialogOpen}
         onClose={() => setIsViewDialogOpen(false)}
-        onToggleLoadingStatus={onToggleLoadingStatus}
-        onEquipmentStatusChange={onEquipmentStatusChange}
       />
     </div>
   );

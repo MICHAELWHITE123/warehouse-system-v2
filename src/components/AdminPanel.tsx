@@ -23,7 +23,7 @@ import { AuditLogs } from "./admin/AuditLogs";
 import { SystemInfo } from "./admin/SystemInfo";
 
 interface AdminPanelProps {
-  user: {
+  user?: {
     username: string;
     role: string;
     displayName: string;
@@ -34,7 +34,7 @@ export function AdminPanel({ user }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState("overview");
 
   // Проверка прав доступа
-  if (user.role !== "admin") {
+  if (!user || user.role !== "admin") {
     return (
       <div className="container mx-auto p-6">
         <Card className="border-destructive">
