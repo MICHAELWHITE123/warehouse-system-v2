@@ -4,6 +4,7 @@ import { EquipmentStack } from "../components/StackManagement";
 export const mockEquipment: Equipment[] = [
   {
     id: "1",
+    uuid: "mbp16-001-uuid",
     name: "MacBook Pro 16\"",
     category: "Компьютеры",
     serialNumber: "MBP16-001",
@@ -14,7 +15,8 @@ export const mockEquipment: Equipment[] = [
     assignedTo: "Иванов И.И."
   },
   {
-    id: "2", 
+    id: "2",
+    uuid: "hp400-001-uuid",
     name: "HP LaserJet Pro 400",
     category: "Принтеры",
     serialNumber: "HP400-001",
@@ -25,6 +27,7 @@ export const mockEquipment: Equipment[] = [
   },
   {
     id: "3",
+    uuid: "dell27-001-uuid",
     name: "Dell UltraSharp 27\"",
     category: "Мониторы", 
     serialNumber: "DELL27-001",
@@ -34,6 +37,7 @@ export const mockEquipment: Equipment[] = [
   },
   {
     id: "4",
+    uuid: "csc28-001-uuid",
     name: "Cisco SG350-28",
     category: "Сетевое оборудование",
     serialNumber: "CSC28-001", 
@@ -44,6 +48,7 @@ export const mockEquipment: Equipment[] = [
   },
   {
     id: "5",
+    uuid: "iph14-001-uuid",
     name: "iPhone 14 Pro",
     category: "Мобильные устройства",
     serialNumber: "IPH14-001",
@@ -53,6 +58,7 @@ export const mockEquipment: Equipment[] = [
   },
   {
     id: "6",
+    uuid: "lgt-mx3-001-uuid",
     name: "Logitech MX Master 3",
     category: "Аксессуары",
     serialNumber: "LGT-MX3-001",
@@ -62,6 +68,7 @@ export const mockEquipment: Equipment[] = [
   },
   {
     id: "7",
+    uuid: "apl-kb-001-uuid",
     name: "Apple Magic Keyboard",
     category: "Аксессуары",
     serialNumber: "APL-KB-001",

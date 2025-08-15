@@ -5,21 +5,108 @@ import { Progress } from "./ui/progress";
 import { Checkbox } from "./ui/checkbox";
 import { Equipment } from "./EquipmentList";
 import { Shipment } from "./ShipmentList";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 interface ShipmentDetailsModalProps {
   shipment: Shipment | null;
   equipment: Equipment[];
   isOpen: boolean;
   onClose: () => void;
+  onToggleLoadingStatus?: (shipment: Shipment) => void;
+  onEquipmentStatusChange?: (equipmentId: string, newStatus: string) => void;
 }
 
 export function ShipmentDetailsModal({
   shipment,
   equipment,
   isOpen,
-  onClose
+  onClose,
+  onToggleLoadingStatus,
+  onEquipmentStatusChange
 }: ShipmentDetailsModalProps) {
   if (!shipment) return null;
+
+  // Состояние для отслеживания погруженной техники
+  const [loadedEquipment, setLoadedEquipment] = useState<Set<string>>(new Set());
+  const [loadedStacks, setLoadedStacks] = useState<Set<string>>(new Set());
+
+  // Инициализация состояния при открытии модального окна
+  useEffect(() => {
+    if (shipment) {
+      // Инициализируем состояние на основе текущих данных
+      const initialLoadedEquipment = new Set<string>();
+      const initialLoadedStacks = new Set<string>();
+      
+      // Здесь можно добавить логику для загрузки состояния из базы данных
+      // Пока что все техника считается не погруженной
+      
+      setLoadedEquipment(initialLoadedEquipment);
+      setLoadedStacks(initialLoadedStacks);
+    }
+  }, [shipment]);
+
+  const handleToggleLoadingStatus = (shipment: Shipment) => {
+    if (onToggleLoadingStatus) {
+      onToggleLoadingStatus(shipment);
+    }
+  };
+
+  // Обработчик изменения статуса погрузки оборудования
+  const handleEquipmentLoaded = (equipmentId: string, isLoaded: boolean) => {
+    console.log('=== handleEquipmentLoaded ===');
+    console.log('equipmentId:', equipmentId);
+    console.log('isLoaded:', isLoaded);
+    
+    setLoadedEquipment(prev => {
+      const newSet = new Set(prev);
+      if (isLoaded) {
+        newSet.add(equipmentId);
+      } else {
+        newSet.delete(equipmentId);
+      }
+      console.log('Новое состояние loadedEquipment:', Array.from(newSet));
+      return newSet;
+    });
+
+    // Уведомляем родительский компонент об изменении статуса
+    if (onEquipmentStatusChange) {
+      const newStatus = isLoaded ? "in-use" : "available";
+      onEquipmentStatusChange(equipmentId, newStatus);
+    }
+
+    // Показываем уведомление
+    toast.success(
+      isLoaded 
+        ? `Техника отмечена как погруженная` 
+        : `Техника отмечена как не погруженная`
+    );
+  };
+
+  // Обработчик изменения статуса погрузки стеков
+  const handleStackLoaded = (stackId: string, isLoaded: boolean) => {
+    console.log('=== handleStackLoaded ===');
+    console.log('stackId:', stackId);
+    console.log('isLoaded:', isLoaded);
+    
+    setLoadedStacks(prev => {
+      const newSet = new Set(prev);
+      if (isLoaded) {
+        newSet.add(stackId);
+      } else {
+        newSet.delete(stackId);
+      }
+      console.log('Новое состояние loadedStacks:', Array.from(newSet));
+      return newSet;
+    });
+
+    // Показываем уведомление
+    toast.success(
+      isLoaded 
+        ? `Стек отмечен как погруженный` 
+        : `Стек отмечен как не погруженный`
+    );
+  };
 
   // Отладочная информация
   console.log('=== ShipmentDetailsModal Debug ===');
@@ -109,23 +196,34 @@ export function ShipmentDetailsModal({
                     <span className="font-medium">{shipment.totalItems}</span>
                   </div>
                   
-                  {/* Статус погрузки - всегда отображается */}
+                  {/* Статус погрузки - интерактивная кнопка */}
                   {(() => {
                     const progress = getChecklistProgress(shipment);
                     const isLoaded = progress.percentage === 100 || shipment.status === 'delivered' || shipment.status === 'in-transit';
                     return (
                       <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Погружено:</span>
-                        <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleToggleLoadingStatus(shipment)}
+                          className={`flex items-center gap-2 px-3 py-1 rounded-md border transition-colors ${
+                            isLoaded 
+                              ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' 
+                              : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
+                          }`}
+                          title={isLoaded ? "Нажмите, чтобы отметить как не погружено" : "Нажмите, чтобы отметить как погружено"}
+                        >
                           {isLoaded ? (
                             <>
                               <CheckCircle2 className="h-4 w-4 text-green-600" />
                               <span className="font-medium">Да</span>
                             </>
                           ) : (
-                            <span className="font-medium text-muted-foreground">Нет</span>
+                            <>
+                              <div className="h-4 w-4 border-2 border-gray-400 rounded-sm" />
+                              <span className="font-medium">Нет</span>
+                            </>
                           )}
-                        </div>
+                        </button>
                       </div>
                     );
                   })()}
@@ -179,14 +277,24 @@ export function ShipmentDetailsModal({
               <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
                 <Package className="h-5 w-5" />
                 Оборудование ({shipment.equipment.length} позиций)
+                {loadedEquipment.size > 0 && (
+                  <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800">
+                    Погружено: {loadedEquipment.size}/{shipment.equipment.length}
+                  </Badge>
+                )}
               </h3>
               {shipment.equipment.length > 0 ? (
                 <div className="space-y-3">
                   {shipment.equipment.map((item, index) => {
                     const equipmentItem = getEquipmentInfo(item.equipmentId);
+                    const isLoaded = loadedEquipment.has(item.equipmentId);
                     return (
                       <div key={index} className="flex items-center gap-3 p-4 border rounded-lg bg-muted/30">
-                        <Checkbox checked={true} disabled className="mt-1" />
+                        <Checkbox 
+                          checked={isLoaded} 
+                          onCheckedChange={(checked) => handleEquipmentLoaded(item.equipmentId, checked || false)}
+                          className="mt-1" 
+                        />
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
                             <h4 className="font-medium text-green-700">{item.name}</h4>
@@ -218,15 +326,24 @@ export function ShipmentDetailsModal({
               <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
                 <Users className="h-5 w-5" />
                 Стеки техники ({(shipment.stacks && shipment.stacks.length) || 0} стеков)
+                {loadedStacks.size > 0 && (
+                  <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800">
+                    Погружено: {loadedStacks.size}/{(shipment.stacks && shipment.stacks.length) || 0}
+                  </Badge>
+                )}
               </h3>
               {shipment.stacks && shipment.stacks.length > 0 ? (
                 <div className="space-y-4">
-                  {shipment.stacks.map((stack, index) => {
-                    const stackEquipment = getStackEquipment(stack.equipmentIds);
-                    return (
-                      <div key={index} className="border rounded-lg p-4 bg-muted/30">
-                        <div className="flex items-center gap-3 mb-4">
-                          <Checkbox checked={true} disabled />
+                                      {shipment.stacks.map((stack, index) => {
+                      const stackEquipment = getStackEquipment(stack.equipmentIds);
+                      const isLoaded = loadedStacks.has(stack.stackId);
+                      return (
+                        <div key={index} className="border rounded-lg p-4 bg-muted/30">
+                          <div className="flex items-center gap-3 mb-4">
+                            <Checkbox 
+                              checked={isLoaded} 
+                              onCheckedChange={(checked) => handleStackLoaded(stack.stackId, checked || false)}
+                            />
                           <div className="flex-1">
                             <div className="flex items-center justify-between">
                               <h4 className="font-medium text-green-700">{stack.name}</h4>

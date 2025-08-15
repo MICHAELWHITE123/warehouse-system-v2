@@ -65,9 +65,11 @@ interface ShipmentListProps {
   onEdit: (shipment: Shipment) => void;
   onView: (shipment: Shipment) => void;
   onCreate: () => void;
+  onToggleLoadingStatus?: (shipment: Shipment) => void;
+  onEquipmentStatusChange?: (equipmentId: string, newStatus: string) => void;
 }
 
-export function ShipmentList({ shipments, equipment, onEdit, onCreate }: ShipmentListProps) {
+export function ShipmentList({ shipments, equipment, onEdit, onCreate, onToggleLoadingStatus, onEquipmentStatusChange }: ShipmentListProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
@@ -437,6 +439,8 @@ export function ShipmentList({ shipments, equipment, onEdit, onCreate }: Shipmen
         equipment={equipment}
         isOpen={isViewDialogOpen}
         onClose={() => setIsViewDialogOpen(false)}
+        onToggleLoadingStatus={onToggleLoadingStatus}
+        onEquipmentStatusChange={onEquipmentStatusChange}
       />
     </div>
   );

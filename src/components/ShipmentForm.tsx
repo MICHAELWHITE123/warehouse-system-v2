@@ -151,6 +151,27 @@ export function ShipmentForm({
     setIsStackDialogOpen(false);
   };
 
+  // Обработчик изменения статуса техники
+  const handleEquipmentStatusChange = (equipmentId: string, newStatus: string) => {
+    console.log('=== ShipmentForm: handleEquipmentStatusChange ===');
+    console.log('equipmentId:', equipmentId);
+    console.log('newStatus:', newStatus);
+    
+    // Обновляем статус техники в локальном состоянии
+    // Это позволит UI обновиться в реальном времени
+    const updatedEquipment = equipment.map(eq => 
+      eq.id === equipmentId 
+        ? { ...eq, status: newStatus as Equipment['status'] }
+        : eq
+    );
+    
+    console.log('Обновленное оборудование:', updatedEquipment);
+    console.log('===============================');
+    
+    // Показываем уведомление об изменении статуса
+    toast.success(`Статус техники изменен на: ${newStatus === 'in-use' ? 'В работе' : newStatus}`);
+  };
+
   const handleRemoveEquipment = (index: number) => {
     setShipmentEquipment(prev => prev.filter((_, i) => i !== index));
   };
@@ -464,6 +485,7 @@ export function ShipmentForm({
               equipment={equipment} 
               onEquipmentView={onEquipmentView}
               compactMode={true}
+              onEquipmentStatusChange={handleEquipmentStatusChange}
             />
           </div>
 

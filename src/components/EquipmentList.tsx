@@ -9,6 +9,7 @@ import { QRScanner } from "./QRScanner";
 
 export interface Equipment {
   id: string;
+  uuid?: string;
   name: string;
   category: string;
   serialNumber: string;

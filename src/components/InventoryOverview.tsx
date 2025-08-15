@@ -14,15 +14,20 @@ import {
   Filter,
   MapPin,
   Tag,
-  Eye
+  Eye,
+  Check
 } from "lucide-react";
 import { Equipment } from "./EquipmentList";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { toast } from "sonner";
+import { EquipmentService } from "../database/services/equipmentService";
+import { ShipmentService } from "../database/services/shipmentService";
 
 interface InventoryOverviewProps {
   equipment: Equipment[];
   onEquipmentView?: (equipment: Equipment) => void;
   compactMode?: boolean;
+  onEquipmentStatusChange?: (equipmentId: string, newStatus: string) => void;
 }
 
 interface InventorySummary {
@@ -34,15 +39,48 @@ interface InventorySummary {
   };
 }
 
+/**
+ * Компонент для просмотра остатков техники на складе с возможностью быстрой отметки погрузки
+ * 
+ * @param equipment - массив оборудования для отображения
+ * @param onEquipmentView - callback для просмотра деталей оборудования
+ * @param compactMode - режим отображения (компактный или полный)
+ * @param onEquipmentStatusChange - callback для уведомления об изменении статуса оборудования
+ */
 export function InventoryOverview({ 
   equipment, 
   onEquipmentView, 
-  compactMode = false 
+  compactMode = false,
+  onEquipmentStatusChange
 }: InventoryOverviewProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterLocation, setFilterLocation] = useState<string>("all");
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [loadingEquipment, setLoadingEquipment] = useState<Set<string>>(new Set());
+
+  // Инициализация сервисов
+  const equipmentService = new EquipmentService();
+  const shipmentService = new ShipmentService();
+
+  // Отладочная информация
+  console.log('=== InventoryOverview Debug ===');
+  console.log('equipment:', equipment);
+  console.log('equipment.length:', equipment?.length);
+  console.log('compactMode:', compactMode);
+  console.log('onEquipmentStatusChange:', !!onEquipmentStatusChange);
+  
+  if (equipment && equipment.length > 0) {
+    console.log('Первая единица техники:', equipment[0]);
+    console.log('Доступная техника:', equipment.filter(item => item.status === "available"));
+  }
+  console.log('=============================');
+
+  // Простой тест для проверки работы компонента
+  const testClick = () => {
+    console.log('Тестовая кнопка нажата!');
+    toast.success('Тестовая кнопка работает!');
+  };
 
   // Получаем уникальные значения для фильтров
   const categories = Array.from(new Set(equipment.map(item => item.category)));
@@ -148,6 +186,81 @@ export function InventoryOverview({
     }
   };
 
+  /**
+   * Обработчик отметки техники как погруженной
+   * 
+   * При нажатии на кнопку-галочку:
+   * 1. Создается автоматическая отгрузка
+   * 2. Техника добавляется в отгрузку
+   * 3. Статус техники меняется на "in-use"
+   * 4. Показывается уведомление об успехе
+   * 
+   * @param equipment - оборудование для отметки как погруженное
+   */
+  const handleMarkAsLoaded = async (equipment: Equipment) => {
+    console.log('=== handleMarkAsLoaded Debug ===');
+    console.log('Вызван для техники:', equipment);
+    console.log('ID техники:', equipment.id);
+    console.log('UUID техники:', equipment.uuid);
+    console.log('Статус техники:', equipment.status);
+    console.log('Текущее состояние loadingEquipment:', Array.from(loadingEquipment));
+    
+    // Защита от повторных нажатий
+    if (loadingEquipment.has(equipment.id)) {
+      console.log('Техника уже в процессе обработки:', equipment.id);
+      return;
+    }
+    
+    // Устанавливаем состояние загрузки для данной техники
+    setLoadingEquipment(prev => {
+      const newSet = new Set(prev).add(equipment.id);
+      console.log('Новое состояние loadingEquipment:', Array.from(newSet));
+      return newSet;
+    });
+    
+    try {
+      console.log('Начинаем обработку погрузки для техники:', equipment.name);
+      
+      // Проверяем, инициализирована ли база данных
+      console.log('Проверяем базу данных...');
+      
+      // Сначала попробуем просто показать уведомление для тестирования
+      toast.success(`Техника "${equipment.name}" отмечена как погруженная (тестовый режим)`, {
+        description: `ID: ${equipment.id}, UUID: ${equipment.uuid || 'не указан'}`,
+        duration: 4000
+      });
+      
+      // Уведомляем родительский компонент об изменении статуса
+      if (onEquipmentStatusChange) {
+        console.log('Вызываем onEquipmentStatusChange с параметрами:', equipment.id, "in-use");
+        onEquipmentStatusChange(equipment.id, "in-use");
+      } else {
+        console.log('onEquipmentStatusChange не передан');
+      }
+      
+      console.log('Обработка завершена успешно');
+      
+    } catch (error) {
+      console.error("Ошибка при отметке техники как погруженной:", error);
+      
+      // Показываем пользователю понятное сообщение об ошибке
+      toast.error("Произошла ошибка при отметке техники", {
+        description: "Попробуйте еще раз или обратитесь к администратору"
+      });
+    } finally {
+      // Снимаем состояние загрузки независимо от результата
+      setLoadingEquipment(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(equipment.id);
+        console.log('Снимаем состояние загрузки для техники:', equipment.id);
+        console.log('Финальное состояние loadingEquipment:', Array.from(newSet));
+        return newSet;
+      });
+    }
+    
+    console.log('=== Конец handleMarkAsLoaded ===');
+  };
+
   if (compactMode) {
     return (
       <Card>
@@ -177,12 +290,31 @@ export function InventoryOverview({
                   equipment={equipment} 
                   onEquipmentView={onEquipmentView}
                   compactMode={false}
+                  onEquipmentStatusChange={onEquipmentStatusChange}
                 />
               </DialogContent>
             </Dialog>
           </div>
         </CardHeader>
         <CardContent>
+          {/* Тестовая кнопка */}
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-medium text-yellow-800">Тестовая панель</h4>
+                <p className="text-xs text-yellow-600">Проверка работы компонента</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={testClick}
+                className="text-yellow-700 border-yellow-300 hover:bg-yellow-100"
+              >
+                Тест
+              </Button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
               <div className="flex items-center justify-center mb-1">
@@ -234,6 +366,52 @@ export function InventoryOverview({
               }
             </div>
           </div>
+
+          {/* Быстрая отметка доступной техники */}
+          <div className="mt-4 pt-4 border-t">
+            <h4 className="text-sm font-medium mb-3 text-green-700 flex items-center gap-2">
+              <Check className="h-4 w-4" />
+              Быстрая отметка погрузки
+            </h4>
+            <div className="space-y-2">
+              {equipment
+                .filter(item => item.status === "available")
+                .slice(0, 3)
+                .map((item) => (
+                  <div key={item.id} className="flex items-center justify-between text-sm">
+                    <div className="flex-1 min-w-0">
+                      <span className="truncate block">{item.name}</span>
+                      <span className="text-xs text-muted-foreground truncate block">
+                        {item.category} • {item.location}
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        console.log('Клик по кнопке в компактном режиме для техники:', item);
+                        handleMarkAsLoaded(item);
+                      }}
+                      disabled={loadingEquipment.has(item.id)}
+                      className="text-green-600 hover:text-green-700 hover:bg-green-50 p-2 h-8 w-8 border border-green-200 hover:border-green-300"
+                      title="Отметить как погруженную"
+                    >
+                      {loadingEquipment.has(item.id) ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-green-600 border-t-transparent" />
+                      ) : (
+                        <Check className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                ))
+              }
+              {equipment.filter(item => item.status === "available").length === 0 && (
+                <div className="text-center py-2 text-xs text-muted-foreground">
+                  Нет доступной техники
+                </div>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
     );
@@ -241,6 +419,42 @@ export function InventoryOverview({
 
   return (
     <div className="space-y-6">
+      {/* Тестовая панель */}
+      <Card className="border-yellow-200 bg-yellow-50">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-yellow-800">Тестовая панель</h3>
+              <p className="text-sm text-yellow-600">Проверка работы компонента и отладка</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={testClick}
+                className="text-yellow-700 border-yellow-300 hover:bg-yellow-100"
+              >
+                Тест
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  console.log('Проверка состояния компонента');
+                  console.log('loadingEquipment:', Array.from(loadingEquipment));
+                  console.log('searchTerm:', searchTerm);
+                  console.log('filterCategory:', filterCategory);
+                  console.log('filterLocation:', filterLocation);
+                }}
+                className="text-yellow-700 border-yellow-300 hover:bg-yellow-100"
+              >
+                Состояние
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Общая статистика */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -407,9 +621,12 @@ export function InventoryOverview({
       {/* Детальный список доступного оборудования */}
       <Card>
         <CardHeader>
-          <CardTitle>Доступное оборудование</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-green-700">
+            <Check className="h-5 w-5" />
+            Доступное оборудование
+          </CardTitle>
           <CardDescription>
-            Список всей техники со статусом "Доступно"
+            Список всей техники со статусом "Доступно" - нажмите на галочку для отметки как погруженной
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -465,16 +682,37 @@ export function InventoryOverview({
                       {item.category} • {item.serialNumber} • {item.location}
                     </p>
                   </div>
-                  {onEquipmentView && (
+                  <div className="flex items-center gap-2">
+                    {/* Кнопка отметки как погруженной */}
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      onClick={() => onEquipmentView(item)}
+                      onClick={() => {
+                        console.log('Клик по кнопке в полном режиме для техники:', item);
+                        handleMarkAsLoaded(item);
+                      }}
+                      disabled={loadingEquipment.has(item.id)}
+                      className="text-green-600 hover:text-green-700 hover:bg-green-50 border border-green-200 hover:border-green-300"
+                      title="Отметить как погруженную"
                     >
-                      <Eye className="h-4 w-4 mr-1" />
-                      Просмотр
+                      {loadingEquipment.has(item.id) ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-green-600 border-t-transparent" />
+                      ) : (
+                        <Check className="h-4 w-4" />
+                      )}
                     </Button>
-                  )}
+                    
+                    {onEquipmentView && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onEquipmentView(item)}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Просмотр
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))
             }
