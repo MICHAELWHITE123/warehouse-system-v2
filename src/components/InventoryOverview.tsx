@@ -20,8 +20,7 @@ import {
 import { Equipment } from "./EquipmentList";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { toast } from "sonner";
-import { EquipmentService } from "../database/services/equipmentService";
-import { ShipmentService } from "../database/services/shipmentService";
+
 
 interface InventoryOverviewProps {
   equipment: Equipment[];

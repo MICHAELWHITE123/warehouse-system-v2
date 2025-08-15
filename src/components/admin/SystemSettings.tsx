@@ -15,7 +15,6 @@ import {
   Database,
   Mail,
   Bell,
-  Clock,
   Download,
   Upload,
   RotateCcw,
