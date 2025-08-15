@@ -69,15 +69,12 @@ interface ShipmentListProps {
 function ShipmentSummary({ 
   shipment, 
   loadedEquipment, 
-  loadedStacks, 
-  onEquipmentLoaded, 
-  onStackLoaded 
+  loadedStacks
 }: { 
   shipment: Shipment;
   loadedEquipment: Set<string>;
   loadedStacks: Set<string>;
-  onEquipmentLoaded: (equipmentId: string, checked: boolean) => void;
-  onStackLoaded: (stackId: string, checked: boolean) => void;
+
 }) {
   const equipmentCount = shipment.equipment.length;
   const stacksCount = shipment.stacks?.length || 0;
@@ -459,8 +456,6 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
                         shipment={shipment}
                         loadedEquipment={loadedEquipmentByShipment[shipment.id] || new Set()}
                         loadedStacks={loadedStacksByShipment[shipment.id] || new Set()}
-                        onEquipmentLoaded={(equipmentId, checked) => handleEquipmentLoaded(shipment.id, equipmentId, checked)}
-                        onStackLoaded={(stackId, checked) => handleStackLoaded(shipment.id, stackId, checked)}
                       />
                     </div>
 
@@ -514,8 +509,7 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
         onClose={() => setIsViewDialogOpen(false)}
         loadedEquipment={selectedShipment ? loadedEquipmentByShipment[selectedShipment.id] || new Set() : undefined}
         loadedStacks={selectedShipment ? loadedStacksByShipment[selectedShipment.id] || new Set() : undefined}
-        onEquipmentLoaded={selectedShipment ? (equipmentId, checked) => handleEquipmentLoaded(selectedShipment.id, equipmentId, checked) : undefined}
-        onStackLoaded={selectedShipment ? (stackId, checked) => handleStackLoaded(selectedShipment.id, stackId, checked) : undefined}
+
       />
     </div>
   );

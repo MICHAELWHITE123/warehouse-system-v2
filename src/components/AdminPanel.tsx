@@ -10,7 +10,6 @@ import {
   Shield, 
   Activity, 
   Database,
-  Key,
   Info,
   BarChart3,
   Clock,

@@ -18,8 +18,6 @@ interface ShipmentDetailsModalProps {
   // Добавляем новые пропсы для синхронизации состояния
   loadedEquipment?: Set<string>;
   loadedStacks?: Set<string>;
-  onEquipmentLoaded?: (equipmentId: string, checked: boolean) => void;
-  onStackLoaded?: (stackId: string, checked: boolean) => void;
 }
 
 export function ShipmentDetailsModal({
@@ -31,8 +29,7 @@ export function ShipmentDetailsModal({
   onEquipmentStatusChange,
   loadedEquipment: externalLoadedEquipment,
   loadedStacks: externalLoadedStacks,
-  onEquipmentLoaded: externalOnEquipmentLoaded,
-  onStackLoaded: externalOnStackLoaded
+
 }: ShipmentDetailsModalProps) {
   if (!shipment) return null;
 
@@ -75,10 +72,7 @@ export function ShipmentDetailsModal({
     console.log('equipmentId:', equipmentId);
     console.log('isLoaded:', isLoaded);
     
-    if (externalOnEquipmentLoaded) {
-      // Если есть внешний обработчик, используем его
-      externalOnEquipmentLoaded(equipmentId, isLoaded);
-    } else {
+    // Обновляем локальное состояние
       // Иначе обновляем локальное состояние
       setLocalLoadedEquipment(prev => {
         const newSet = new Set(prev);

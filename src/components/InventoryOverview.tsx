@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -59,9 +59,7 @@ export function InventoryOverview({
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [loadingEquipment, setLoadingEquipment] = useState<Set<string>>(new Set());
 
-  // Инициализация сервисов
-  const equipmentService = new EquipmentService();
-  const shipmentService = new ShipmentService();
+
 
   // Отладочная информация
   console.log('=== InventoryOverview Debug ===');

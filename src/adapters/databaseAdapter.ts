@@ -2,7 +2,6 @@
 
 import type { Equipment } from '../components/EquipmentList';
 import type { EquipmentStack } from '../components/StackManagement';
-import type { Shipment } from '../components/ShipmentList';
 
 import type { 
   EquipmentWithRelations, 
