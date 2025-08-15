@@ -415,7 +415,6 @@ export function UserManagement() {
                       <Switch
                         checked={user.isActive}
                         onCheckedChange={() => handleToggleUserStatus(user.id)}
-                        size="sm"
                       />
                       <span className={`text-sm ${user.isActive ? 'text-green-600' : 'text-gray-500'}`}>
                         {user.isActive ? 'Активен' : 'Неактивен'}
