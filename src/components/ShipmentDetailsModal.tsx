@@ -14,6 +14,11 @@ interface ShipmentDetailsModalProps {
   onClose: () => void;
   onToggleLoadingStatus?: (shipment: Shipment) => void;
   onEquipmentStatusChange?: (equipmentId: string, newStatus: string) => void;
+  // Добавляем новые пропсы для синхронизации состояния
+  loadedEquipment?: Set<string>;
+  loadedStacks?: Set<string>;
+  onEquipmentLoaded?: (equipmentId: string, checked: boolean) => void;
+  onStackLoaded?: (stackId: string, checked: boolean) => void;
 }
 
 export function ShipmentDetailsModal({
@@ -22,28 +27,40 @@ export function ShipmentDetailsModal({
   isOpen,
   onClose,
   onToggleLoadingStatus,
-  onEquipmentStatusChange
+  onEquipmentStatusChange,
+  loadedEquipment: externalLoadedEquipment,
+  loadedStacks: externalLoadedStacks,
+  onEquipmentLoaded: externalOnEquipmentLoaded,
+  onStackLoaded: externalOnStackLoaded
 }: ShipmentDetailsModalProps) {
   if (!shipment) return null;
 
-  // Состояние для отслеживания погруженной техники
-  const [loadedEquipment, setLoadedEquipment] = useState<Set<string>>(new Set());
-  const [loadedStacks, setLoadedStacks] = useState<Set<string>>(new Set());
+  // Используем внешнее состояние, если оно передано, иначе локальное
+  const [localLoadedEquipment, setLocalLoadedEquipment] = useState<Set<string>>(new Set());
+  const [localLoadedStacks, setLocalLoadedStacks] = useState<Set<string>>(new Set());
+
+  // Определяем, какое состояние использовать
+  const loadedEquipment = externalLoadedEquipment || localLoadedEquipment;
+  const loadedStacks = externalLoadedStacks || localLoadedStacks;
 
   // Инициализация состояния при открытии модального окна
   useEffect(() => {
     if (shipment) {
-      // Инициализируем состояние на основе текущих данных
-      const initialLoadedEquipment = new Set<string>();
-      const initialLoadedStacks = new Set<string>();
+      if (externalLoadedEquipment) {
+        // Если передано внешнее состояние, используем его
+        setLocalLoadedEquipment(new Set(externalLoadedEquipment));
+      } else {
+        // Иначе инициализируем локальное состояние
+        setLocalLoadedEquipment(new Set());
+      }
       
-      // Здесь можно добавить логику для загрузки состояния из базы данных
-      // Пока что все техника считается не погруженной
-      
-      setLoadedEquipment(initialLoadedEquipment);
-      setLoadedStacks(initialLoadedStacks);
+      if (externalLoadedStacks) {
+        setLocalLoadedStacks(new Set(externalLoadedStacks));
+      } else {
+        setLocalLoadedStacks(new Set());
+      }
     }
-  }, [shipment]);
+  }, [shipment, externalLoadedEquipment, externalLoadedStacks]);
 
   const handleToggleLoadingStatus = (shipment: Shipment) => {
     if (onToggleLoadingStatus) {
@@ -57,16 +74,22 @@ export function ShipmentDetailsModal({
     console.log('equipmentId:', equipmentId);
     console.log('isLoaded:', isLoaded);
     
-    setLoadedEquipment(prev => {
-      const newSet = new Set(prev);
-      if (isLoaded) {
-        newSet.add(equipmentId);
-      } else {
-        newSet.delete(equipmentId);
-      }
-      console.log('Новое состояние loadedEquipment:', Array.from(newSet));
-      return newSet;
-    });
+    if (externalOnEquipmentLoaded) {
+      // Если есть внешний обработчик, используем его
+      externalOnEquipmentLoaded(equipmentId, isLoaded);
+    } else {
+      // Иначе обновляем локальное состояние
+      setLocalLoadedEquipment(prev => {
+        const newSet = new Set(prev);
+        if (isLoaded) {
+          newSet.add(equipmentId);
+        } else {
+          newSet.delete(equipmentId);
+        }
+        console.log('Новое состояние loadedEquipment:', Array.from(newSet));
+        return newSet;
+      });
+    }
 
     // Уведомляем родительский компонент об изменении статуса
     if (onEquipmentStatusChange) {
@@ -88,16 +111,22 @@ export function ShipmentDetailsModal({
     console.log('stackId:', stackId);
     console.log('isLoaded:', isLoaded);
     
-    setLoadedStacks(prev => {
-      const newSet = new Set(prev);
-      if (isLoaded) {
-        newSet.add(stackId);
-      } else {
-        newSet.delete(stackId);
-      }
-      console.log('Новое состояние loadedStacks:', Array.from(newSet));
-      return newSet;
-    });
+    if (externalOnStackLoaded) {
+      // Если есть внешний обработчик, используем его
+      externalOnStackLoaded(stackId, isLoaded);
+    } else {
+      // Иначе обновляем локальное состояние
+      setLocalLoadedStacks(prev => {
+        const newSet = new Set(prev);
+        if (isLoaded) {
+          newSet.add(stackId);
+        } else {
+          newSet.delete(stackId);
+        }
+        console.log('Новое состояние loadedStacks:', Array.from(newSet));
+        return newSet;
+      });
+    }
 
     // Показываем уведомление
     toast.success(

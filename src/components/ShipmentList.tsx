@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search, Eye, Edit, Truck, Clock, CheckCircle, XCircle, Filter, Package, Users } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
@@ -124,8 +124,55 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  const [loadedEquipment, setLoadedEquipment] = useState<Set<string>>(new Set());
-  const [loadedStacks, setLoadedStacks] = useState<Set<string>>(new Set());
+  // Изменяем структуру: храним состояние для каждой отгрузки отдельно
+  const [loadedEquipmentByShipment, setLoadedEquipmentByShipment] = useState<Record<string, Set<string>>>({});
+  const [loadedStacksByShipment, setLoadedStacksByShipment] = useState<Record<string, Set<string>>>({});
+
+  // Инициализация состояния для каждой отгрузки при загрузке данных
+  useEffect(() => {
+    // Пытаемся загрузить сохраненное состояние из localStorage
+    const savedLoadedEquipment = localStorage.getItem('loadedEquipmentByShipment');
+    const savedLoadedStacks = localStorage.getItem('loadedStacksByShipment');
+    
+    let initialLoadedEquipment: Record<string, Set<string>> = {};
+    let initialLoadedStacks: Record<string, Set<string>> = {};
+    
+    if (savedLoadedEquipment) {
+      try {
+        const parsed = JSON.parse(savedLoadedEquipment);
+        // Преобразуем обратно в Set для каждого ключа
+        Object.keys(parsed).forEach(key => {
+          initialLoadedEquipment[key] = new Set(parsed[key]);
+        });
+      } catch (e) {
+        console.warn('Ошибка при загрузке состояния загрузки оборудования:', e);
+      }
+    }
+    
+    if (savedLoadedStacks) {
+      try {
+        const parsed = JSON.parse(savedLoadedStacks);
+        Object.keys(parsed).forEach(key => {
+          initialLoadedStacks[key] = new Set(parsed[key]);
+        });
+      } catch (e) {
+        console.warn('Ошибка при загрузке состояния загрузки стеков:', e);
+      }
+    }
+    
+    // Инициализируем состояние для новых отгрузок
+    shipments.forEach(shipment => {
+      if (!initialLoadedEquipment[shipment.id]) {
+        initialLoadedEquipment[shipment.id] = new Set();
+      }
+      if (!initialLoadedStacks[shipment.id]) {
+        initialLoadedStacks[shipment.id] = new Set();
+      }
+    });
+    
+    setLoadedEquipmentByShipment(initialLoadedEquipment);
+    setLoadedStacksByShipment(initialLoadedStacks);
+  }, [shipments]);
 
   // Фильтрация отгрузок
   const filteredShipments = shipments.filter(shipment => {
@@ -184,28 +231,64 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
     setIsViewDialogOpen(true);
   };
 
-  const handleEquipmentLoaded = (equipmentId: string, checked: boolean) => {
-    if (checked) {
-      setLoadedEquipment(prev => new Set([...prev, equipmentId]));
-    } else {
-      setLoadedEquipment(prev => {
-        const newSet = new Set(prev);
+  const handleEquipmentLoaded = (shipmentId: string, equipmentId: string, checked: boolean) => {
+    setLoadedEquipmentByShipment(prev => {
+      const currentSet = prev[shipmentId] || new Set();
+      const newSet = new Set(currentSet);
+      
+      if (checked) {
+        newSet.add(equipmentId);
+      } else {
         newSet.delete(equipmentId);
-        return newSet;
-      });
-    }
+      }
+      
+      const newState = {
+        ...prev,
+        [shipmentId]: newSet
+      };
+      
+      // Сохраняем в localStorage
+      try {
+        const serialized = Object.fromEntries(
+          Object.entries(newState).map(([key, value]) => [key, Array.from(value)])
+        );
+        localStorage.setItem('loadedEquipmentByShipment', JSON.stringify(serialized));
+      } catch (e) {
+        console.warn('Ошибка при сохранении состояния загрузки оборудования:', e);
+      }
+      
+      return newState;
+    });
   };
 
-  const handleStackLoaded = (stackId: string, checked: boolean) => {
-    if (checked) {
-      setLoadedStacks(prev => new Set([...prev, stackId]));
-    } else {
-      setLoadedStacks(prev => {
-        const newSet = new Set(prev);
+  const handleStackLoaded = (shipmentId: string, stackId: string, checked: boolean) => {
+    setLoadedStacksByShipment(prev => {
+      const currentSet = prev[shipmentId] || new Set();
+      const newSet = new Set(currentSet);
+      
+      if (checked) {
+        newSet.add(stackId);
+      } else {
         newSet.delete(stackId);
-        return newSet;
-      });
-    }
+      }
+      
+      const newState = {
+        ...prev,
+        [shipmentId]: newSet
+      };
+      
+      // Сохраняем в localStorage
+      try {
+        const serialized = Object.fromEntries(
+          Object.entries(newState).map(([key, value]) => [key, Array.from(value)])
+        );
+        localStorage.setItem('loadedStacksByShipment', JSON.stringify(serialized));
+      } catch (e) {
+        console.warn('Ошибка при сохранении состояния загрузки стеков:', e);
+      }
+      
+      return newState;
+    });
   };
 
   // Вычисление статистики
@@ -373,10 +456,10 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
                     <div className="flex-shrink-0 min-w-[200px]">
                       <ShipmentSummary 
                         shipment={shipment}
-                        loadedEquipment={loadedEquipment}
-                        loadedStacks={loadedStacks}
-                        onEquipmentLoaded={handleEquipmentLoaded}
-                        onStackLoaded={handleStackLoaded}
+                        loadedEquipment={loadedEquipmentByShipment[shipment.id] || new Set()}
+                        loadedStacks={loadedStacksByShipment[shipment.id] || new Set()}
+                        onEquipmentLoaded={(equipmentId, checked) => handleEquipmentLoaded(shipment.id, equipmentId, checked)}
+                        onStackLoaded={(stackId, checked) => handleStackLoaded(shipment.id, stackId, checked)}
                       />
                     </div>
 
@@ -423,6 +506,10 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
         equipment={[]}
         isOpen={isViewDialogOpen}
         onClose={() => setIsViewDialogOpen(false)}
+        loadedEquipment={selectedShipment ? loadedEquipmentByShipment[selectedShipment.id] || new Set() : undefined}
+        loadedStacks={selectedShipment ? loadedStacksByShipment[selectedShipment.id] || new Set() : undefined}
+        onEquipmentLoaded={selectedShipment ? (equipmentId, checked) => handleEquipmentLoaded(selectedShipment.id, equipmentId, checked) : undefined}
+        onStackLoaded={selectedShipment ? (stackId, checked) => handleStackLoaded(selectedShipment.id, stackId, checked) : undefined}
       />
     </div>
   );
