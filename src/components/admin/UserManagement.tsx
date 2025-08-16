@@ -15,7 +15,6 @@ import {
   Trash2, 
   Search, 
   User, 
-  Mail,
   Eye,
   EyeOff
 } from "lucide-react";

@@ -229,66 +229,6 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
     setIsViewDialogOpen(true);
   };
 
-  const handleEquipmentLoaded = (shipmentId: string, equipmentId: string, checked: boolean) => {
-    setLoadedEquipmentByShipment(prev => {
-      const currentSet = prev[shipmentId] || new Set();
-      const newSet = new Set(currentSet);
-      
-      if (checked) {
-        newSet.add(equipmentId);
-      } else {
-        newSet.delete(equipmentId);
-      }
-      
-      const newState = {
-        ...prev,
-        [shipmentId]: newSet
-      };
-      
-      // Сохраняем в localStorage
-      try {
-        const serialized = Object.fromEntries(
-          Object.entries(newState).map(([key, value]) => [key, Array.from(value)])
-        );
-        localStorage.setItem('loadedEquipmentByShipment', JSON.stringify(serialized));
-      } catch (e) {
-        console.warn('Ошибка при сохранении состояния загрузки оборудования:', e);
-      }
-      
-      return newState;
-    });
-  };
-
-  const handleStackLoaded = (shipmentId: string, stackId: string, checked: boolean) => {
-    setLoadedStacksByShipment(prev => {
-      const currentSet = prev[shipmentId] || new Set();
-      const newSet = new Set(currentSet);
-      
-      if (checked) {
-        newSet.add(stackId);
-      } else {
-        newSet.delete(stackId);
-      }
-      
-      const newState = {
-        ...prev,
-        [shipmentId]: newSet
-      };
-      
-      // Сохраняем в localStorage
-      try {
-        const serialized = Object.fromEntries(
-          Object.entries(newState).map(([key, value]) => [key, Array.from(value)])
-        );
-        localStorage.setItem('loadedStacksByShipment', JSON.stringify(serialized));
-      } catch (e) {
-        console.warn('Ошибка при сохранении состояния загрузки стеков:', e);
-      }
-      
-      return newState;
-    });
-  };
-
   // Вычисление статистики
   const totalShipments = shipments.length;
   const pendingShipments = shipments.filter(s => s.status === "pending").length;

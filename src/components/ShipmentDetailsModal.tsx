@@ -7,16 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { 
   Package, 
   Users, 
-  CheckCircle2, 
-  Eye,
-  Edit,
-  Trash2,
-  Calendar,
-  MapPin,
-  Truck
+  CheckCircle2
 } from "lucide-react";
 import { toast } from "sonner";
-
+import { Equipment } from "./EquipmentList";
+import { Shipment } from "./ShipmentList";
 
 interface ShipmentDetailsModalProps {
   shipment: Shipment | null;
@@ -25,41 +20,6 @@ interface ShipmentDetailsModalProps {
   onClose: () => void;
   loadedEquipment?: Set<string>;
   loadedStacks?: Set<string>;
-}
-
-interface Equipment {
-  id: string;
-  name: string;
-  serialNumber: string;
-  category: string;
-  status: "available" | "in-use" | "maintenance";
-  location: string;
-  purchaseDate: string;
-}
-
-interface Shipment {
-  id: string;
-  number: string;
-  recipient: string;
-  status: string;
-  createdAt: string;
-  equipment: Array<{
-    equipmentId: string;
-    name: string;
-    serialNumber?: string;
-    quantity: number;
-  }>;
-  stacks?: Array<{
-    stackId: string;
-    name: string;
-    equipmentIds: string[];
-    quantity: number;
-  }>;
-  rental?: Array<{
-    equipment: string;
-    quantity: number;
-    link?: string;
-  }>;
 }
 
 export function ShipmentDetailsModal({
