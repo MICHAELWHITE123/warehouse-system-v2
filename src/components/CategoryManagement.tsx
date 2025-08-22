@@ -14,10 +14,9 @@ import type { DbCategory } from "../database/types";
 interface CategoryManagementProps {
   categories: string[];
   onCategoriesChange: (categories: string[]) => void;
-  equipmentCount: { [category: string]: number };
 }
 
-export function CategoryManagement({ categories, onCategoriesChange, equipmentCount }: CategoryManagementProps) {
+export function CategoryManagement({ categories, onCategoriesChange }: CategoryManagementProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -110,7 +109,7 @@ export function CategoryManagement({ categories, onCategoriesChange, equipmentCo
     setIsLoading(true);
     try {
       const trimmedName = newCategoryName.trim();
-      const newCategory = categoryService.createCategory({
+      categoryService.createCategory({
         name: trimmedName,
         description: ""
       });

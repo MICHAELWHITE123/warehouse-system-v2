@@ -17,7 +17,7 @@ import { toast } from "sonner";
 
 // Импорты для работы с базой данных
 import { ExtendedShipment, ActiveView } from "./types";
-import { calculateStats, calculateEquipmentCountByCategory } from "./utils/statistics";
+import { calculateStats } from "./utils/statistics";
 import { useTheme } from "./hooks/useTheme";
 import { useAuth } from "./hooks/useAuth";
 import { useDatabase, useEquipment, useCategories, useLocations, useStacks, useShipments, useStatistics } from "./hooks/useDatabase";
@@ -77,7 +77,7 @@ export default function App() {
 
   // Используем статистику из БД или рассчитываем локально как fallback
   const stats = dbStats || calculateStats(equipment, stacks, shipments);
-  const equipmentCountByCategory = calculateEquipmentCountByCategory(equipment);
+
   const notificationCount = stats.maintenanceEquipment;
 
   // Обработчики для оборудования
@@ -479,7 +479,6 @@ export default function App() {
           <CategoryManagement
             categories={categories}
             onCategoriesChange={handleCategoriesChange}
-            equipmentCount={equipmentCountByCategory}
           />
         );
       case "locations":
