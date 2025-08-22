@@ -109,10 +109,10 @@ export function ShipmentPDFGenerator({ shipment, equipment, className }: Shipmen
         </div>
         ` : ''}
         
-        <!-- Список оборудования -->
+        <!-- Список оборудования (если передано отдельно) -->
         ${equipment && equipment.length > 0 ? `
         <div style="margin-bottom: 20px;">
-          <h3 style="font-size: 14px; font-weight: bold; margin: 0 0 10px 0;">Список оборудования:</h3>
+          <h3 style="font-size: 14px; font-weight: bold; margin: 0 0 10px 0;">Дополнительное оборудование:</h3>
           <table style="width: 100%; border-collapse: collapse; border: 1px solid #ccc; font-size: 10px;">
             <thead>
               <tr style="background-color: #f0f0f0;">
@@ -138,16 +138,32 @@ export function ShipmentPDFGenerator({ shipment, equipment, className }: Shipmen
         </div>
         ` : ''}
         
-        <!-- Чек-лист -->
-        ${shipment.checklist && shipment.checklist.length > 0 ? `
+        <!-- Список техники из отгрузочного листа -->
+        ${shipment.equipment && shipment.equipment.length > 0 ? `
         <div style="margin-bottom: 20px;">
-          <h3 style="font-size: 14px; font-weight: bold; margin: 0 0 10px 0;">Чек-лист:</h3>
-          ${shipment.checklist.map(item => `
-            <div style="margin: 8px 0;">
-              <span style="font-weight: bold;">${item.isCompleted ? '[✓]' : '[ ]'}</span> ${safeText(item.title)}
-              ${item.description ? `<div style="margin-left: 20px; font-size: 10px; color: #666;">${safeText(item.description)}</div>` : ''}
-            </div>
-          `).join('')}
+          <h3 style="font-size: 14px; font-weight: bold; margin: 0 0 10px 0;">Техника в отгрузке:</h3>
+          <table style="width: 100%; border-collapse: collapse; border: 1px solid #ccc; font-size: 10px;">
+            <thead>
+              <tr style="background-color: #f0f0f0;">
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">№</th>
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Наименование</th>
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Серийный номер</th>
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Количество</th>
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Отметка</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${shipment.equipment.map((item, index) => `
+                <tr>
+                  <td style="border: 1px solid #ccc; padding: 8px;">${index + 1}</td>
+                  <td style="border: 1px solid #ccc; padding: 8px;">${safeText(item.name)}</td>
+                  <td style="border: 1px solid #ccc; padding: 8px;">${safeText(item.serialNumber)}</td>
+                  <td style="border: 1px solid #ccc; padding: 8px;">${item.quantity}</td>
+                  <td style="border: 1px solid #ccc; padding: 8px;">[ ]</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
         </div>
         ` : ''}
         
