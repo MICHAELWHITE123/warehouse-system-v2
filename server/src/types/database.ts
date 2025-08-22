@@ -202,7 +202,7 @@ export interface UpdateEquipment extends Partial<CreateEquipment> {}
 export interface CreateEquipmentStack {
   name: string;
   description?: string;
-  tags?: string[];
+  tags?: string; // JSON string
   equipment_ids?: number[];
 }
 

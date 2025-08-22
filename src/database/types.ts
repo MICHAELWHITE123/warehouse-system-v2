@@ -139,7 +139,7 @@ export interface CreateEquipmentStack {
   name: string;
   description?: string;
   created_by: string;
-  tags?: string[];
+  tags?: string; // JSON string
 }
 
 export interface CreateShipment {

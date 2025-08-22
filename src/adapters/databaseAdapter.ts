@@ -72,9 +72,29 @@ export function adaptEquipmentToDB(
 
 // Преобразование стека из БД в интерфейс компонента
 export function adaptStackFromDB(dbStack: StackWithEquipment): EquipmentStack {
-  const tags = dbStack.tags ? JSON.parse(dbStack.tags) : [];
+  console.log('adaptStackFromDB input:', dbStack);
+  console.log('dbStack.tags:', dbStack.tags, 'type:', typeof dbStack.tags);
   
-  return {
+  let tags: string[] = [];
+  
+  try {
+    if (dbStack.tags && typeof dbStack.tags === 'string' && dbStack.tags.trim() !== '') {
+      const parsed = JSON.parse(dbStack.tags);
+      // Убеждаемся, что результат - это массив
+      if (Array.isArray(parsed)) {
+        tags = parsed;
+      } else {
+        console.warn('Tags for stack is not an array:', dbStack.uuid, parsed);
+        tags = [];
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to parse tags for stack:', dbStack.uuid, error);
+    console.warn('Raw tags value:', dbStack.tags);
+    tags = [];
+  }
+  
+  const result = {
     id: dbStack.uuid,
     name: dbStack.name,
     description: dbStack.description || '',
@@ -83,6 +103,9 @@ export function adaptStackFromDB(dbStack: StackWithEquipment): EquipmentStack {
     createdBy: dbStack.created_by,
     tags
   };
+  
+  console.log('adaptStackFromDB result:', result);
+  return result;
 }
 
 // Преобразование стека из интерфейса компонента в БД
@@ -90,13 +113,19 @@ export function adaptStackToDB(
   stack: Omit<EquipmentStack, 'id'>,
   uuid?: string
 ): CreateEquipmentStack {
-  return {
+  console.log('adaptStackToDB input:', stack);
+  console.log('stack.tags:', stack.tags);
+  
+  const result = {
     uuid: uuid || Date.now().toString(),
     name: stack.name,
     description: stack.description,
     created_by: stack.createdBy,
-    tags: stack.tags
+    tags: stack.tags && stack.tags.length > 0 ? JSON.stringify(stack.tags) : undefined
   };
+  
+  console.log('adaptStackToDB result:', result);
+  return result;
 }
 
 // Преобразование отгрузки из БД в интерфейс компонента

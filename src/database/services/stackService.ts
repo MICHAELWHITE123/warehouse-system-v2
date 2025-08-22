@@ -216,12 +216,22 @@ export class StackService {
     const originalStack = this.getStackWithEquipmentById(stackId);
     if (!originalStack) return null;
 
+    let tags: string[] = [];
+    try {
+      if (originalStack.tags && originalStack.tags.trim() !== '') {
+        tags = JSON.parse(originalStack.tags);
+      }
+    } catch (error) {
+      console.warn('Failed to parse tags for stack cloning:', stackId, error);
+      tags = [];
+    }
+
     const newStack = this.createStack({
       uuid: Date.now().toString(),
       name: newName,
       description: `Копия: ${originalStack.description || originalStack.name}`,
       created_by: originalStack.created_by,
-      tags: originalStack.tags ? JSON.parse(originalStack.tags) : []
+      tags: tags.length > 0 ? JSON.stringify(tags) : undefined
     });
 
     if (originalStack.equipment.length > 0) {

@@ -65,9 +65,13 @@ export default function App() {
   const equipment: Equipment[] = dbEquipment.map(adaptEquipmentFromDB);
   const categories: string[] = adaptCategoriesFromDB(dbCategories);
   const locations: string[] = adaptLocationsFromDB(dbLocations);
-  const stacks: EquipmentStack[] = dbStacks.map(adaptStackFromDB);
   
   console.log('=== App.tsx Debug ===');
+  console.log('dbStacks from database:', dbStacks);
+  
+  const stacks: EquipmentStack[] = dbStacks.map(adaptStackFromDB);
+  
+  console.log('stacks after adaptation:', stacks);
   console.log('dbShipments from database:', dbShipments);
   
   const shipments: ExtendedShipment[] = dbShipments.map(adaptShipmentFromDB);
