@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -6,17 +6,37 @@ import { Label } from "./ui/label";
 import { Badge } from "./ui/badge";
 import { MapPin, Plus, Pencil, Trash2, Save, X } from "lucide-react";
 import { toast } from "sonner";
+import { locationService } from "../database/services";
+import type { DbLocation } from "../database/types";
 
-interface LocationManagementProps {
-  locations: string[];
-  onLocationsChange: (locations: string[]) => void;
-  equipmentCount: { [location: string]: number };
-}
-
-export function LocationManagement({ locations, onLocationsChange, equipmentCount }: LocationManagementProps) {
+export function LocationManagement() {
+  const [locations, setLocations] = useState<DbLocation[]>([]);
   const [newLocation, setNewLocation] = useState("");
-  const [editingLocation, setEditingLocation] = useState<string | null>(null);
+  const [editingLocation, setEditingLocation] = useState<DbLocation | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [equipmentCount, setEquipmentCount] = useState<{ [locationId: number]: number }>({});
+
+  // Загрузка местоположений и подсчет оборудования
+  const loadLocations = () => {
+    try {
+      const data = locationService.getAllLocations();
+      setLocations(data);
+      
+      // Подсчитываем количество оборудования для каждого местоположения
+      const counts: { [locationId: number]: number } = {};
+      data.forEach(location => {
+        counts[location.id] = locationService.getEquipmentCountByLocation(location.id);
+      });
+      setEquipmentCount(counts);
+    } catch (error) {
+      console.error('Error loading locations:', error);
+      toast.error('Ошибка загрузки местоположений');
+    }
+  };
+
+  useEffect(() => {
+    loadLocations();
+  }, []);
 
   const handleAddLocation = () => {
     if (!newLocation.trim()) {
@@ -24,19 +44,29 @@ export function LocationManagement({ locations, onLocationsChange, equipmentCoun
       return;
     }
 
-    if (locations.includes(newLocation.trim())) {
+    if (locations.some(loc => loc.name === newLocation.trim())) {
       toast.error("Такое местоположение уже существует");
       return;
     }
 
-    onLocationsChange([...locations, newLocation.trim()]);
-    setNewLocation("");
-    toast.success("Местоположение добавлено");
+    try {
+      locationService.createLocation({
+        name: newLocation.trim(),
+        description: "",
+        address: ""
+      });
+      setNewLocation("");
+      loadLocations(); // Перезагружаем данные
+      toast.success("Местоположение добавлено");
+    } catch (error) {
+      console.error('Error creating location:', error);
+      toast.error('Ошибка создания местоположения');
+    }
   };
 
-  const handleEditLocation = (location: string) => {
+  const handleEditLocation = (location: DbLocation) => {
     setEditingLocation(location);
-    setEditValue(location);
+    setEditValue(location.name);
   };
 
   const handleSaveEdit = () => {
@@ -45,18 +75,28 @@ export function LocationManagement({ locations, onLocationsChange, equipmentCoun
       return;
     }
 
-    if (editValue.trim() !== editingLocation && locations.includes(editValue.trim())) {
+    if (!editingLocation) return;
+
+    if (editValue.trim() !== editingLocation.name && 
+        locations.some(loc => loc.name === editValue.trim())) {
       toast.error("Такое местоположение уже существует");
       return;
     }
 
-    const updatedLocations = locations.map(loc => 
-      loc === editingLocation ? editValue.trim() : loc
-    );
-    onLocationsChange(updatedLocations);
-    setEditingLocation(null);
-    setEditValue("");
-    toast.success("Местоположение обновлено");
+    try {
+      locationService.updateLocation(editingLocation.id, {
+        name: editValue.trim(),
+        description: editingLocation.description || "",
+        address: editingLocation.address || ""
+      });
+      setEditingLocation(null);
+      setEditValue("");
+      loadLocations(); // Перезагружаем данные
+      toast.success("Местоположение обновлено");
+    } catch (error) {
+      console.error('Error updating location:', error);
+      toast.error('Ошибка обновления местоположения');
+    }
   };
 
   const handleCancelEdit = () => {
@@ -64,16 +104,22 @@ export function LocationManagement({ locations, onLocationsChange, equipmentCoun
     setEditValue("");
   };
 
-  const handleDeleteLocation = (location: string) => {
-    const count = equipmentCount[location] || 0;
+  const handleDeleteLocation = (location: DbLocation) => {
+    const count = equipmentCount[location.id] || 0;
     
     if (count > 0) {
-      toast.error(`Нельзя удалить местоположение "${location}". В нем находится ${count} единиц техники.`);
+      toast.error(`Нельзя удалить местоположение "${location.name}". В нем находится ${count} единиц техники.`);
       return;
     }
 
-    onLocationsChange(locations.filter(loc => loc !== location));
-    toast.success("Местоположение удалено");
+    try {
+      locationService.deleteLocation(location.id);
+      loadLocations(); // Перезагружаем данные
+      toast.success("Местоположение удалено");
+    } catch (error) {
+      console.error('Error deleting location:', error);
+      toast.error('Ошибка удаления местоположения');
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent, action: 'add' | 'edit') => {
@@ -136,10 +182,10 @@ export function LocationManagement({ locations, onLocationsChange, equipmentCoun
           ) : (
             <div className="space-y-3">
               {locations.map((location) => (
-                <div key={location} className="flex items-center justify-between p-4 border rounded-lg">
+                <div key={location.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex items-center gap-3 flex-1">
                     <MapPin className="h-4 w-4 text-muted-foreground" />
-                    {editingLocation === location ? (
+                    {editingLocation?.id === location.id ? (
                       <div className="flex gap-2 flex-1">
                         <Input
                           value={editValue}
@@ -156,15 +202,15 @@ export function LocationManagement({ locations, onLocationsChange, equipmentCoun
                       </div>
                     ) : (
                       <>
-                        <span className="flex-1">{location}</span>
+                        <span className="flex-1">{location.name}</span>
                         <Badge variant="secondary">
-                          {equipmentCount[location] || 0} единиц
+                          {equipmentCount[location.id] || 0} единиц
                         </Badge>
                       </>
                     )}
                   </div>
                   
-                  {editingLocation !== location && (
+                  {editingLocation?.id !== location.id && (
                     <div className="flex gap-2">
                       <Button
                         size="sm"
@@ -177,7 +223,7 @@ export function LocationManagement({ locations, onLocationsChange, equipmentCoun
                         size="sm"
                         variant="outline"
                         onClick={() => handleDeleteLocation(location)}
-                        disabled={equipmentCount[location] > 0}
+                        disabled={equipmentCount[location.id] > 0}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -198,12 +244,12 @@ export function LocationManagement({ locations, onLocationsChange, equipmentCoun
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {locations.map((location) => {
-              const count = equipmentCount[location] || 0;
+              const count = equipmentCount[location.id] || 0;
               return (
-                <div key={location} className="p-4 border rounded-lg">
+                <div key={location.id} className="p-4 border rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
                     <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span className="truncate">{location}</span>
+                    <span className="truncate">{location.name}</span>
                   </div>
                   <div className="text-2xl font-medium">{count}</div>
                   <div className="text-sm text-muted-foreground">

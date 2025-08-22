@@ -447,13 +447,7 @@ export default function App() {
           />
         );
       case "locations":
-        return (
-          <LocationManagement
-            locations={locations}
-            onLocationsChange={handleLocationsChange}
-            equipmentCount={equipmentCountByLocation}
-          />
-        );
+        return <LocationManagement />;
       case "admin":
         return user ? <AdminPanel user={user} /> : null;
       default:
