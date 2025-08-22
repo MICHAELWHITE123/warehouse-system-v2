@@ -1,7 +1,7 @@
 {
-  "name": "server",
+  "name": "wearehouse-server",
   "version": "1.0.0",
-  "description": "Warehouse management system server",
+  "description": "Серверная часть системы управления складом WeareHouse",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -9,6 +9,7 @@
     "dev": "nodemon src/index.ts",
     "dev:ts": "ts-node src/index.ts",
     "prod": "npm run build && npm start",
+    "migrate": "ts-node src/database/migrator.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

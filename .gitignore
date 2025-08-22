@@ -98,3 +98,23 @@ jspm_packages/
 # OS
 .DS_Store
 Thumbs.db
+
+# Production database files
+server/warehouse.db
+server/*.db
+server/*.sqlite
+server/*.sqlite3
+
+# Production environment files
+server/.env
+server/.env.production
+server/.env.local
+
+# Backup files
+*.backup
+*.bak
+*.tmp
+
+# Log files
+server/logs/
+server/*.log

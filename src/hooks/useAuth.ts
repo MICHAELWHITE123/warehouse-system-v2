@@ -26,12 +26,10 @@ export const useAuth = () => {
   // Функция для генерации отображаемого имени на основе логина и роли
   const getDisplayNameForUser = (username: string, role: string): string => {
     const userNames: Record<string, string> = {
-      admin: "Администратор Системы",
-      manager: "Менеджер Склада",
-      operator: "Оператор Склада"
+      Qstream: "Администратор Системы"
     };
 
-    return userNames[username] || userNames[role] || `Пользователь ${username}`;
+    return userNames[username] || `Пользователь ${username}`;
   };
 
   const handleLogin = (userData: User) => {
@@ -43,6 +41,7 @@ export const useAuth = () => {
 
     setUser(userWithDisplayName);
     localStorage.setItem("user", JSON.stringify(userWithDisplayName));
+    toast.success("Добро пожаловать в систему управления складом!");
   };
 
   const handleLogout = () => {
