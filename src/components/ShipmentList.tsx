@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Eye, Edit, Truck, Clock, CheckCircle, XCircle, Filter, Package, Users } from "lucide-react";
+import { Plus, Search, Eye, Edit, Truck, Clock, CheckCircle, XCircle, Filter, Package, Users, QrCode, CheckCircle2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 
 import { ShipmentDetailsModal } from "./ShipmentDetailsModal";
 import { ShipmentPDFGenerator } from "./ShipmentPDFGenerator";
+import { QRScanner } from "./QRScanner";
 
 export interface ShipmentEquipment {
   equipmentId: string;
@@ -126,6 +127,8 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
+  const [selectedShipmentForQR, setSelectedShipmentForQR] = useState<Shipment | null>(null);
   // Изменяем структуру: храним состояние для каждой отгрузки отдельно
   const [loadedEquipmentByShipment, setLoadedEquipmentByShipment] = useState<Record<string, Set<string>>>({});
   const [loadedStacksByShipment, setLoadedStacksByShipment] = useState<Record<string, Set<string>>>({});
@@ -317,6 +320,24 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
     });
   };
 
+  // Обработчики для QR сканера
+  const handleEquipmentLoadedFromQR = (equipmentId: string, isLoaded: boolean, loadedBy: string) => {
+    if (selectedShipmentForQR) {
+      handleEquipmentLoadedChange(selectedShipmentForQR.id, equipmentId, isLoaded);
+    }
+  };
+
+  const handleStackLoadedFromQR = (stackId: string, isLoaded: boolean, loadedBy: string) => {
+    if (selectedShipmentForQR) {
+      handleStackLoadedChange(selectedShipmentForQR.id, stackId, isLoaded);
+    }
+  };
+
+  const openQRScanner = (shipment: Shipment) => {
+    setSelectedShipmentForQR(shipment);
+    setIsQRScannerOpen(true);
+  };
+
   // Вычисление статистики
   const totalShipments = shipments.length;
   const pendingShipments = shipments.filter(s => s.status === "pending").length;
@@ -476,6 +497,17 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
                         <p className="text-sm text-muted-foreground">Ответственный</p>
                         <p className="font-medium">{shipment.responsiblePerson}</p>
                       </div>
+
+                      {/* Статус погрузки */}
+                      <div className="text-center lg:text-left">
+                        <p className="text-sm text-muted-foreground">Погрузка</p>
+                        <div className="flex items-center gap-1 justify-center lg:justify-start">
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <span className="font-medium text-sm">
+                            {loadedEquipmentByShipment[shipment.id]?.size || 0} + {loadedStacksByShipment[shipment.id]?.size || 0}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Информация об оборудовании и стеках */}
@@ -491,6 +523,15 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
                     <div className="flex flex-col items-start lg:items-end gap-4 flex-shrink-0 w-full lg:w-auto">
                       {/* Кнопки действий */}
                       <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openQRScanner(shipment)}
+                          className="h-8 px-3 w-full sm:w-auto"
+                        >
+                          <QrCode className="h-4 w-4 mr-1" />
+                          QR
+                        </Button>
                         <ShipmentPDFGenerator 
                           shipment={shipment} 
                           equipment={[]}
@@ -540,6 +581,22 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
           loadedStacks={loadedStacksByShipment[selectedShipment.id] || new Set()}
           onEquipmentLoadedChange={handleEquipmentLoadedChange}
           onStackLoadedChange={handleStackLoadedChange}
+        />
+      )}
+
+      {/* QR сканер */}
+      {selectedShipmentForQR && (
+        <QRScanner
+          isOpen={isQRScannerOpen}
+          onClose={() => {
+            setIsQRScannerOpen(false);
+            setSelectedShipmentForQR(null);
+          }}
+          shipment={selectedShipmentForQR}
+          onEquipmentLoaded={handleEquipmentLoadedFromQR}
+          onStackLoaded={handleStackLoadedFromQR}
+          loadedEquipment={loadedEquipmentByShipment[selectedShipmentForQR.id] || new Set()}
+          loadedStacks={loadedStacksByShipment[selectedShipmentForQR.id] || new Set()}
         />
       )}
     </div>
