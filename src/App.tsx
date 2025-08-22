@@ -40,11 +40,11 @@ export default function App() {
   const { isInitialized, error: dbError } = useDatabase();
   
   // Хуки для работы с данными из БД
-  const { equipment: dbEquipment, createEquipment, updateEquipment } = useEquipment();
+  const { equipment: dbEquipment, createEquipment, updateEquipment, deleteEquipment } = useEquipment();
   const { categories: dbCategories } = useCategories();
   const { locations: dbLocations } = useLocations();
-  const { stacks: dbStacks, createStack, updateStack } = useStacks();
-  const { shipments: dbShipments, createShipmentWithDetails, updateShipment } = useShipments();
+  const { stacks: dbStacks, createStack, updateStack, deleteStack } = useStacks();
+  const { shipments: dbShipments, createShipmentWithDetails, updateShipment, deleteShipment } = useShipments();
   const { stats: dbStats } = useStatistics();
   
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
@@ -122,6 +122,19 @@ export default function App() {
     setActiveView("edit-equipment");
   };
 
+  const handleDeleteEquipment = async (equipmentId: string) => {
+    try {
+      const dbEquipmentItem = dbEquipment.find(eq => eq.uuid === equipmentId);
+      if (dbEquipmentItem) {
+        await deleteEquipment(dbEquipmentItem.id);
+        toast.success("Оборудование успешно удалено");
+      }
+    } catch (error) {
+      toast.error("Ошибка при удалении оборудования");
+      console.error(error);
+    }
+  };
+
   // Обработчики для стеков
   const handleAddStack = async (newStack: Omit<EquipmentStack, 'id'>) => {
     try {
@@ -180,6 +193,19 @@ export default function App() {
     setSelectedStack(stack);
     setIsStackFormVisible(true);
     setActiveView("edit-stack");
+  };
+
+  const handleDeleteStack = async (stackId: string) => {
+    try {
+      const dbStackItem = dbStacks.find(stack => stack.uuid === stackId);
+      if (dbStackItem) {
+        await deleteStack(dbStackItem.id);
+        toast.success("Стек успешно удален");
+      }
+    } catch (error) {
+      toast.error("Ошибка при удалении стека");
+      console.error(error);
+    }
   };
 
   const handleCreateStack = () => {
@@ -267,6 +293,19 @@ export default function App() {
     setSelectedShipment(shipment);
     setIsShipmentFormVisible(true);
     setActiveView("edit-shipment");
+  };
+
+  const handleDeleteShipment = async (shipmentId: string) => {
+    try {
+      const dbShipmentItem = dbShipments.find(shipment => shipment.uuid === shipmentId);
+      if (dbShipmentItem) {
+        await deleteShipment(dbShipmentItem.id);
+        toast.success("Отгрузка успешно удалена");
+      }
+    } catch (error) {
+      toast.error("Ошибка при удалении отгрузки");
+      console.error(error);
+    }
   };
 
   const handleCreateShipment = () => {
@@ -375,6 +414,7 @@ export default function App() {
             equipment={equipment}
             onEdit={handleEditEquipmentClick}
             onView={handleViewEquipment}
+            onDelete={handleDeleteEquipment}
           />
         );
       case "stacks":
@@ -385,6 +425,7 @@ export default function App() {
             onStacksChange={handleStacksChange}
             onCreateStack={handleCreateStack}
             onEditStack={handleEditStackClick}
+            onDeleteStack={handleDeleteStack}
           />
         );
       case "shipments":
@@ -394,6 +435,7 @@ export default function App() {
             onEdit={handleEditShipmentClick}
             onView={handleViewShipment}
             onCreate={handleCreateShipment}
+            onDelete={handleDeleteShipment}
           />
         );
       case "categories":

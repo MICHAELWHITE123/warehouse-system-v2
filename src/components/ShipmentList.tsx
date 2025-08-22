@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Eye, Edit, Truck, Clock, CheckCircle, XCircle, Filter, Package, Users, QrCode, CheckCircle2 } from "lucide-react";
+import { Plus, Search, Eye, Edit, Truck, Clock, CheckCircle, XCircle, Filter, Package, Users, QrCode, CheckCircle2, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 
 import { ShipmentDetailsModal } from "./ShipmentDetailsModal";
 import { ShipmentPDFGenerator } from "./ShipmentPDFGenerator";
@@ -64,6 +65,7 @@ interface ShipmentListProps {
   onEdit: (shipment: Shipment) => void;
   onView: (shipment: Shipment) => void;
   onCreate: () => void;
+  onDelete?: (shipmentId: string) => void;
 }
 
 // Компонент для отображения краткой информации об оборудовании и стеках
@@ -122,7 +124,7 @@ function ShipmentSummary({
   );
 }
 
-export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps) {
+export function ShipmentList({ shipments, onEdit, onCreate, onDelete }: ShipmentListProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
@@ -336,6 +338,12 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
   const openQRScanner = (shipment: Shipment) => {
     setSelectedShipmentForQR(shipment);
     setIsQRScannerOpen(true);
+  };
+
+  const handleDeleteShipment = (shipment: Shipment) => {
+    if (onDelete) {
+      onDelete(shipment.id);
+    }
   };
 
   // Вычисление статистики
@@ -555,6 +563,30 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
                           <Edit className="h-4 w-4 mr-1" />
                           Редактировать
                         </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-3 w-full sm:w-auto"
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Удалить
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Это действие нельзя отменить. Это удалит все данные об отгрузке "{shipment.number}".
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Отмена</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteShipment(shipment)}>Удалить</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
 
                       {/* Дата создания */}

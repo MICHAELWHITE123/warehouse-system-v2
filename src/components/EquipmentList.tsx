@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Search, Eye, Edit, Filter, Package, AlertTriangle, CheckCircle, Wrench, QrCode } from "lucide-react";
+import { Search, Eye, Edit, Filter, Package, AlertTriangle, CheckCircle, Wrench, QrCode, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { QRScanner } from "./QRScanner";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
+import { toast } from "sonner";
 
 export interface Equipment {
   id: string;
@@ -24,14 +26,16 @@ interface EquipmentListProps {
   equipment: Equipment[];
   onEdit: (equipment: Equipment) => void;
   onView: (equipment: Equipment) => void;
+  onDelete?: (equipmentId: string) => void;
 }
 
-export function EquipmentList({ equipment, onEdit, onView }: EquipmentListProps) {
+export function EquipmentList({ equipment, onEdit, onView, onDelete }: EquipmentListProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
+
 
   // Получаем уникальные значения для фильтров
   const categories = Array.from(new Set(equipment.map(item => item.category)));
@@ -91,6 +95,13 @@ export function EquipmentList({ equipment, onEdit, onView }: EquipmentListProps)
       // Если оборудование не найдено в списке, все равно показываем его данные
       onView(scannedEquipment);
       setIsQRScannerOpen(false);
+    }
+  };
+
+  const handleDelete = (equipment: Equipment) => {
+    if (onDelete) {
+      onDelete(equipment.id);
+      toast.success("Оборудование успешно удалено");
     }
   };
 
@@ -249,6 +260,31 @@ export function EquipmentList({ equipment, onEdit, onView }: EquipmentListProps)
                       <Edit className="h-4 w-4 mr-1" />
                       Редактировать
                     </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Удалить
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Это действие нельзя отменить. Это удалит все данные о
+                            оборудовании "{item.name}".
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Отмена</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDelete(item)}>Удалить</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               </CardContent>

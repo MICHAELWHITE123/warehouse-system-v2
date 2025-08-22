@@ -25,6 +25,7 @@ interface StackManagementProps {
   onStacksChange: (stacks: EquipmentStack[]) => void;
   onCreateStack: () => void;
   onEditStack: (stack: EquipmentStack) => void;
+  onDeleteStack?: (stackId: string) => void;
 }
 
 export function StackManagement({
@@ -32,7 +33,8 @@ export function StackManagement({
   equipment,
   onStacksChange,
   onCreateStack,
-  onEditStack
+  onEditStack,
+  onDeleteStack
 }: StackManagementProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStack, setSelectedStack] = useState<EquipmentStack | null>(null);
@@ -85,9 +87,14 @@ export function StackManagement({
   };
 
   const handleDeleteStack = (stackId: string) => {
-    const updatedStacks = stacks.filter(stack => stack.id !== stackId);
-    onStacksChange(updatedStacks);
-    toast.success("Стек успешно удален");
+    if (onDeleteStack) {
+      onDeleteStack(stackId);
+      toast.success("Стек успешно удален");
+    } else {
+      const updatedStacks = stacks.filter(stack => stack.id !== stackId);
+      onStacksChange(updatedStacks);
+      toast.success("Стек успешно удален");
+    }
   };
 
   const handleViewStack = (stack: EquipmentStack) => {
