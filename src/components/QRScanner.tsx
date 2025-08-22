@@ -4,10 +4,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Alert, AlertDescription } from "./ui/alert";
-import { Camera, X, CheckCircle, AlertCircle, FileText, Package, Users } from "lucide-react";
+import { Camera, X, CheckCircle, AlertCircle, FileText, Package } from "lucide-react";
 import { toast } from "sonner";
 import { Equipment } from "./EquipmentList";
-import { Shipment, ShipmentEquipment, ShipmentStack } from "./ShipmentList";
+import { Shipment } from "./ShipmentList";
 import { useAuth } from "../hooks/useAuth";
 
 interface QRScannerProps {

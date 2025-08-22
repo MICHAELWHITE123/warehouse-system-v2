@@ -323,13 +323,13 @@ export function ShipmentList({ shipments, onEdit, onCreate, onDelete }: Shipment
   };
 
   // Обработчики для QR сканера
-  const handleEquipmentLoadedFromQR = (equipmentId: string, isLoaded: boolean, loadedBy: string) => {
+  const handleEquipmentLoadedFromQR = (equipmentId: string, isLoaded: boolean, _loadedBy: string) => {
     if (selectedShipmentForQR) {
       handleEquipmentLoadedChange(selectedShipmentForQR.id, equipmentId, isLoaded);
     }
   };
 
-  const handleStackLoadedFromQR = (stackId: string, isLoaded: boolean, loadedBy: string) => {
+  const handleStackLoadedFromQR = (stackId: string, isLoaded: boolean, _loadedBy: string) => {
     if (selectedShipmentForQR) {
       handleStackLoadedChange(selectedShipmentForQR.id, stackId, isLoaded);
     }

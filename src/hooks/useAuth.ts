@@ -24,7 +24,7 @@ export const useAuth = () => {
   }, []);
 
   // Функция для генерации отображаемого имени на основе логина и роли
-  const getDisplayNameForUser = (username: string, role: string): string => {
+  const getDisplayNameForUser = (username: string, _role: string): string => {
     const userNames: Record<string, string> = {
       Qstream: "Администратор Системы"
     };
