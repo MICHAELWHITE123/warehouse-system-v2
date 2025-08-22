@@ -99,14 +99,14 @@ export function EquipmentList({ equipment, onEdit, onView }: EquipmentListProps)
       {/* Заголовок */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Оборудование</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Оборудование</h1>
+          <p className="text-muted-foreground mt-2 text-sm sm:text-base">
             Управление техникой на складе
           </p>
         </div>
         <Button 
           onClick={() => setIsQRScannerOpen(true)}
-          className="sm:w-auto"
+          className="w-full sm:w-auto"
         >
           <QrCode className="h-4 w-4 mr-2" />
           Сканировать QR-код
@@ -125,7 +125,7 @@ export function EquipmentList({ equipment, onEdit, onView }: EquipmentListProps)
           />
         </div>
         
-        <div className="flex flex-col sm:flex-row gap-4 lg:w-auto">
+        <div className="flex flex-col sm:flex-row gap-3 lg:gap-4 lg:w-auto">
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
             <SelectTrigger className="w-full sm:w-48">
               <Filter className="h-4 w-4 mr-2" />
@@ -168,24 +168,24 @@ export function EquipmentList({ equipment, onEdit, onView }: EquipmentListProps)
       {/* Список оборудования */}
       {filteredEquipment.length === 0 ? (
         <Card>
-          <CardContent className="p-12 text-center">
-            <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Оборудование не найдено</h3>
-            <p className="text-muted-foreground">
+          <CardContent className="p-6 sm:p-12 text-center">
+            <Package className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-base sm:text-lg font-semibold mb-2">Оборудование не найдено</h3>
+            <p className="text-muted-foreground text-sm sm:text-base">
               Попробуйте изменить критерии поиска или фильтры
             </p>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {filteredEquipment.map((item) => (
             <Card key={item.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-3 p-4 sm:p-6">
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg mb-1 flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-base sm:text-lg mb-1 flex items-center gap-2">
                       {getStatusIcon(item.status)}
-                      {item.name}
+                      <span className="truncate">{item.name}</span>
                     </CardTitle>
                     <CardDescription className="text-sm">
                       {item.category}
@@ -195,32 +195,32 @@ export function EquipmentList({ equipment, onEdit, onView }: EquipmentListProps)
                 </div>
               </CardHeader>
 
-              <CardContent>
+              <CardContent className="p-4 sm:p-6">
                 <div className="space-y-3">
                   {/* Основная информация */}
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                       <span className="text-muted-foreground">Серийный номер:</span>
-                      <span className="font-medium">{item.serialNumber}</span>
+                      <span className="font-medium break-words">{item.serialNumber}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                       <span className="text-muted-foreground">Местоположение:</span>
-                      <span className="font-medium">{item.location}</span>
+                      <span className="font-medium break-words">{item.location}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                       <span className="text-muted-foreground">Дата покупки:</span>
                       <span className="font-medium">
                         {new Date(item.purchaseDate).toLocaleDateString('ru-RU')}
                       </span>
                     </div>
                     {item.assignedTo && (
-                      <div className="flex justify-between">
+                      <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                         <span className="text-muted-foreground">Назначено:</span>
-                        <span className="font-medium">{item.assignedTo}</span>
+                        <span className="font-medium break-words">{item.assignedTo}</span>
                       </div>
                     )}
                     {item.lastMaintenance && (
-                      <div className="flex justify-between">
+                      <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                         <span className="text-muted-foreground">Последнее ТО:</span>
                         <span className="font-medium">
                           {new Date(item.lastMaintenance).toLocaleDateString('ru-RU')}
@@ -230,7 +230,7 @@ export function EquipmentList({ equipment, onEdit, onView }: EquipmentListProps)
                   </div>
 
                   {/* Кнопки действий */}
-                  <div className="flex space-x-2 pt-3 border-t">
+                  <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 pt-3 border-t">
                     <Button
                       variant="outline"
                       size="sm"

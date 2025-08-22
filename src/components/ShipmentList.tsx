@@ -89,28 +89,32 @@ function ShipmentSummary({
   
   return (
     <div className="text-sm">
-      <div className="flex items-center gap-1 mb-1">
-        <Package className="h-4 w-4 text-muted-foreground" />
-        <span>Оборудование ({equipmentCount})</span>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-1 mb-1">
+        <div className="flex items-center gap-1">
+          <Package className="h-4 w-4 text-muted-foreground" />
+          <span>Оборудование ({equipmentCount})</span>
+        </div>
         {equipmentCount > 0 && (
-          <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800">
+          <Badge variant="secondary" className="bg-green-100 text-green-800 w-fit">
             Погружено: {loadedEquipment.size}/{equipmentCount}
           </Badge>
         )}
       </div>
-      <div className="text-xs text-muted-foreground">
+      <div className="text-xs text-muted-foreground break-words">
         {equipmentNames}{remainingEquipment}
       </div>
-      <div className="flex items-center gap-1 mt-2">
-        <Users className="h-4 w-4 text-muted-foreground" />
-        <span>Стеки техники ({stacksCount})</span>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-1 mt-2">
+        <div className="flex items-center gap-1">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <span>Стеки техники ({stacksCount})</span>
+        </div>
         {stacksCount > 0 && (
-          <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800">
+          <Badge variant="secondary" className="bg-green-100 text-green-800 w-fit">
             Погружено: {loadedStacks.size}/{stacksCount}
           </Badge>
         )}
       </div>
-      <div className="text-xs text-muted-foreground">
+      <div className="text-xs text-muted-foreground break-words">
         {stackNames || 'Стеки не добавлены'}
       </div>
     </div>
@@ -322,64 +326,64 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
   return (
     <div className="space-y-6">
       {/* Заголовок и кнопка создания */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Отгрузки</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Отгрузки</h1>
           <p className="text-muted-foreground mt-2">
             Управление отгрузочными листами и доставкой оборудования
           </p>
         </div>
-        <Button onClick={onCreate} className="flex items-center gap-2">
+        <Button onClick={onCreate} className="flex items-center gap-2 w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           Создать отгрузку
         </Button>
       </div>
 
       {/* Статистика */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center space-x-2">
-              <Truck className="h-5 w-5 text-blue-600" />
+              <Truck className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
               <div>
-                <p className="text-sm text-muted-foreground">Всего отгрузок</p>
-                <p className="text-2xl font-bold">{totalShipments}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Всего отгрузок</p>
+                <p className="text-lg sm:text-2xl font-bold">{totalShipments}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center space-x-2">
-              <Clock className="h-5 w-5 text-yellow-600" />
+              <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600" />
               <div>
-                <p className="text-sm text-muted-foreground">Ожидают</p>
-                <p className="text-2xl font-bold">{pendingShipments}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Ожидают</p>
+                <p className="text-lg sm:text-2xl font-bold">{pendingShipments}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center space-x-2">
-              <Truck className="h-5 w-5 text-purple-600" />
+              <Truck className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
               <div>
-                <p className="text-sm text-muted-foreground">В пути</p>
-                <p className="text-2xl font-bold">{inTransitShipments}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">В пути</p>
+                <p className="text-lg sm:text-2xl font-bold">{inTransitShipments}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center space-x-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
+              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
               <div>
-                <p className="text-sm text-muted-foreground">Доставлено</p>
-                <p className="text-2xl font-bold">{deliveredShipments}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Доставлено</p>
+                <p className="text-lg sm:text-2xl font-bold">{deliveredShipments}</p>
               </div>
             </div>
           </CardContent>
@@ -416,19 +420,19 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
       {/* Список отгрузок */}
       {filteredShipments.length === 0 ? (
         <Card>
-          <CardContent className="p-12 text-center">
-            <Truck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">
+          <CardContent className="p-6 sm:p-12 text-center">
+            <Truck className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-base sm:text-lg font-semibold mb-2">
               {shipments.length === 0 ? "Отгрузки не созданы" : "Отгрузки не найдены"}
             </h3>
-            <p className="text-muted-foreground mb-4">
+            <p className="text-muted-foreground mb-4 text-sm sm:text-base">
               {shipments.length === 0 
                 ? "Создайте первую отгрузку для отправки оборудования"
                 : "Попробуйте изменить поисковый запрос или фильтры"
               }
             </p>
             {shipments.length === 0 && (
-              <Button onClick={onCreate} className="flex items-center gap-2">
+              <Button onClick={onCreate} className="flex items-center gap-2 w-full sm:w-auto">
                 <Plus className="h-4 w-4" />
                 Создать первую отгрузку
               </Button>
@@ -440,10 +444,10 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
           {filteredShipments.map((shipment) => {
             return (
               <Card key={shipment.id} className="hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between gap-6">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex flex-col lg:flex-row items-start justify-between gap-4 lg:gap-6">
                     {/* Левая часть - основная информация */}
-                    <div className="flex items-start gap-4 flex-1">
+                    <div className="flex items-start gap-4 flex-1 w-full lg:w-auto">
                       {/* Иконка статуса */}
                       <div className="flex-shrink-0 mt-1">
                         {getStatusIcon(shipment.status)}
@@ -451,7 +455,7 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
                       
                       {/* Номер и получатель */}
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
                           <h3 className="font-semibold text-lg">{shipment.number}</h3>
                           {getStatusBadge(shipment.status)}
                         </div>
@@ -460,22 +464,22 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
                     </div>
 
                     {/* Центральная часть - статистика */}
-                    <div className="flex flex-col gap-6 flex-shrink-0">
+                    <div className="flex flex-row lg:flex-col gap-4 lg:gap-6 flex-shrink-0 w-full lg:w-auto justify-between lg:justify-start">
                       {/* Всего позиций */}
-                      <div className="text-center">
+                      <div className="text-center lg:text-left">
                         <p className="text-sm text-muted-foreground">Всего позиций</p>
                         <p className="font-medium text-lg">{shipment.totalItems}</p>
                       </div>
 
                       {/* Ответственный */}
-                      <div className="text-center">
+                      <div className="text-center lg:text-left">
                         <p className="text-sm text-muted-foreground">Ответственный</p>
                         <p className="font-medium">{shipment.responsiblePerson}</p>
                       </div>
                     </div>
 
                     {/* Информация об оборудовании и стеках */}
-                    <div className="flex-shrink-0 min-w-[200px]">
+                    <div className="flex-shrink-0 w-full lg:w-auto lg:min-w-[200px]">
                       <ShipmentSummary 
                         shipment={shipment}
                         loadedEquipment={loadedEquipmentByShipment[shipment.id] || new Set()}
@@ -484,19 +488,19 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
                     </div>
 
                     {/* Правая часть - действия */}
-                    <div className="flex flex-col items-end gap-4 flex-shrink-0">
+                    <div className="flex flex-col items-start lg:items-end gap-4 flex-shrink-0 w-full lg:w-auto">
                       {/* Кнопки действий */}
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                         <ShipmentPDFGenerator 
                           shipment={shipment} 
                           equipment={[]}
-                          className="h-8 px-3"
+                          className="h-8 px-3 w-full sm:w-auto"
                         />
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleViewShipment(shipment)}
-                          className="h-8 px-3"
+                          className="h-8 px-3 w-full sm:w-auto"
                         >
                           <Eye className="h-4 w-4 mr-1" />
                           Просмотр
@@ -505,7 +509,7 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
                           variant="outline"
                           size="sm"
                           onClick={() => onEdit(shipment)}
-                          className="h-8 px-3"
+                          className="h-8 px-3 w-full sm:w-auto"
                         >
                           <Edit className="h-4 w-4 mr-1" />
                           Редактировать
@@ -513,7 +517,7 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
                       </div>
 
                       {/* Дата создания */}
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground w-full lg:w-auto text-center lg:text-right">
                         {new Date(shipment.createdAt).toLocaleDateString('ru-RU')}
                       </div>
                     </div>

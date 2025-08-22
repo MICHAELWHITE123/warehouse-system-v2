@@ -437,10 +437,10 @@ export default function App() {
   // Показываем ошибку базы данных, если есть
   if (dbError) {
     return (
-      <div className="min-h-screen bg-background transition-colors duration-300 flex items-center justify-center">
+      <div className="min-h-screen bg-background transition-colors duration-300 flex items-center justify-center p-4">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Ошибка базы данных</h1>
-          <p className="text-gray-600">{dbError}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-red-600 mb-4">Ошибка базы данных</h1>
+          <p className="text-gray-600 text-sm sm:text-base">{dbError}</p>
         </div>
         <Toaster 
           position="top-right"
@@ -453,10 +453,10 @@ export default function App() {
   // Показываем загрузку, пока база данных не инициализирована
   if (!isInitialized) {
     return (
-      <div className="min-h-screen bg-background transition-colors duration-300 flex items-center justify-center">
+      <div className="min-h-screen bg-background transition-colors duration-300 flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600">Инициализация базы данных...</p>
+          <div className="animate-spin rounded-full h-24 w-24 sm:h-32 sm:w-32 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-base sm:text-lg text-gray-600">Инициализация базы данных...</p>
         </div>
         <Toaster 
           position="top-right"
@@ -492,7 +492,7 @@ export default function App() {
       />
       
       <div className="lg:pl-64">
-        <main className="p-4 lg:p-8">
+        <main className="p-3 sm:p-4 lg:p-8">
           <div className="max-w-7xl mx-auto">
             {renderContent()}
           </div>

@@ -33,20 +33,20 @@ export function Dashboard({ stats, onEquipmentSelect }: DashboardProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h1>Панель управления</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold">Панель управления</h1>
+        <p className="text-muted-foreground text-sm sm:text-base">
           Обзор состояния техники на складе
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm">Всего техники</CardTitle>
+            <CardTitle className="text-xs sm:text-sm">Всего техники</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{stats.totalEquipment}</div>
+            <div className="text-xl sm:text-2xl">{stats.totalEquipment}</div>
             <p className="text-xs text-muted-foreground">
               единиц оборудования
             </p>
@@ -55,11 +55,11 @@ export function Dashboard({ stats, onEquipmentSelect }: DashboardProps) {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm">Доступно</CardTitle>
+            <CardTitle className="text-xs sm:text-sm">Доступно</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{stats.availableEquipment}</div>
+            <div className="text-xl sm:text-2xl">{stats.availableEquipment}</div>
             <p className="text-xs text-muted-foreground">
               готово к использованию
             </p>
@@ -68,11 +68,11 @@ export function Dashboard({ stats, onEquipmentSelect }: DashboardProps) {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm">В использовании</CardTitle>
+            <CardTitle className="text-xs sm:text-sm">В использовании</CardTitle>
             <Building className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{stats.inUseEquipment}</div>
+            <div className="text-xl sm:text-2xl">{stats.inUseEquipment}</div>
             <p className="text-xs text-muted-foreground">
               {utilizationRate}% загруженность
             </p>
@@ -81,11 +81,11 @@ export function Dashboard({ stats, onEquipmentSelect }: DashboardProps) {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm">На обслуживании</CardTitle>
+            <CardTitle className="text-xs sm:text-sm">На обслуживании</CardTitle>
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{stats.maintenanceEquipment}</div>
+            <div className="text-xl sm:text-2xl">{stats.maintenanceEquipment}</div>
             <p className="text-xs text-muted-foreground">
               требует внимания
             </p>
@@ -93,11 +93,11 @@ export function Dashboard({ stats, onEquipmentSelect }: DashboardProps) {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Статус оборудования</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-base sm:text-lg">Статус оборудования</CardTitle>
+            <CardDescription className="text-sm">
               Распределение по статусам
             </CardDescription>
           </CardHeader>
@@ -131,8 +131,8 @@ export function Dashboard({ stats, onEquipmentSelect }: DashboardProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Быстрые действия</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-base sm:text-lg">Быстрые действия</CardTitle>
+            <CardDescription className="text-sm">
               Часто используемые операции
             </CardDescription>
           </CardHeader>

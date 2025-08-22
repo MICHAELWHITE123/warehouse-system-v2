@@ -134,22 +134,22 @@ export function ShipmentDetailsModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Package className="h-4 w-4 sm:h-5 sm:w-5" />
             Отгрузка #{shipment.number}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
           {/* Основная информация */}
           <Card>
             <CardHeader>
               <CardTitle>Информация об отгрузке</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Номер отгрузки</p>
                   <p className="font-medium">{shipment.number}</p>
@@ -172,11 +172,13 @@ export function ShipmentDetailsModal({
 
           {/* Оборудование */}
           <div>
-            <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Оборудование ({shipment.equipment.length} позиций)
+            <h3 className="font-semibold text-lg mb-4 flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Оборудование ({shipment.equipment.length} позиций)
+              </div>
               {localLoadedEquipment.size > 0 && (
-                <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800">
+                <Badge variant="secondary" className="bg-green-100 text-green-800 w-fit">
                   Погружено: {localLoadedEquipment.size}/{shipment.equipment.length}
                 </Badge>
               )}
@@ -187,14 +189,15 @@ export function ShipmentDetailsModal({
                   const equipmentInfo = getEquipmentInfo(item.equipmentId);
                   const isLoaded = localLoadedEquipment.has(item.equipmentId);
                   return (
-                    <div key={index} className="flex items-center gap-3 p-4 border rounded-lg bg-muted/30">
+                    <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 sm:p-4 border rounded-lg bg-muted/30">
                       <Checkbox 
                         checked={isLoaded} 
                         onCheckedChange={(checked) => handleEquipmentLoaded(item.equipmentId, checked || false)}
+                        className="mt-1 sm:mt-0"
                       />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-medium text-green-700">{item.name}</h4>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <h4 className="font-medium text-green-700 truncate">{item.name}</h4>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-xs">
                               x{item.quantity}
@@ -203,7 +206,7 @@ export function ShipmentDetailsModal({
                           </div>
                         </div>
                         {equipmentInfo?.serialNumber && (
-                          <p className="text-sm text-muted-foreground mt-1">
+                          <p className="text-sm text-muted-foreground mt-1 break-words">
                             Серийный номер: {equipmentInfo.serialNumber}
                           </p>
                         )}
@@ -222,11 +225,13 @@ export function ShipmentDetailsModal({
 
           {/* Стеки */}
           <div>
-            <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Стеки техники ({(shipment.stacks && shipment.stacks.length) || 0} стеков)
+            <h3 className="font-semibold text-lg mb-4 flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Стеки техники ({(shipment.stacks && shipment.stacks.length) || 0} стеков)
+              </div>
               {localLoadedStacks.size > 0 && (
-                <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800">
+                <Badge variant="secondary" className="bg-green-100 text-green-800 w-fit">
                   Погружено: {localLoadedStacks.size}/{(shipment.stacks && shipment.stacks.length) || 0}
                 </Badge>
               )}
@@ -237,15 +242,16 @@ export function ShipmentDetailsModal({
                   const stackEquipment = getStackEquipment(stack.equipmentIds);
                   const isLoaded = localLoadedStacks.has(stack.stackId);
                   return (
-                    <div key={index} className="border rounded-lg p-4 bg-muted/30">
-                      <div className="flex items-center gap-3 mb-4">
+                    <div key={index} className="border rounded-lg p-3 sm:p-4 bg-muted/30">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
                         <Checkbox 
                           checked={isLoaded} 
                           onCheckedChange={(checked) => handleStackLoaded(stack.stackId, checked || false)}
+                          className="mt-1 sm:mt-0"
                         />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-medium text-green-700">{stack.name}</h4>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <h4 className="font-medium text-green-700 truncate">{stack.name}</h4>
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="text-xs">
                                 x{stack.quantity}
@@ -259,14 +265,14 @@ export function ShipmentDetailsModal({
                         </div>
                       </div>
                       
-                      <div className="ml-6">
+                      <div className="ml-0 sm:ml-6">
                         <p className="text-sm font-medium mb-3">Состав стека:</p>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
                           {stackEquipment.map((item) => (
                             <div key={item.id} className="text-center">
-                              <div className="bg-muted rounded-lg p-3 border">
+                              <div className="bg-muted rounded-lg p-2 sm:p-3 border">
                                 <p className="text-sm font-medium truncate">{item.name.split(' ')[0]}</p>
-                                <p className="text-xs text-muted-foreground mt-1">{item.serialNumber}</p>
+                                <p className="text-xs text-muted-foreground mt-1 break-words">{item.serialNumber}</p>
                               </div>
                             </div>
                           ))}
@@ -292,11 +298,11 @@ export function ShipmentDetailsModal({
             {shipment.rental && shipment.rental.length > 0 ? (
               <div className="space-y-3">
                 {shipment.rental.map((item, index) => (
-                  <div key={index} className="flex items-center gap-3 p-4 border rounded-lg bg-muted/30">
-                    <Checkbox checked={true} disabled className="mt-1" />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-green-700">{item.equipment}</h4>
+                  <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 sm:p-4 border rounded-lg bg-muted/30">
+                    <Checkbox checked={true} disabled className="mt-1 sm:mt-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <h4 className="font-medium text-green-700 truncate">{item.equipment}</h4>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="text-xs">
                             x{item.quantity}
@@ -305,7 +311,7 @@ export function ShipmentDetailsModal({
                         </div>
                       </div>
                       {item.link && (
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <p className="text-sm text-muted-foreground mt-1 break-words">
                           <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
                             Ссылка на товар
                           </a>
@@ -325,11 +331,11 @@ export function ShipmentDetailsModal({
         </div>
 
         {/* Действия */}
-        <div className="flex justify-end gap-3 p-6 border-t">
-          <Button variant="outline" className="h-10 px-4">
+        <div className="flex flex-col sm:flex-row justify-end gap-3 p-3 sm:p-6 border-t">
+          <Button variant="outline" className="h-10 px-4 order-2 sm:order-1">
             Скачать PDF
           </Button>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} className="order-1 sm:order-2">
             Закрыть
           </Button>
         </div>
