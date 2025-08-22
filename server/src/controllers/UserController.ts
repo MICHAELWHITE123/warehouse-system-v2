@@ -67,13 +67,28 @@ export class UserController extends BaseController {
     try {
       const userData: CreateUser = req.body;
 
-      // Проверить, что пользователь с таким username/email не существует
+      // Проверить, что пользователь с таким username не существует
       const existingUser = await this.userModel.findByUsernameOrEmail(userData.username);
       if (existingUser) {
         this.error(res, 'User with this username already exists', 409);
         return;
       }
 
+      // Проверить, что пользователь с таким login не существует
+      const existingLogin = await this.userModel.findByUsernameOrEmail(userData.login);
+      if (existingLogin) {
+        this.error(res, 'User with this login already exists', 409);
+        return;
+      }
+
+      // Проверить, что пользователь с таким nickname не существует
+      const existingNickname = await this.userModel.findByUsernameOrEmail(userData.nickname);
+      if (existingNickname) {
+        this.error(res, 'User with this nickname already exists', 409);
+        return;
+      }
+
+      // Проверить, что пользователь с таким email не существует
       const existingEmail = await this.userModel.findByUsernameOrEmail(userData.email);
       if (existingEmail) {
         this.error(res, 'User with this email already exists', 409);
@@ -135,6 +150,22 @@ export class UserController extends BaseController {
         }
       }
 
+      if (updateData.login && updateData.login !== existingUser.login) {
+        const userWithLogin = await this.userModel.findByUsernameOrEmail(updateData.login);
+        if (userWithLogin) {
+          this.error(res, 'Login already taken', 409);
+          return;
+        }
+      }
+
+      if (updateData.nickname && updateData.nickname !== existingUser.nickname) {
+        const userWithNickname = await this.userModel.findByUsernameOrEmail(updateData.nickname);
+        if (userWithNickname) {
+          this.error(res, 'Nickname already taken', 409);
+          return;
+        }
+      }
+
       if (updateData.email && updateData.email !== existingUser.email) {
         const userWithEmail = await this.userModel.findByUsernameOrEmail(updateData.email);
         if (userWithEmail) {
@@ -183,6 +214,50 @@ export class UserController extends BaseController {
       await this.userModel.delete(parseInt(id));
 
       this.success(res, null, 'User deleted successfully');
+
+    } catch (error) {
+      this.serverError(res, error as Error);
+    }
+  };
+
+  // Новый метод для сброса пароля пользователя
+  public resetPassword = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { newPassword } = req.body;
+      const currentUserRole = (req as any).user?.role;
+
+      // Только администраторы могут сбрасывать пароли
+      if (currentUserRole !== 'admin') {
+        this.forbidden(res, 'Only administrators can reset user passwords');
+        return;
+      }
+
+      // Проверить существование пользователя
+      const existingUser = await this.userModel.findById(parseInt(id));
+      if (!existingUser) {
+        this.notFound(res, 'User');
+        return;
+      }
+
+      if (!newPassword) {
+        this.error(res, 'New password is required', 400);
+        return;
+      }
+
+      // Хешировать новый пароль
+      const saltRounds = 12;
+      const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+
+      // Обновить пароль пользователя
+      const updatedUser = await this.userModel.update(parseInt(id), {
+        password: passwordHash
+      });
+
+      // Убрать пароль из ответа
+      const { password_hash, ...userWithoutPassword } = updatedUser;
+
+      this.success(res, userWithoutPassword, 'Password reset successfully');
 
     } catch (error) {
       this.serverError(res, error as Error);

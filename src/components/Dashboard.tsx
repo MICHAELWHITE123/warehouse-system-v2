@@ -5,6 +5,7 @@ import { Button } from "./ui/button";
 import { Package, AlertCircle, TrendingUp, Building, QrCode } from "lucide-react";
 import { QRScanner } from "./QRScanner";
 import { Equipment } from "./EquipmentList";
+import { CanView, CanCreate, CanExport } from "./ui/PermissionGate";
 
 interface DashboardStats {
   totalEquipment: number;
@@ -137,26 +138,32 @@ export function Dashboard({ stats, onEquipmentSelect }: DashboardProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button 
-              onClick={() => setIsQRScannerOpen(true)}
-              className="w-full"
-              size="sm"
-            >
-              <QrCode className="h-4 w-4 mr-2" />
-              Сканировать QR-код
-            </Button>
-            
-            <div className="grid gap-2 pt-2 border-t">
-              <div className="text-sm">
-                <strong>Категорий:</strong> {stats.categories}
+            <CanView fallback={
+              <div className="text-center py-4 text-muted-foreground">
+                <p className="text-sm">Нет доступа к функциям</p>
               </div>
-              <div className="text-sm">
-                <strong>Загруженность:</strong> {utilizationRate}%
+            }>
+              <Button 
+                onClick={() => setIsQRScannerOpen(true)}
+                className="w-full"
+                size="sm"
+              >
+                <QrCode className="h-4 w-4 mr-2" />
+                Сканировать QR-код
+              </Button>
+              
+              <div className="grid gap-2 pt-2 border-t">
+                <div className="text-sm">
+                  <strong>Категорий:</strong> {stats.categories}
+                </div>
+                <div className="text-sm">
+                  <strong>Загруженность:</strong> {utilizationRate}%
+                </div>
+                <div className="text-sm">
+                  <strong>Доступность:</strong> {Math.round((stats.availableEquipment / stats.totalEquipment) * 100)}%
+                </div>
               </div>
-              <div className="text-sm">
-                <strong>Доступность:</strong> {Math.round((stats.availableEquipment / stats.totalEquipment) * 100)}%
-              </div>
-            </div>
+            </CanView>
           </CardContent>
         </Card>
       </div>

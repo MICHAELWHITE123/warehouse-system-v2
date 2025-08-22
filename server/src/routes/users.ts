@@ -24,4 +24,7 @@ router.put('/:id', validateUpdateUser, userController.update);
 // DELETE /api/users/:id - Удалить пользователя (только админы)
 router.delete('/:id', requireRole(['admin']), userController.delete);
 
+// POST /api/users/:id/reset-password - Сбросить пароль пользователя (только админы)
+router.post('/:id/reset-password', requireRole(['admin']), userController.resetPassword);
+
 export default router;

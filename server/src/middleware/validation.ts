@@ -17,6 +17,23 @@ export const handleValidationErrors = (req: Request, res: Response, next: NextFu
   next();
 };
 
+// Улучшенная валидация паролей
+export const validatePassword = (fieldName: string = 'password') => {
+  return body(fieldName)
+    .isLength({ min: 8 })
+    .withMessage('Пароль должен содержать минимум 8 символов')
+    .matches(/^(?=.*[a-z])/)
+    .withMessage('Пароль должен содержать минимум одну строчную букву')
+    .matches(/^(?=.*[A-Z])/)
+    .withMessage('Пароль должен содержать минимум одну заглавную букву')
+    .matches(/^(?=.*\d)/)
+    .withMessage('Пароль должен содержать минимум одну цифру')
+    .matches(/^(?=.*[@$!%*?&])/)
+    .withMessage('Пароль должен содержать минимум один специальный символ (@$!%*?&)')
+    .matches(/^[a-zA-Z0-9@$!%*?&]+$/)
+    .withMessage('Пароль может содержать только буквы, цифры и специальные символы @$!%*?&');
+};
+
 // Валидация для входа
 export const validateLogin = [
   body('username')
@@ -44,16 +61,28 @@ export const validateRegister = [
     .matches(/^[a-zA-Z0-9_]+$/)
     .withMessage('Username can only contain letters, numbers, and underscores'),
   
+  body('login')
+    .notEmpty()
+    .withMessage('Login is required')
+    .isLength({ min: 3, max: 50 })
+    .withMessage('Login must be between 3 and 50 characters')
+    .matches(/^[a-zA-Z0-9_]+$/)
+    .withMessage('Login can only contain letters, numbers, and underscores'),
+  
+  body('nickname')
+    .notEmpty()
+    .withMessage('Nickname is required')
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Nickname must be between 2 and 50 characters')
+    .matches(/^[a-zA-Zа-яА-Я0-9_\s-]+$/)
+    .withMessage('Nickname can contain letters, numbers, spaces, underscores and hyphens'),
+  
   body('email')
     .isEmail()
     .withMessage('Valid email is required')
     .normalizeEmail(),
   
-  body('password')
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+  validatePassword('password'),
   
   body('full_name')
     .optional()
@@ -82,6 +111,20 @@ export const validateUpdateUser = [
     .matches(/^[a-zA-Z0-9_]+$/)
     .withMessage('Username can only contain letters, numbers, and underscores'),
   
+  body('login')
+    .optional()
+    .isLength({ min: 3, max: 50 })
+    .withMessage('Login must be between 3 and 50 characters')
+    .matches(/^[a-zA-Z0-9_]+$/)
+    .withMessage('Login can only contain letters, numbers, and underscores'),
+  
+  body('nickname')
+    .optional()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Nickname must be between 2 and 50 characters')
+    .matches(/^[a-zA-Zа-яА-Я0-9_\s-]+$/)
+    .withMessage('Nickname can contain letters, numbers, spaces, underscores and hyphens'),
+  
   body('email')
     .optional()
     .isEmail()
@@ -90,8 +133,30 @@ export const validateUpdateUser = [
   
   body('password')
     .optional()
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long'),
+    .custom((value) => {
+      if (value && value.length > 0) {
+        // Применяем улучшенную валидацию только если пароль предоставлен
+        if (value.length < 8) {
+          throw new Error('Пароль должен содержать минимум 8 символов');
+        }
+        if (!/(?=.*[a-z])/.test(value)) {
+          throw new Error('Пароль должен содержать минимум одну строчную букву');
+        }
+        if (!/(?=.*[A-Z])/.test(value)) {
+          throw new Error('Пароль должен содержать минимум одну заглавную букву');
+        }
+        if (!/(?=.*\d)/.test(value)) {
+          throw new Error('Пароль должен содержать минимум одну цифру');
+        }
+        if (!/(?=.*[@$!%*?&])/.test(value)) {
+          throw new Error('Пароль должен содержать минимум один специальный символ (@$!%*?&)');
+        }
+        if (!/^[a-zA-Z0-9@$!%*?&]+$/.test(value)) {
+          throw new Error('Пароль может содержать только буквы, цифры и специальные символы @$!%*?&');
+        }
+      }
+      return true;
+    }),
   
   body('full_name')
     .optional()

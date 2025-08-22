@@ -35,6 +35,21 @@ export function AuthForm({ onLogin }: AuthFormProps) {
       password: "QstreamPro2023",
       role: "admin",
       displayName: "Администратор Системы"
+    },
+    manager: {
+      password: "manager123",
+      role: "manager",
+      displayName: "Менеджер Склада"
+    },
+    operator: {
+      password: "operator123",
+      role: "operator",
+      displayName: "Оператор Склада"
+    },
+    admin: {
+      password: "admin123",
+      role: "admin",
+      displayName: "Администратор"
     }
   };
 
@@ -165,6 +180,9 @@ export function AuthForm({ onLogin }: AuthFormProps) {
 
           <div className="text-center text-sm text-muted-foreground">
             <p>Система управления складом</p>
+            <p className="mt-2 text-xs">
+              Доступные логины: Qstream, manager, operator, admin
+            </p>
           </div>
         </CardContent>
       </Card>

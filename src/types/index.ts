@@ -1,6 +1,9 @@
 // Реэкспорт типов из базы данных
 export * from '../database/types';
 
+// Реэкспорт типов для системы прав доступа
+export * from './permissions';
+
 // Импорт интерфейса отгрузки из компонента (для обратной совместимости)
 import { Shipment } from "../components/ShipmentList";
 
@@ -45,4 +48,19 @@ export type ActiveView =
 // Интерфейс для подсчета по категориям/местоположениям
 export interface CountMap {
   [key: string]: number;
+}
+
+export interface User {
+  id: string;
+  username: string;
+  login: string;
+  nickname: string;
+  email: string;
+  fullName: string;
+  role: UserRole;
+  permissions: UserPermissions;
+  isActive: boolean;
+  lastLogin: string;
+  createdAt: string;
+  updatedAt: string;
 }

@@ -4,6 +4,8 @@ export interface User {
   id: number;
   uuid: string;
   username: string;
+  login: string;
+  nickname: string;
   email: string;
   password_hash: string;
   full_name?: string;
@@ -135,6 +137,15 @@ export interface AuditLog {
   created_at: Date;
 }
 
+export interface PasswordHistory {
+  id: number;
+  user_id: number;
+  password_hash: string;
+  changed_by?: number;
+  change_reason: string;
+  created_at: Date;
+}
+
 // Расширенные типы с join'ами
 export interface EquipmentWithRelations extends Equipment {
   category_name?: string;
@@ -158,6 +169,8 @@ export interface ShipmentWithDetails extends Shipment {
 // DTO типы для создания/обновления
 export interface CreateUser {
   username: string;
+  login: string;
+  nickname: string;
   email: string;
   password: string;
   full_name?: string;
@@ -166,6 +179,8 @@ export interface CreateUser {
 
 export interface UpdateUser {
   username?: string;
+  login?: string;
+  nickname?: string;
   email?: string;
   password?: string;
   full_name?: string;
