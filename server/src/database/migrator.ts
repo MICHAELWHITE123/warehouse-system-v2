@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { query, queryOne } from '../config/database';
+import { query, queryOne } from '../config/database-sqlite';
 
 interface Migration {
   id: number;
@@ -19,9 +19,9 @@ export class DatabaseMigrator {
   async createMigrationsTable(): Promise<void> {
     const sql = `
       CREATE TABLE IF NOT EXISTS migrations (
-        id SERIAL PRIMARY KEY,
-        filename VARCHAR(255) NOT NULL UNIQUE,
-        executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        filename TEXT NOT NULL UNIQUE,
+        executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `;
     await query(sql);
@@ -37,8 +37,8 @@ export class DatabaseMigrator {
   // Получение списка файлов миграций
   getMigrationFiles(): string[] {
     const files = [
-      '001_create_tables.sql',
-      '002_seed_data.sql'
+      '001_create_tables_sqlite.sql',
+      '002_seed_data_sqlite.sql'
     ];
     return files.sort();
   }
@@ -57,7 +57,7 @@ export class DatabaseMigrator {
       
       // Записываем в таблицу миграций
       await query(
-        'INSERT INTO migrations (filename) VALUES ($1)',
+        'INSERT INTO migrations (filename) VALUES (?)',
         [filename]
       );
       
@@ -110,7 +110,7 @@ export class DatabaseMigrator {
     
     // Удаляем запись о миграции
     await query(
-      'DELETE FROM migrations WHERE filename = $1',
+      'DELETE FROM migrations WHERE filename = ?',
       [lastMigration.filename]
     );
     

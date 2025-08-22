@@ -172,6 +172,37 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
     setLoadedStacksByShipment(initialLoadedStacks);
   }, [shipments]);
 
+  // Обновляем состояние при добавлении новых отгрузок
+  useEffect(() => {
+    setLoadedEquipmentByShipment(prev => {
+      const newState = { ...prev };
+      let hasChanges = false;
+      
+      shipments.forEach(shipment => {
+        if (!newState[shipment.id]) {
+          newState[shipment.id] = new Set();
+          hasChanges = true;
+        }
+      });
+      
+      return hasChanges ? newState : prev;
+    });
+    
+    setLoadedStacksByShipment(prev => {
+      const newState = { ...prev };
+      let hasChanges = false;
+      
+      shipments.forEach(shipment => {
+        if (!newState[shipment.id]) {
+          newState[shipment.id] = new Set();
+          hasChanges = true;
+        }
+      });
+      
+      return hasChanges ? newState : prev;
+    });
+  }, [shipments]);
+
   // Фильтрация отгрузок
   const filteredShipments = shipments.filter(shipment => {
     const matchesSearch = 
@@ -219,6 +250,8 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
   };
 
   const handleViewShipment = (shipment: Shipment) => {
+    if (!shipment) return;
+    
     console.log('=== handleViewShipment Debug ===');
     console.log('clicking on shipment:', shipment);
     console.log('shipment.equipment:', shipment.equipment);
@@ -227,6 +260,57 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
     console.log('================================');
     setSelectedShipment(shipment);
     setIsViewDialogOpen(true);
+  };
+
+  // Обработчики изменения состояния загрузки
+  const handleEquipmentLoadedChange = (shipmentId: string, equipmentId: string, isLoaded: boolean) => {
+    setLoadedEquipmentByShipment(prev => {
+      const newState = { ...prev };
+      if (!newState[shipmentId]) {
+        newState[shipmentId] = new Set();
+      }
+      
+      if (isLoaded) {
+        newState[shipmentId].add(equipmentId);
+      } else {
+        newState[shipmentId].delete(equipmentId);
+      }
+      
+      // Сохраняем в localStorage
+      const serialized = JSON.stringify(
+        Object.fromEntries(
+          Object.entries(newState).map(([key, value]) => [key, Array.from(value)])
+        )
+      );
+      localStorage.setItem('loadedEquipmentByShipment', serialized);
+      
+      return newState;
+    });
+  };
+
+  const handleStackLoadedChange = (shipmentId: string, stackId: string, isLoaded: boolean) => {
+    setLoadedStacksByShipment(prev => {
+      const newState = { ...prev };
+      if (!newState[shipmentId]) {
+        newState[shipmentId] = new Set();
+      }
+      
+      if (isLoaded) {
+        newState[shipmentId].add(stackId);
+      } else {
+        newState[shipmentId].delete(stackId);
+      }
+      
+      // Сохраняем в localStorage
+      const serialized = JSON.stringify(
+        Object.fromEntries(
+          Object.entries(newState).map(([key, value]) => [key, Array.from(value)])
+        )
+      );
+      localStorage.setItem('loadedStacksByShipment', serialized);
+      
+      return newState;
+    });
   };
 
   // Вычисление статистики
@@ -442,15 +526,18 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
       )}
 
       {/* Модальное окно просмотра отгрузки */}
-      <ShipmentDetailsModal
-        shipment={selectedShipment}
-        equipment={[]}
-        isOpen={isViewDialogOpen}
-        onClose={() => setIsViewDialogOpen(false)}
-        loadedEquipment={selectedShipment ? loadedEquipmentByShipment[selectedShipment.id] || new Set() : undefined}
-        loadedStacks={selectedShipment ? loadedStacksByShipment[selectedShipment.id] || new Set() : undefined}
-
-      />
+      {selectedShipment && (
+        <ShipmentDetailsModal
+          shipment={selectedShipment}
+          equipment={[]}
+          isOpen={isViewDialogOpen}
+          onClose={() => setIsViewDialogOpen(false)}
+          loadedEquipment={loadedEquipmentByShipment[selectedShipment.id] || new Set()}
+          loadedStacks={loadedStacksByShipment[selectedShipment.id] || new Set()}
+          onEquipmentLoadedChange={handleEquipmentLoadedChange}
+          onStackLoadedChange={handleStackLoadedChange}
+        />
+      )}
     </div>
   );
 }

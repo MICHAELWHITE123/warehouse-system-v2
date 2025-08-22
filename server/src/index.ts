@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
-import { testConnection } from './config/database';
+import { testSqliteConnection as testConnection } from './config/database-sqlite';
 import { migrator } from './database/migrator';
 import apiRoutes from './routes';
 

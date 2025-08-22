@@ -20,6 +20,8 @@ interface ShipmentDetailsModalProps {
   onClose: () => void;
   loadedEquipment?: Set<string>;
   loadedStacks?: Set<string>;
+  onEquipmentLoadedChange?: (shipmentId: string, equipmentId: string, isLoaded: boolean) => void;
+  onStackLoadedChange?: (shipmentId: string, stackId: string, isLoaded: boolean) => void;
 }
 
 export function ShipmentDetailsModal({
@@ -28,8 +30,11 @@ export function ShipmentDetailsModal({
   isOpen,
   onClose,
   loadedEquipment = new Set(),
-  loadedStacks = new Set()
+  loadedStacks = new Set(),
+  onEquipmentLoadedChange,
+  onStackLoadedChange
 }: ShipmentDetailsModalProps) {
+  // Если отгрузка не выбрана, не рендерим модальное окно
   if (!shipment) return null;
 
   const [localLoadedEquipment, setLocalLoadedEquipment] = useState<Set<string>>(new Set());
@@ -43,6 +48,19 @@ export function ShipmentDetailsModal({
     }
   }, [shipment, loadedEquipment, loadedStacks]);
 
+  // Синхронизация локального состояния с пропсами
+  useEffect(() => {
+    if (shipment && loadedEquipment) {
+      setLocalLoadedEquipment(new Set(loadedEquipment));
+    }
+  }, [shipment, loadedEquipment]);
+
+  useEffect(() => {
+    if (shipment && loadedStacks) {
+      setLocalLoadedStacks(new Set(loadedStacks));
+    }
+  }, [shipment, loadedStacks]);
+
   const handleEquipmentLoaded = (equipmentId: string, isLoaded: boolean) => {
     setLocalLoadedEquipment(prev => {
       const newSet = new Set(prev);
@@ -53,6 +71,11 @@ export function ShipmentDetailsModal({
       }
       return newSet;
     });
+    
+    // Вызываем callback для обновления состояния в родительском компоненте
+    if (onEquipmentLoadedChange) {
+      onEquipmentLoadedChange(shipment.id, equipmentId, isLoaded);
+    }
     
     toast.success(
       isLoaded 
@@ -71,6 +94,11 @@ export function ShipmentDetailsModal({
       }
       return newSet;
     });
+    
+    // Вызываем callback для обновления состояния в родительском компоненте
+    if (onStackLoadedChange) {
+      onStackLoadedChange(shipment.id, stackId, isLoaded);
+    }
     
     toast.success(
       isLoaded 
