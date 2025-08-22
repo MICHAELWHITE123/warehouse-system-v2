@@ -22,7 +22,6 @@ import {
   Eye,
   EyeOff,
   Shield,
-  Settings,
   Key,
   RefreshCw,
   History

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { QRScanner } from "./QRScanner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 import { toast } from "sonner";
-import { CanView, CanCreate, CanEdit, CanDelete, CanExport } from "./ui/PermissionGate";
+import { CanView, CanEdit, CanDelete } from "./ui/PermissionGate";
 
 export interface Equipment {
   id: string;

@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 import { Package, AlertCircle, TrendingUp, Building, QrCode } from "lucide-react";
 import { QRScanner } from "./QRScanner";
 import { Equipment } from "./EquipmentList";
-import { CanView, CanCreate, CanExport } from "./ui/PermissionGate";
+import { CanView } from "./ui/PermissionGate";
 
 interface DashboardStats {
   totalEquipment: number;

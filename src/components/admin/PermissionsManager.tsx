@@ -6,18 +6,13 @@ import { Label } from "../ui/label";
 import { Badge } from "../ui/badge";
 import { Separator } from "../ui/separator";
 import { 
-  Shield, 
   Package, 
   Users, 
   Truck, 
   FolderOpen, 
   MapPin, 
   Settings, 
-  FileText,
-  QrCode,
-  Download,
-  Database,
-  Upload
+  FileText
 } from "lucide-react";
 import { UserPermissions, UserRole, DEFAULT_PERMISSIONS } from "../../types/permissions";
 import { toast } from "sonner";

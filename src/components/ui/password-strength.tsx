@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Badge } from "./badge";
-import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle } from "lucide-react";
 
 interface PasswordStrengthProps {
   password: string;

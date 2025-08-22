@@ -49,18 +49,3 @@ export type ActiveView =
 export interface CountMap {
   [key: string]: number;
 }
-
-export interface User {
-  id: string;
-  username: string;
-  login: string;
-  nickname: string;
-  email: string;
-  fullName: string;
-  role: UserRole;
-  permissions: UserPermissions;
-  isActive: boolean;
-  lastLogin: string;
-  createdAt: string;
-  updatedAt: string;
-}
