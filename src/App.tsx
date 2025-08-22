@@ -382,8 +382,13 @@ export default function App() {
   };
 
   const handleCategoriesChange = async () => {
-    // Этот метод теперь работает через компонент CategoryManagement напрямую с БД
-    console.log("CategoriesChange called but handled by CategoryManagement component");
+    // Обновляем список категорий после изменений
+    try {
+      // Принудительно обновляем данные из базы
+      window.location.reload();
+    } catch (error) {
+      console.error('Ошибка обновления категорий:', error);
+    }
   };
 
   const renderContent = () => {
