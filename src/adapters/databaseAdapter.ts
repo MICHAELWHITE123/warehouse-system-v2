@@ -17,6 +17,21 @@ import { ExtendedShipment } from '../types';
 
 // Преобразование оборудования из БД в интерфейс компонента
 export function adaptEquipmentFromDB(dbEquipment: EquipmentWithRelations): Equipment {
+  // Извлекаем текст спецификации из объекта или строки
+  let specifications: string | undefined;
+  if (dbEquipment.specifications) {
+    if (typeof dbEquipment.specifications === 'string') {
+      try {
+        const parsed = JSON.parse(dbEquipment.specifications);
+        specifications = parsed.text || dbEquipment.specifications;
+      } catch {
+        specifications = dbEquipment.specifications;
+      }
+    } else if (typeof dbEquipment.specifications === 'object') {
+      specifications = (dbEquipment.specifications as any).text || JSON.stringify(dbEquipment.specifications);
+    }
+  }
+
   return {
     id: dbEquipment.uuid,
     name: dbEquipment.name,
@@ -26,7 +41,8 @@ export function adaptEquipmentFromDB(dbEquipment: EquipmentWithRelations): Equip
     location: dbEquipment.location_name || '',
     purchaseDate: dbEquipment.purchase_date || '',
     lastMaintenance: dbEquipment.last_maintenance,
-    assignedTo: dbEquipment.assigned_to
+    assignedTo: dbEquipment.assigned_to,
+    specifications: specifications // Добавляю поле спецификации
   };
 }
 
@@ -49,7 +65,8 @@ export function adaptEquipmentToDB(
     location_id: location?.id,
     purchase_date: equipment.purchaseDate || undefined,
     last_maintenance: equipment.lastMaintenance,
-    assigned_to: equipment.assignedTo
+    assigned_to: equipment.assignedTo,
+    specifications: equipment.specifications ? { text: equipment.specifications } : undefined // Преобразуем строку в объект
   };
 }
 

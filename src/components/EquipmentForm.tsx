@@ -37,6 +37,7 @@ export function EquipmentForm({
     purchaseDate: string;
     lastMaintenance: string;
     assignedTo: string;
+    specifications: string; // Спецификация/комментарии
   }>({
     name: "",
     category: "",
@@ -45,7 +46,8 @@ export function EquipmentForm({
     location: "",
     purchaseDate: "",
     lastMaintenance: "",
-    assignedTo: ""
+    assignedTo: "",
+    specifications: "" // Инициализация поля спецификации
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -62,7 +64,8 @@ export function EquipmentForm({
         location: equipment.location,
         purchaseDate: equipment.purchaseDate,
         lastMaintenance: equipment.lastMaintenance || "",
-        assignedTo: equipment.assignedTo || ""
+        assignedTo: equipment.assignedTo || "",
+        specifications: equipment.specifications || "" // Инициализация поля спецификации
       });
     }
   }, [equipment, isEditing]);
@@ -118,7 +121,8 @@ export function EquipmentForm({
       location: formData.location,
       purchaseDate: formData.purchaseDate,
       lastMaintenance: formData.lastMaintenance || undefined,
-      assignedTo: formData.assignedTo.trim() || undefined
+      assignedTo: formData.assignedTo.trim() || undefined,
+      specifications: formData.specifications.trim() || undefined
     };
 
     onSave(equipmentData);
@@ -331,6 +335,17 @@ export function EquipmentForm({
                     onChange={(e) => handleInputChange("lastMaintenance", e.target.value)}
                   />
                 </div>
+
+                <div>
+                  <Label htmlFor="specifications">Спецификация/Комментарии</Label>
+                  <textarea
+                    id="specifications"
+                    value={formData.specifications}
+                    onChange={(e) => handleInputChange("specifications", e.target.value)}
+                    placeholder="Введите технические характеристики, особенности или комментарии к оборудованию..."
+                    className="w-full min-h-[100px] px-3 py-2 border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 rounded-md resize-vertical"
+                  />
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -393,6 +408,16 @@ export function EquipmentForm({
                   <span className="text-muted-foreground">Местоположение:</span>
                   <span>{formData.location || "Не выбрано"}</span>
                 </div>
+                {formData.specifications && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Спецификация:</span>
+                    <span className="text-xs max-w-[150px] truncate" title={formData.specifications}>
+                      {formData.specifications.length > 20 
+                        ? formData.specifications.substring(0, 20) + "..." 
+                        : formData.specifications}
+                    </span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

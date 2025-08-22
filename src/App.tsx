@@ -3,6 +3,7 @@ import { Navigation } from "./components/Navigation";
 import { Dashboard } from "./components/Dashboard";
 import { EquipmentList, Equipment } from "./components/EquipmentList";
 import { EquipmentForm } from "./components/EquipmentForm";
+import { EquipmentDetails } from "./components/EquipmentDetails";
 import { CategoryManagement } from "./components/CategoryManagement";
 import { LocationManagement } from "./components/LocationManagement";
 import { StackManagement, EquipmentStack } from "./components/StackManagement";
@@ -16,7 +17,7 @@ import { toast } from "sonner";
 
 // Импорты для работы с базой данных
 import { ExtendedShipment, ActiveView } from "./types";
-import { calculateStats, calculateEquipmentCountByCategory, calculateEquipmentCountByLocation } from "./utils/statistics";
+import { calculateStats, calculateEquipmentCountByCategory } from "./utils/statistics";
 import { useTheme } from "./hooks/useTheme";
 import { useAuth } from "./hooks/useAuth";
 import { useDatabase, useEquipment, useCategories, useLocations, useStacks, useShipments, useStatistics } from "./hooks/useDatabase";
@@ -50,6 +51,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [isFormVisible, setIsFormVisible] = useState(false);
+  const [isEquipmentDetailsVisible, setIsEquipmentDetailsVisible] = useState(false); // Состояние для отображения деталей
   
   // Состояние для стеков
   const [selectedStack, setSelectedStack] = useState<EquipmentStack | null>(null);
@@ -76,7 +78,6 @@ export default function App() {
   // Используем статистику из БД или рассчитываем локально как fallback
   const stats = dbStats || calculateStats(equipment, stacks, shipments);
   const equipmentCountByCategory = calculateEquipmentCountByCategory(equipment);
-  const equipmentCountByLocation = calculateEquipmentCountByLocation(equipment);
   const notificationCount = stats.maintenanceEquipment;
 
   // Обработчики для оборудования
@@ -99,8 +100,20 @@ export default function App() {
         if (dbEquipmentItem) {
           const equipmentData = adaptEquipmentToDB(updatedEquipment, dbCategories, dbLocations, selectedEquipment.id);
           await updateEquipment({ ...equipmentData, id: dbEquipmentItem.id });
-          setSelectedEquipment(null);
+          
+          // Обновляем выбранное оборудование с новыми данными
+          const updatedEquipmentWithId = { ...updatedEquipment, id: selectedEquipment.id };
+          setSelectedEquipment(updatedEquipmentWithId);
+          
           setIsFormVisible(false);
+          // Возвращаемся к деталям, если пользователь был там
+          if (isEquipmentDetailsVisible) {
+            setActiveView("view-equipment");
+          } else {
+            setSelectedEquipment(null);
+            setActiveView("equipment");
+          }
+          
           toast.success("Оборудование успешно обновлено");
         }
       } catch (error) {
@@ -112,13 +125,20 @@ export default function App() {
 
   const handleViewEquipment = (item: Equipment) => {
     setSelectedEquipment(item);
-    setIsFormVisible(true);
+    setIsEquipmentDetailsVisible(true);
     setActiveView("view-equipment");
+  };
+
+  const handleEquipmentDetailsBack = () => {
+    setIsEquipmentDetailsVisible(false);
+    setSelectedEquipment(null);
+    setActiveView("equipment");
   };
 
   const handleEditEquipmentClick = (item: Equipment) => {
     setSelectedEquipment(item);
     setIsFormVisible(true);
+    setIsEquipmentDetailsVisible(false); // Скрываем детали при редактировании
     setActiveView("edit-equipment");
   };
 
@@ -351,8 +371,14 @@ export default function App() {
 
   const handleFormCancel = () => {
     setIsFormVisible(false);
-    setSelectedEquipment(null);
-    setActiveView("equipment");
+    if (isEquipmentDetailsVisible) {
+      // Если пользователь был в деталях, возвращаемся туда
+      setActiveView("view-equipment");
+    } else {
+      // Иначе возвращаемся к списку
+      setSelectedEquipment(null);
+      setActiveView("equipment");
+    }
   };
 
   const handleCategoriesChange = async () => {
@@ -360,12 +386,17 @@ export default function App() {
     console.log("CategoriesChange called but handled by CategoryManagement component");
   };
 
-  const handleLocationsChange = async () => {
-    // Этот метод теперь работает через компонент LocationManagement напрямую с БД
-    console.log("LocationsChange called but handled by LocationManagement component");
-  };
-
   const renderContent = () => {
+    if (isEquipmentDetailsVisible && selectedEquipment) {
+      return (
+        <EquipmentDetails
+          equipment={selectedEquipment}
+          onBack={handleEquipmentDetailsBack}
+          onEdit={handleEditEquipmentClick}
+        />
+      );
+    }
+
     if (isFormVisible) {
       return (
         <EquipmentForm

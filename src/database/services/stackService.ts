@@ -94,11 +94,9 @@ export class StackService {
   }
 
   // Обновить стек
-  updateStack(stack: UpdateEquipmentStack): DbEquipmentStack | null {
-    const now = new Date().toISOString();
-    const updatedStack = {
-      ...stack,
-      updated_at: now
+  updateStack(stack: UpdateEquipmentStack & { id: number }): DbEquipmentStack | null {
+    const updatedStack: UpdateEquipmentStack = {
+      ...stack
     };
 
     return this.db.update('equipment_stacks', stack.id, updatedStack) as DbEquipmentStack | null;

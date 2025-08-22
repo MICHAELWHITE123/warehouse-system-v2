@@ -20,6 +20,7 @@ export interface Equipment {
   purchaseDate: string;
   lastMaintenance?: string;
   assignedTo?: string;
+  specifications?: string; // Спецификация/комментарии к технике
 }
 
 interface EquipmentListProps {
@@ -46,7 +47,8 @@ export function EquipmentList({ equipment, onEdit, onView, onDelete }: Equipment
     const matchesSearch = 
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchTerm.toLowerCase());
+      item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.specifications && item.specifications.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
     const matchesStatus = statusFilter === "all" || item.status === statusFilter;
@@ -235,6 +237,17 @@ export function EquipmentList({ equipment, onEdit, onView, onDelete }: Equipment
                         <span className="text-muted-foreground">Последнее ТО:</span>
                         <span className="font-medium">
                           {new Date(item.lastMaintenance).toLocaleDateString('ru-RU')}
+                        </span>
+                      </div>
+                    )}
+                    {item.specifications && (
+                      <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
+                        <span className="text-muted-foreground">Спецификация:</span>
+                        <span className="font-medium break-words max-w-[120px] text-xs" 
+                              title={item.specifications}>
+                          {item.specifications.length > 25 
+                            ? item.specifications.substring(0, 25) + "..." 
+                            : item.specifications}
                         </span>
                       </div>
                     )}

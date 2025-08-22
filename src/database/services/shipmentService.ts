@@ -183,11 +183,9 @@ export class ShipmentService {
   }
 
   // Обновить отгрузку
-  updateShipment(shipment: UpdateShipment): DbShipment | null {
-    const now = new Date().toISOString();
-    const updatedShipment = {
-      ...shipment,
-      updated_at: now
+  updateShipment(shipment: UpdateShipment & { id: number }): DbShipment | null {
+    const updatedShipment: UpdateShipment = {
+      ...shipment
     };
 
     return this.db.update('shipments', shipment.id, updatedShipment) as DbShipment | null;

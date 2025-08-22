@@ -114,11 +114,9 @@ export class EquipmentService {
   }
 
   // Обновить оборудование
-  updateEquipment(equipment: UpdateEquipment): DbEquipment | null {
-    const now = new Date().toISOString();
-    const updatedEquipment = {
-      ...equipment,
-      updated_at: now
+  updateEquipment(equipment: UpdateEquipment & { id: number }): DbEquipment | null {
+    const updatedEquipment: UpdateEquipment = {
+      ...equipment
     };
 
     return this.db.update('equipment', equipment.id, updatedEquipment) as DbEquipment | null;
