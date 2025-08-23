@@ -12,6 +12,7 @@ import { ShipmentList } from "./components/ShipmentList";
 import { ShipmentForm } from "./components/ShipmentForm";
 import { AuthForm } from "./components/AuthForm";
 import { AdminPanel } from "./components/AdminPanel";
+import { SyncNotifications } from "./components/SyncNotifications";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
 
@@ -573,6 +574,9 @@ export default function App() {
           </div>
         </main>
       </div>
+
+      {/* Уведомления о синхронизации */}
+      <SyncNotifications />
 
       <Toaster 
         position="top-right"

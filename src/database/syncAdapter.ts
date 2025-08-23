@@ -33,6 +33,7 @@ class SyncAdapter {
   private isOnline: boolean = navigator.onLine;
   private isSyncing: boolean = false;
   private lastSync: number = 0;
+  private syncTimeout: NodeJS.Timeout | null = null;
   private syncInterval: NodeJS.Timeout | null = null;
   private conflicts: SyncConflict[] = [];
 
@@ -116,11 +117,11 @@ class SyncAdapter {
 
   // Запланировать синхронизацию
   private scheduleSync(): void {
-    if (this.syncInterval) {
-      clearTimeout(this.syncInterval);
+    if (this.syncTimeout) {
+      clearTimeout(this.syncTimeout);
     }
 
-    this.syncInterval = setTimeout(() => {
+    this.syncTimeout = setTimeout(() => {
       this.performSync();
     }, 1000); // Задержка 1 секунда
   }
@@ -154,6 +155,9 @@ class SyncAdapter {
       this.lastSync = Date.now();
       
       console.log('Sync completed successfully');
+      
+      // ПОСЛЕ отправки своих операций, получаем операции от других устройств
+      await this.pullOperationsFromServer();
       
     } catch (error) {
       console.error('Sync failed:', error);
@@ -261,17 +265,23 @@ class SyncAdapter {
   }
 
   // Применить удаленную операцию
-  private applyRemoteOperation(operation: SyncOperation): void {
-    switch (operation.operation) {
-      case 'create':
-        this.db.insert(operation.table, operation.data);
-        break;
-      case 'update':
-        this.db.update(operation.table, operation.data.id, operation.data);
-        break;
-      case 'delete':
-        this.db.delete(operation.table, operation.data.id);
-        break;
+  private async applyRemoteOperation(operation: SyncOperation): Promise<void> {
+    try {
+      switch (operation.operation) {
+        case 'create':
+          await this.db.insert(operation.table, operation.data);
+          break;
+        case 'update':
+          await this.db.update(operation.table, operation.data.id, operation.data);
+          break;
+        case 'delete':
+          await this.db.delete(operation.table, operation.data.id);
+          break;
+      }
+      console.log(`Applied remote operation: ${operation.operation} on ${operation.table}`);
+    } catch (error) {
+      console.error(`Failed to apply remote operation ${operation.operation} on ${operation.table}:`, error);
+      throw error;
     }
   }
 
@@ -289,7 +299,13 @@ class SyncAdapter {
   // Принудительная синхронизация
   async forceSync(): Promise<void> {
     if (this.isOnline) {
-      await this.performSync();
+      // Сначала отправляем свои операции
+      if (this.syncQueue.length > 0) {
+        await this.performSync();
+      } else {
+        // Если нет операций для отправки, только получаем с сервера
+        await this.pullOperationsFromServer();
+      }
     }
   }
 
@@ -302,6 +318,26 @@ class SyncAdapter {
   // Установить пользователя
   setUser(userId: string): void {
     this.userId = userId;
+    // При смене пользователя сразу синхронизируемся для получения данных
+    if (this.isOnline) {
+      this.scheduleInitialSync();
+    }
+  }
+
+  // Запланировать начальную синхронизацию для нового пользователя
+  private scheduleInitialSync(): void {
+    if (this.syncTimeout) {
+      clearTimeout(this.syncTimeout);
+    }
+    
+    this.syncTimeout = setTimeout(async () => {
+      try {
+        console.log('Performing initial sync for new user...');
+        await this.pullOperationsFromServer();
+      } catch (error) {
+        console.error('Initial sync failed:', error);
+      }
+    }, 2000); // Задержка 2 секунды для стабилизации
   }
 
   // Получить количество операций в очереди
@@ -314,15 +350,88 @@ class SyncAdapter {
     return this.conflicts.length;
   }
 
+  // НОВАЯ ФУНКЦИЯ: Получение операций от других устройств с сервера
+  private async pullOperationsFromServer(): Promise<void> {
+    try {
+      console.log('Pulling operations from server...');
+      
+      const { getApiUrl, getAuthHeaders } = await import('../config/api');
+      
+      // Получаем операции от других устройств
+      const response = await fetch(getApiUrl(`sync/operations?deviceId=${this.deviceId}&lastSync=${this.lastSync}`), {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data && result.data.length > 0) {
+        console.log(`Received ${result.data.length} operations from other devices`);
+        
+        // Применяем полученные операции к локальной базе
+        for (const operation of result.data) {
+          await this.applyRemoteOperation({
+            id: operation.operation_id,
+            table: operation.table_name,
+            operation: operation.operation_type,
+            data: JSON.parse(operation.data),
+            timestamp: new Date(operation.timestamp).getTime(),
+            deviceId: operation.source_device_id,
+            userId: operation.user_id
+          });
+          
+          // Подтверждаем получение операции
+          await this.acknowledgeOperation(operation.operation_id);
+        }
+        
+        // Обновляем время последней синхронизации
+        this.lastSync = Date.now();
+        
+        console.log('Successfully applied operations from other devices');
+      }
+      
+    } catch (error) {
+      console.error('Failed to pull operations from server:', error);
+      // Не прерываем основную синхронизацию из-за этой ошибки
+    }
+  }
+
+  // НОВАЯ ФУНКЦИЯ: Подтверждение получения операции
+  private async acknowledgeOperation(operationId: string): Promise<void> {
+    try {
+      const { getApiUrl, getAuthHeaders } = await import('../config/api');
+      
+      await fetch(getApiUrl(`sync/operations/${operationId}/acknowledge`), {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          deviceId: this.deviceId
+        })
+      });
+    } catch (error) {
+      console.error('Failed to acknowledge operation:', error);
+    }
+  }
+
   // Запустить автоматическую синхронизацию
   startAutoSync(intervalMs: number = 30000): void {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
     }
 
-    this.syncInterval = setInterval(() => {
-      if (this.isOnline && this.syncQueue.length > 0) {
-        this.performSync();
+    this.syncInterval = setInterval(async () => {
+      if (this.isOnline) {
+        // Если есть операции для отправки, синхронизируем
+        if (this.syncQueue.length > 0) {
+          await this.performSync();
+        } else {
+          // Если нет операций для отправки, только получаем с сервера
+          await this.pullOperationsFromServer();
+        }
       }
     }, intervalMs);
   }
@@ -332,6 +441,10 @@ class SyncAdapter {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
       this.syncInterval = null;
+    }
+    if (this.syncTimeout) {
+      clearTimeout(this.syncTimeout);
+      this.syncTimeout = null;
     }
   }
 
@@ -348,6 +461,4 @@ class SyncAdapter {
 // Создаем единственный экземпляр адаптера синхронизации
 export const syncAdapter = new SyncAdapter();
 
-// Экспортируем типы
-export type { SyncOperation, SyncConflict, SyncStatus };
 export default SyncAdapter;

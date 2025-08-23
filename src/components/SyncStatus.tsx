@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { syncAdapter, type SyncStatus, type SyncConflict } from '../database/syncAdapter';
+import { syncAdapter, type SyncStatus as SyncStatusType } from '../database/syncAdapter';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -10,7 +10,6 @@ import {
   Wifi, 
   WifiOff, 
   AlertTriangle, 
-  CheckCircle, 
   Clock,
   Smartphone,
   Monitor,
@@ -18,7 +17,7 @@ import {
 } from 'lucide-react';
 
 export const SyncStatus: React.FC = () => {
-  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatusType | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
@@ -117,6 +116,16 @@ export const SyncStatus: React.FC = () => {
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
               Синхронизировать
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleForceSync}
+              disabled={isSyncing || !isOnline}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Получить изменения
             </Button>
             <Button
               variant="ghost"

@@ -73,12 +73,6 @@ export function InventoryOverview({
   }
   console.log('=============================');
 
-  // Простой тест для проверки работы компонента
-  const testClick = () => {
-    console.log('Тестовая кнопка нажата!');
-    toast.success('Тестовая кнопка работает!');
-  };
-
   // Получаем уникальные значения для фильтров
   const categories = Array.from(new Set(equipment.map(item => item.category)));
   const locations = Array.from(new Set(equipment.map(item => item.location)));
@@ -294,24 +288,6 @@ export function InventoryOverview({
           </div>
         </CardHeader>
         <CardContent>
-          {/* Тестовая кнопка */}
-          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-sm font-medium text-yellow-800">Тестовая панель</h4>
-                <p className="text-xs text-yellow-600">Проверка работы компонента</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={testClick}
-                className="text-yellow-700 border-yellow-300 hover:bg-yellow-100"
-              >
-                Тест
-              </Button>
-            </div>
-          </div>
-
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
               <div className="flex items-center justify-center mb-1">
@@ -416,42 +392,6 @@ export function InventoryOverview({
 
   return (
     <div className="space-y-6">
-      {/* Тестовая панель */}
-      <Card className="border-yellow-200 bg-yellow-50">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium text-yellow-800">Тестовая панель</h3>
-              <p className="text-sm text-yellow-600">Проверка работы компонента и отладка</p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={testClick}
-                className="text-yellow-700 border-yellow-300 hover:bg-yellow-100"
-              >
-                Тест
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  console.log('Проверка состояния компонента');
-                  console.log('loadingEquipment:', Array.from(loadingEquipment));
-                  console.log('searchTerm:', searchTerm);
-                  console.log('filterCategory:', filterCategory);
-                  console.log('filterLocation:', filterLocation);
-                }}
-                className="text-yellow-700 border-yellow-300 hover:bg-yellow-100"
-              >
-                Состояние
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Общая статистика */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>

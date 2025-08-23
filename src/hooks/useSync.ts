@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { syncAdapter, type SyncStatus, type SyncConflict } from '../database/syncAdapter';
+import { syncAdapter, type SyncStatus } from '../database/syncAdapter';
 import { useAuth } from './useAuth';
 
 export const useSync = () => {
@@ -67,8 +67,13 @@ export const useSync = () => {
 
   useEffect(() => {
     // Устанавливаем пользователя в адаптер синхронизации
-    if (user?.id) {
-      syncAdapter.setUser(user.id.toString());
+    if (user?.username) {
+      syncAdapter.setUser(user.username);
+      
+      // Принудительно синхронизируемся при входе пользователя
+      setTimeout(() => {
+        forceSync();
+      }, 1000);
     }
 
     // Обновляем статус при монтировании
@@ -85,7 +90,7 @@ export const useSync = () => {
       window.removeEventListener('sync-conflict', handleSyncEvent);
       stopAutoSync();
     };
-  }, [user?.id, updateStatus, startAutoSync, stopAutoSync]);
+  }, [user?.username, updateStatus, startAutoSync, stopAutoSync, forceSync]);
 
   // Обновляем статус каждые 5 секунд
   useEffect(() => {
