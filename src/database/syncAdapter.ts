@@ -367,8 +367,18 @@ class SyncAdapter {
       
       const { getApiUrl, getAuthHeaders } = await import('../config/api');
       
+      // Проверяем, доступен ли сервер
+      const apiUrl = getApiUrl(`sync/operations?deviceId=${this.deviceId}&lastSync=${this.lastSync}`);
+      
+      // Если URL указывает на localhost, но мы на Vercel, пропускаем серверную синхронизацию
+      if (apiUrl.includes('localhost') && window.location.hostname.includes('vercel.app')) {
+        console.log('On Vercel, skipping server sync to localhost');
+        await this.pullOperationsFromLocalStorage();
+        return;
+      }
+      
       // Получаем операции от других устройств
-      const response = await fetch(getApiUrl(`sync/operations?deviceId=${this.deviceId}&lastSync=${this.lastSync}`), {
+      const response = await fetch(apiUrl, {
         method: 'GET',
         headers: getAuthHeaders()
       });
@@ -437,8 +447,41 @@ class SyncAdapter {
         
         console.log('Successfully applied operations from localStorage');
       }
+      
+      // Также проверяем операции из других вкладок
+      await this.checkForTabOperations();
+      
     } catch (error) {
       console.error('LocalStorage sync failed:', error);
+    }
+  }
+
+  // НОВАЯ ФУНКЦИЯ: Проверка операций из других вкладок
+  private async checkForTabOperations(): Promise<void> {
+    try {
+      // Слушаем изменения в localStorage от других вкладок
+      const storageKey = `warehouse-tab-sync-${this.deviceId}`;
+      const tabOperations = localStorage.getItem(storageKey);
+      
+      if (tabOperations) {
+        const operations = JSON.parse(tabOperations);
+        const newOperations = operations.filter((op: SyncOperation) => 
+          op.timestamp > this.lastSync
+        );
+        
+        if (newOperations.length > 0) {
+          console.log(`Found ${newOperations.length} operations from other tabs`);
+          
+          for (const operation of newOperations) {
+            await this.applyRemoteOperation(operation);
+          }
+          
+          this.lastSync = Date.now();
+          console.log('Successfully applied operations from other tabs');
+        }
+      }
+    } catch (error) {
+      console.error('Tab operations check failed:', error);
     }
   }
 

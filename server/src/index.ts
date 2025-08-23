@@ -16,8 +16,19 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  credentials: true
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:4173',
+    'http://localhost:4174',
+    'http://localhost:4175',
+    'http://localhost:4176',
+    'https://warehouse-system-v2.vercel.app',
+    'https://warehouse-system-v2.vercel.app/',
+    ...(process.env.CORS_ORIGIN ? [process.env.CORS_ORIGIN] : [])
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
 app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));

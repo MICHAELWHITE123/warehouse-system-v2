@@ -1,7 +1,20 @@
 // Конфигурация API
 export const API_CONFIG = {
-  // Базовый URL API
-  BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
+  // Базовый URL API - автоматически определяется по окружению
+  BASE_URL: (() => {
+    // Если указан переменная окружения, используем её
+    if (import.meta.env.VITE_API_URL) {
+      return import.meta.env.VITE_API_URL;
+    }
+    
+    // Если на Vercel, используем локальный сервер (для разработки)
+    if (window.location.hostname.includes('vercel.app')) {
+      return 'http://localhost:3001/api';
+    }
+    
+    // По умолчанию локальный сервер
+    return 'http://localhost:3001/api';
+  })(),
   
   // Таймауты
   TIMEOUT: 30000, // 30 секунд
