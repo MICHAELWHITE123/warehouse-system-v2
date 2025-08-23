@@ -238,6 +238,8 @@ class SyncAdapter {
       // Если API недоступен, results будет пустым массивом
       if (results.length === 0) {
         console.log('API not available, skipping server sync but keeping operations in queue');
+        // Проверяем, не застряли ли операции слишком долго
+        await this.checkForStuckOperations();
         // Не удаляем операции из очереди, так как они не были отправлены
         // Просто получаем операции от других устройств через localStorage
         await this.pullOperationsFromLocalStorage();
@@ -280,6 +282,8 @@ class SyncAdapter {
       } else {
         // Другие ошибки - оставляем операции в очереди для повторной попытки
         console.log('Other error, keeping operations in queue for retry');
+        // Но проверяем, не застряли ли операции слишком долго
+        await this.checkForStuckOperations();
       }
     } finally {
       this.isSyncing = false;
@@ -751,6 +755,29 @@ class SyncAdapter {
     }
   }
 
+  // НОВАЯ ФУНКЦИЯ: Проверка застрявших операций
+  private async checkForStuckOperations(): Promise<void> {
+    const now = Date.now();
+    const stuckThreshold = 5 * 60 * 1000; // 5 минут
+    
+    // Фильтруем операции, которые застряли слишком долго
+    const stuckOperations = this.syncQueue.filter(op => {
+      const timeSinceCreation = now - op.timestamp;
+      return timeSinceCreation > stuckThreshold;
+    });
+    
+    if (stuckOperations.length > 0) {
+      console.log(`Found ${stuckOperations.length} stuck operations, removing them to prevent infinite loops`);
+      
+      // Удаляем застрявшие операции
+      this.syncQueue = this.syncQueue.filter(op => !stuckOperations.includes(op));
+      this.saveSyncQueue();
+      
+      // Обновляем время последней синхронизации чтобы не блокировать новые операции
+      this.lastSync = now;
+    }
+  }
+
   // НОВАЯ ФУНКЦИЯ: Сохранение операции в localStorage для синхронизации между вкладками
   private saveOperationToLocalStorage(operation: SyncOperation): void {
     try {
@@ -798,6 +825,9 @@ class SyncAdapter {
   private getAllOperationsFromLocalStorage(): SyncOperation[] {
     try {
       const allOperations: SyncOperation[] = [];
+      const now = Date.now();
+      const maxAge = 24 * 60 * 60 * 1000; // 24 часа
+      
       console.log('Scanning localStorage for operations...');
       
       // Получаем все операции из localStorage
@@ -809,16 +839,27 @@ class SyncAdapter {
             const operations = JSON.parse(localStorage.getItem(key) || '[]');
             console.log('Operations in key', key, ':', operations);
             if (Array.isArray(operations)) {
-              // Добавляем все операции, которые новее последней синхронизации
-              const newOperations = operations.filter((op: SyncOperation) => {
+              // Фильтруем операции по времени и новизне
+              const validOperations = operations.filter((op: SyncOperation) => {
                 const isNew = op.timestamp > this.lastSync;
-                console.log(`Operation ${op.id}: timestamp ${op.timestamp}, lastSync ${this.lastSync}, isNew: ${isNew}`);
-                return isNew;
+                const isNotTooOld = (now - op.timestamp) < maxAge;
+                console.log(`Operation ${op.id}: timestamp ${op.timestamp}, lastSync ${this.lastSync}, isNew: ${isNew}, isNotTooOld: ${isNotTooOld}`);
+                return isNew && isNotTooOld;
               });
-              allOperations.push(...newOperations);
+              
+              // Если есть старые операции, очищаем их
+              if (validOperations.length < operations.length) {
+                const oldOperationsCount = operations.length - validOperations.length;
+                console.log(`Cleaning up ${oldOperationsCount} old operations from ${key}`);
+                localStorage.setItem(key, JSON.stringify(validOperations));
+              }
+              
+              allOperations.push(...validOperations);
             }
           } catch (e) {
             console.warn('Failed to parse localStorage operation:', e);
+            // Если не можем распарсить, очищаем поврежденные данные
+            localStorage.removeItem(key);
           }
         }
       }
