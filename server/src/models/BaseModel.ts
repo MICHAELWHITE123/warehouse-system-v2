@@ -1,25 +1,18 @@
-import { Pool } from 'pg';
-import { pool } from '../config/database';
+import { query, queryOne } from '../config/database-sqlite';
 
 export abstract class BaseModel {
-  protected pool: Pool;
-
-  constructor() {
-    this.pool = pool;
-  }
-
-  protected async executeQuery<T = any>(query: string, params: any[] = []): Promise<T[]> {
+  protected async executeQuery<T = any>(queryText: string, params: any[] = []): Promise<T[]> {
     try {
-      const result = await this.pool.query(query, params);
-      return result.rows;
+      const result = await query(queryText, params);
+      return result;
     } catch (error) {
       console.error('Database query error:', error);
       throw error;
     }
   }
 
-  protected async executeQuerySingle<T = any>(query: string, params: any[] = []): Promise<T | null> {
-    const result = await this.executeQuery<T>(query, params);
+  protected async executeQuerySingle<T = any>(queryText: string, params: any[] = []): Promise<T | null> {
+    const result = await this.executeQuery<T>(queryText, params);
     return result.length > 0 ? result[0] : null;
   }
 
@@ -31,10 +24,10 @@ export abstract class BaseModel {
     for (const [key, value] of Object.entries(conditions)) {
       if (value !== undefined && value !== null) {
         if (typeof value === 'string' && key.includes('search')) {
-          whereParts.push(`${key.replace('_search', '')} ILIKE $${paramIndex}`);
+          whereParts.push(`${key.replace('_search', '')} LIKE ?`);
           params.push(`%${value}%`);
         } else {
-          whereParts.push(`${key} = $${paramIndex}`);
+          whereParts.push(`${key} = ?`);
           params.push(value);
         }
         paramIndex++;

@@ -36,6 +36,8 @@ class SyncAdapter {
   private syncTimeout: NodeJS.Timeout | null = null;
   private syncInterval: NodeJS.Timeout | null = null;
   private conflicts: SyncConflict[] = [];
+  private lastSyncAttempt: number = 0;
+  private syncRetryDelay: number = 30000; // 30 секунд между попытками
 
   constructor() {
     this.db = getDatabase();
@@ -353,6 +355,14 @@ class SyncAdapter {
   // НОВАЯ ФУНКЦИЯ: Получение операций от других устройств с сервера
   private async pullOperationsFromServer(): Promise<void> {
     try {
+      // Проверяем, не слишком ли рано для повторной попытки
+      const now = Date.now();
+      if (now - this.lastSyncAttempt < this.syncRetryDelay) {
+        console.log('Skipping server sync - too soon after last attempt');
+        return;
+      }
+      
+      this.lastSyncAttempt = now;
       console.log('Pulling operations from server...');
       
       const { getApiUrl, getAuthHeaders } = await import('../config/api');
@@ -364,6 +374,11 @@ class SyncAdapter {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          // Не авторизован - не повторяем попытку
+          console.log('Not authenticated, skipping server sync');
+          return;
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -396,7 +411,65 @@ class SyncAdapter {
       
     } catch (error) {
       console.error('Failed to pull operations from server:', error);
-      // Не прерываем основную синхронизацию из-за этой ошибки
+      
+      // FALLBACK: Если сервер недоступен, используем localStorage синхронизацию
+      console.log('Falling back to localStorage sync...');
+      await this.pullOperationsFromLocalStorage();
+    }
+  }
+
+  // НОВАЯ ФУНКЦИЯ: Fallback синхронизация через localStorage
+  private async pullOperationsFromLocalStorage(): Promise<void> {
+    try {
+      // Получаем операции из localStorage других устройств
+      const otherDeviceOperations = this.getOtherDeviceOperations();
+      
+      if (otherDeviceOperations.length > 0) {
+        console.log(`Found ${otherDeviceOperations.length} operations from other devices in localStorage`);
+        
+        // Применяем операции
+        for (const operation of otherDeviceOperations) {
+          await this.applyRemoteOperation(operation);
+        }
+        
+        // Обновляем время последней синхронизации
+        this.lastSync = Date.now();
+        
+        console.log('Successfully applied operations from localStorage');
+      }
+    } catch (error) {
+      console.error('LocalStorage sync failed:', error);
+    }
+  }
+
+  // НОВАЯ ФУНКЦИЯ: Получение операций других устройств из localStorage
+  private getOtherDeviceOperations(): SyncOperation[] {
+    try {
+      const allOperations: SyncOperation[] = [];
+      
+      // Получаем все операции из localStorage
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('warehouse-sync-')) {
+          try {
+            const operations = JSON.parse(localStorage.getItem(key) || '[]');
+            if (Array.isArray(operations)) {
+              // Фильтруем операции от других устройств
+              const otherDeviceOps = operations.filter((op: SyncOperation) => 
+                op.deviceId !== this.deviceId && op.timestamp > this.lastSync
+              );
+              allOperations.push(...otherDeviceOps);
+            }
+          } catch (e) {
+            console.warn('Failed to parse localStorage operation:', e);
+          }
+        }
+      }
+      
+      return allOperations;
+    } catch (error) {
+      console.error('Error getting other device operations:', error);
+      return [];
     }
   }
 
@@ -425,6 +498,15 @@ class SyncAdapter {
 
     this.syncInterval = setInterval(async () => {
       if (this.isOnline) {
+        // Проверяем, не слишком ли рано для повторной попытки
+        const now = Date.now();
+        if (now - this.lastSyncAttempt < this.syncRetryDelay) {
+          console.log('Skipping sync - too soon after last attempt');
+          return;
+        }
+        
+        this.lastSyncAttempt = now;
+        
         // Если есть операции для отправки, синхронизируем
         if (this.syncQueue.length > 0) {
           await this.performSync();
