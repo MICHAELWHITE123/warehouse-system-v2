@@ -7,14 +7,10 @@ export const API_CONFIG = {
       return import.meta.env.VITE_API_URL;
     }
     
-    // Если на Vercel, используем Supabase
+    // Если на Vercel, используем собственный API
     if (window.location.hostname.includes('vercel.app')) {
-      // В production на Vercel используем Supabase
-      if (import.meta.env.VITE_SUPABASE_URL) {
-        return import.meta.env.VITE_SUPABASE_URL;
-      }
-      // Если Supabase не настроен, отключаем синхронизацию
-      return '';
+      // В production на Vercel используем встроенный API
+      return `${window.location.origin}/api`;
     }
     
     // По умолчанию локальный сервер для разработки
@@ -54,6 +50,13 @@ export const getApiUrl = (endpoint: string): string => {
     return `${cleanBaseUrl}/rest/v1/${endpoint}`;
   }
   
+  // Если это Vercel API, используем прямые пути
+  if (baseUrl.includes('/api')) {
+    const cleanBaseUrl = baseUrl.replace(/\/$/, ''); // Убираем trailing slash
+    const cleanEndpoint = endpoint.replace(/^\//, ''); // Убираем leading slash
+    return `${cleanBaseUrl}/${cleanEndpoint}`;
+  }
+  
   const cleanBaseUrl = baseUrl.replace(/\/$/, ''); // Убираем trailing slash
   const cleanEndpoint = endpoint.replace(/^\//, ''); // Убираем leading slash
   return `${cleanBaseUrl}/${cleanEndpoint}`;
@@ -75,6 +78,14 @@ export const getAuthHeaders = (): Record<string, string> => {
       ...API_CONFIG.DEFAULT_HEADERS,
       'apikey': supabaseKey || '',
       'Authorization': `Bearer ${supabaseKey || ''}`,
+      ...(token && { 'Authorization': `Bearer ${token}` })
+    };
+  }
+  
+  // Для Vercel API используем стандартные заголовки
+  if (API_CONFIG.BASE_URL.includes('/api')) {
+    return {
+      ...API_CONFIG.DEFAULT_HEADERS,
       ...(token && { 'Authorization': `Bearer ${token}` })
     };
   }

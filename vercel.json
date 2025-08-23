@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "name": "warehouse-system",
   "builds": [
     {
       "src": "package.json",
@@ -11,20 +12,30 @@
   ],
   "routes": [
     {
-      "src": "/assets/(.*)",
-      "dest": "/assets/$1"
-    },
-    {
-      "src": "/(.*\\.js)",
-      "dest": "/$1"
-    },
-    {
-      "src": "/(.*\\.css)",
-      "dest": "/$1"
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
     },
     {
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ]
+  ],
+  "functions": {
+    "api/sync.js": {
+      "runtime": "nodejs18.x"
+    },
+    "api/sync/operations.js": {
+      "runtime": "nodejs18.x"
+    },
+    "api/sync/operations/[id]/acknowledge.js": {
+      "runtime": "nodejs18.x"
+    },
+    "api/status.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "env": {
+    "KV_REST_API_URL": "@kv_rest_api_url",
+    "KV_REST_API_TOKEN": "@kv_rest_api_token"
+  }
 }

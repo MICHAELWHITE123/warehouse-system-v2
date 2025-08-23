@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "start": "npm run build && npm run preview",
     "api": "node api-server.cjs",
-    "api:json": "json-server --watch db.json --port 3002 --host 0.0.0.0"
+    "api:json": "json-server --watch db.json --port 3002 --host 0.0.0.0",
+    "vercel-build": "npm run build"
   },
   "dependencies": {
     "@fontsource/noto-sans": "^5.2.7",
@@ -45,6 +46,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@supabase/supabase-js": "^2.39.0",
     "@types/qrcode": "^1.5.5",
+    "@vercel/kv": "^3.0.0",
     "@yudiel/react-qr-scanner": "^2.3.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
