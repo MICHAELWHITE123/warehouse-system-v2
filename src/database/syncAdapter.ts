@@ -50,6 +50,11 @@ class SyncAdapter {
       console.log('Device ID:', this.deviceId);
       console.log('Database:', this.db ? 'OK' : 'FAILED');
       
+      // Добавляем alert для критических проверок (временно для отладки)
+      if (typeof window !== 'undefined') {
+        console.log('DEBUG: SyncAdapter created, deviceId:', this.deviceId);
+      }
+      
       // Запускаем автоматическую синхронизацию
       this.startAutoSync();
       
@@ -138,6 +143,9 @@ class SyncAdapter {
     };
 
     console.log(`Adding operation to sync queue: ${operation} on ${table}`, syncOp);
+    
+    // Добавляем явный лог для отладки
+    console.log('DEBUG: addToSyncQueue called with:', { table, operation, data });
 
     this.syncQueue.push(syncOp);
     this.saveSyncQueue();

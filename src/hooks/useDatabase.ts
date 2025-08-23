@@ -53,9 +53,13 @@ export function useEquipment() {
 
   const createEquipment = useCallback(async (data: any) => {
     try {
+      console.log('DEBUG: createEquipment called with data:', data);
       await equipmentService.createEquipment(data);
+      console.log('DEBUG: equipmentService.createEquipment completed');
       await loadEquipment();
+      console.log('DEBUG: loadEquipment completed');
     } catch (err) {
+      console.error('DEBUG: createEquipment failed:', err);
       throw new Error(err instanceof Error ? err.message : 'Failed to create equipment');
     }
   }, [loadEquipment]);
