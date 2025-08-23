@@ -6,6 +6,7 @@ import { Package, AlertCircle, TrendingUp, Building, QrCode } from "lucide-react
 import { QRScanner } from "./QRScanner";
 import { Equipment } from "./EquipmentList";
 import { CanView } from "./ui/PermissionGate";
+import { SyncStatus } from "./SyncStatus";
 
 interface DashboardStats {
   totalEquipment: number;
@@ -167,6 +168,11 @@ export function Dashboard({ stats, onEquipmentSelect }: DashboardProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Статус синхронизации */}
+      <CanView fallback={null}>
+        <SyncStatus />
+      </CanView>
 
       {/* QR Scanner */}
       <QRScanner

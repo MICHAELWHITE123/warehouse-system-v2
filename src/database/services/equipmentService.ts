@@ -1,4 +1,5 @@
 import { getDatabase } from '../index';
+import { syncAdapter } from '../syncAdapter';
 import type {
   DbEquipment,
   CreateEquipment,
@@ -110,7 +111,12 @@ export class EquipmentService {
       updated_at: now
     };
 
-    return this.db.insert('equipment', newEquipment) as DbEquipment;
+    const result = this.db.insert('equipment', newEquipment) as DbEquipment;
+    
+    // Добавляем в очередь синхронизации
+    syncAdapter.addToSyncQueue('equipment', 'create', result);
+    
+    return result;
   }
 
   // Обновить оборудование
@@ -119,12 +125,29 @@ export class EquipmentService {
       ...equipment
     };
 
-    return this.db.update('equipment', equipment.id, updatedEquipment) as DbEquipment | null;
+    const result = this.db.update('equipment', equipment.id, updatedEquipment) as DbEquipment | null;
+    
+    if (result) {
+      // Добавляем в очередь синхронизации
+      syncAdapter.addToSyncQueue('equipment', 'update', result);
+    }
+    
+    return result;
   }
 
   // Удалить оборудование
   deleteEquipment(id: number): boolean {
-    return this.db.delete('equipment', id);
+    // Получаем данные перед удалением для синхронизации
+    const equipment = this.db.selectById('equipment', id);
+    
+    const result = this.db.delete('equipment', id);
+    
+    if (result && equipment) {
+      // Добавляем в очередь синхронизации
+      syncAdapter.addToSyncQueue('equipment', 'delete', { id });
+    }
+    
+    return result;
   }
 
   // Поиск оборудования
@@ -200,6 +223,15 @@ export class EquipmentService {
       status, 
       updated_at: new Date().toISOString() 
     });
+    
+    if (updated) {
+      // Добавляем в очередь синхронизации
+      const equipment = this.db.selectById('equipment', id);
+      if (equipment) {
+        syncAdapter.addToSyncQueue('equipment', 'update', equipment);
+      }
+    }
+    
     return !!updated;
   }
 
@@ -210,6 +242,15 @@ export class EquipmentService {
       status: 'in-use',
       updated_at: new Date().toISOString() 
     });
+    
+    if (updated) {
+      // Добавляем в очередь синхронизации
+      const equipment = this.db.selectById('equipment', id);
+      if (equipment) {
+        syncAdapter.addToSyncQueue('equipment', 'update', equipment);
+      }
+    }
+    
     return !!updated;
   }
 
@@ -220,6 +261,15 @@ export class EquipmentService {
       status: 'available',
       updated_at: new Date().toISOString() 
     });
+    
+    if (updated) {
+      // Добавляем в очередь синхронизации
+      const equipment = this.db.selectById('equipment', id);
+      if (equipment) {
+        syncAdapter.addToSyncQueue('equipment', 'update', equipment);
+      }
+    }
+    
     return !!updated;
   }
 
