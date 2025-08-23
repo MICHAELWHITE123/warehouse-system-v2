@@ -200,7 +200,7 @@ class SyncAdapter {
       );
       this.saveSyncQueue();
       
-      // Обновляем время последней синхронизации
+      // Обновляем время последней синхронизации ТОЛЬКО при успешной синхронизации
       this.lastSync = Date.now();
       
       console.log('Sync completed successfully');
@@ -493,15 +493,21 @@ class SyncAdapter {
         // Сортируем по времени
         const sortedOperations = allOperations.sort((a, b) => a.timestamp - b.timestamp);
         
+        let appliedOperations = 0;
+        
         // Применяем операции
         for (const operation of sortedOperations) {
           await this.applyRemoteOperation(operation);
+          appliedOperations++;
         }
         
-        // Обновляем время последней синхронизации
-        this.lastSync = Date.now();
-        
-        console.log('Successfully applied operations from localStorage');
+        // Обновляем время последней синхронизации ТОЛЬКО если применили операции
+        if (appliedOperations > 0) {
+          this.lastSync = Date.now();
+          console.log(`Successfully applied ${appliedOperations} operations from localStorage`);
+        } else {
+          console.log('No new operations were applied from localStorage');
+        }
       }
       
     } catch (error) {
@@ -527,20 +533,27 @@ class SyncAdapter {
         // Сортируем по времени
         const sortedOperations = allOperations.sort((a, b) => a.timestamp - b.timestamp);
         
+        let appliedOperations = 0;
+        
         for (const operation of sortedOperations) {
           // Проверяем, не применяли ли мы уже эту операцию
           if (operation.timestamp > this.lastSync) {
             console.log(`Applying operation: ${operation.operation} on ${operation.table}`, operation);
             await this.applyRemoteOperation(operation);
             console.log(`Applied operation: ${operation.operation} on ${operation.table}`);
+            appliedOperations++;
           } else {
             console.log(`Skipping operation ${operation.id} - already applied (timestamp: ${operation.timestamp}, lastSync: ${this.lastSync})`);
           }
         }
         
-        // Обновляем время последней синхронизации
-        this.lastSync = Date.now();
-        console.log('Successfully applied operations from other tabs/devices');
+        // Обновляем время последней синхронизации ТОЛЬКО если применили операции
+        if (appliedOperations > 0) {
+          this.lastSync = Date.now();
+          console.log(`Successfully applied ${appliedOperations} operations from other tabs/devices`);
+        } else {
+          console.log('No new operations were applied');
+        }
       } else {
         console.log('No new operations found');
       }
