@@ -44,6 +44,14 @@ class SyncAdapter {
     this.deviceId = this.generateDeviceId();
     this.setupEventListeners();
     this.loadSyncQueue();
+    
+    // Запускаем автоматическую синхронизацию
+    this.startAutoSync();
+    
+    // Проверяем localStorage сразу после инициализации
+    setTimeout(() => {
+      this.checkForTabOperations();
+    }, 1000);
   }
 
   private generateDeviceId(): string {
@@ -475,8 +483,14 @@ class SyncAdapter {
   // НОВАЯ ФУНКЦИЯ: Проверка операций из других вкладок
   private async checkForTabOperations(): Promise<void> {
     try {
+      console.log('Checking for tab operations...');
+      console.log('Current deviceId:', this.deviceId);
+      console.log('Current lastSync:', this.lastSync);
+      
       // Получаем операции от всех устройств/вкладок
       const allOperations = this.getAllOperationsFromLocalStorage();
+      
+      console.log('All operations found:', allOperations);
       
       if (allOperations.length > 0) {
         console.log(`Found ${allOperations.length} operations from other tabs/devices`);
@@ -487,14 +501,19 @@ class SyncAdapter {
         for (const operation of sortedOperations) {
           // Проверяем, не применяли ли мы уже эту операцию
           if (operation.timestamp > this.lastSync) {
+            console.log(`Applying operation: ${operation.operation} on ${operation.table}`, operation);
             await this.applyRemoteOperation(operation);
             console.log(`Applied operation: ${operation.operation} on ${operation.table}`);
+          } else {
+            console.log(`Skipping operation ${operation.id} - already applied (timestamp: ${operation.timestamp}, lastSync: ${this.lastSync})`);
           }
         }
         
         // Обновляем время последней синхронизации
         this.lastSync = Date.now();
         console.log('Successfully applied operations from other tabs/devices');
+      } else {
+        console.log('No new operations found');
       }
     } catch (error) {
       console.error('Tab operations check failed:', error);
@@ -505,12 +524,16 @@ class SyncAdapter {
   private saveOperationToLocalStorage(operation: SyncOperation): void {
     try {
       const storageKey = `warehouse-sync-${this.deviceId}`;
+      console.log('Saving operation to localStorage with key:', storageKey);
+      console.log('Operation to save:', operation);
+      
       const existingOperations = localStorage.getItem(storageKey);
       let operations: SyncOperation[] = [];
       
       if (existingOperations) {
         try {
           operations = JSON.parse(existingOperations);
+          console.log('Existing operations:', operations);
         } catch (e) {
           console.warn('Failed to parse existing localStorage operations:', e);
         }
@@ -518,6 +541,7 @@ class SyncAdapter {
       
       // Добавляем новую операцию
       operations.push(operation);
+      console.log('Operations after adding new one:', operations);
       
       // Ограничиваем количество операций (последние 100)
       if (operations.length > 100) {
@@ -526,10 +550,12 @@ class SyncAdapter {
       
       // Сохраняем обратно в localStorage
       localStorage.setItem(storageKey, JSON.stringify(operations));
+      console.log('Operations saved to localStorage');
       
       // Уведомляем другие вкладки об изменении
       // Используем общий ключ для всех вкладок
       localStorage.setItem('warehouse-sync-updated', Date.now().toString());
+      console.log('Updated warehouse-sync-updated key');
       
       console.log(`Operation saved to localStorage: ${operation.operation} on ${operation.table}`);
     } catch (error) {
@@ -541,18 +567,23 @@ class SyncAdapter {
   private getAllOperationsFromLocalStorage(): SyncOperation[] {
     try {
       const allOperations: SyncOperation[] = [];
+      console.log('Scanning localStorage for operations...');
       
       // Получаем все операции из localStorage
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith('warehouse-sync-')) {
+          console.log('Found sync key:', key);
           try {
             const operations = JSON.parse(localStorage.getItem(key) || '[]');
+            console.log('Operations in key', key, ':', operations);
             if (Array.isArray(operations)) {
               // Добавляем все операции, которые новее последней синхронизации
-              const newOperations = operations.filter((op: SyncOperation) => 
-                op.timestamp > this.lastSync
-              );
+              const newOperations = operations.filter((op: SyncOperation) => {
+                const isNew = op.timestamp > this.lastSync;
+                console.log(`Operation ${op.id}: timestamp ${op.timestamp}, lastSync ${this.lastSync}, isNew: ${isNew}`);
+                return isNew;
+              });
               allOperations.push(...newOperations);
             }
           } catch (e) {
@@ -561,6 +592,7 @@ class SyncAdapter {
         }
       }
       
+      console.log('Total operations found:', allOperations);
       return allOperations;
     } catch (error) {
       console.error('Error getting operations from localStorage:', error);
