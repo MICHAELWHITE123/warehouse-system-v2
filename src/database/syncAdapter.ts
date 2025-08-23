@@ -209,6 +209,15 @@ class SyncAdapter {
       // Отправляем операции на сервер
       const results = await this.sendOperationsToServer(operationsToSync);
       
+      // Если API недоступен, results будет пустым массивом
+      if (results.length === 0) {
+        console.log('API not available, skipping server sync but keeping operations in queue');
+        // Не удаляем операции из очереди, так как они не были отправлены
+        // Просто получаем операции от других устройств через localStorage
+        await this.pullOperationsFromLocalStorage();
+        return;
+      }
+      
       // Обрабатываем результаты
       await this.processSyncResults(results);
       
@@ -236,9 +245,11 @@ class SyncAdapter {
         this.syncQueue = [];
         this.saveSyncQueue();
         this.lastSyncAttempt = Date.now();
-      } else if (error instanceof Error && error.message.includes('localhost')) {
-        // Ошибка подключения к localhost - не повторяем попытку
-        console.log('Localhost connection error, skipping retry');
+      } else if (error instanceof Error && (error.message.includes('localhost') || error.message.includes('Cannot connect to localhost'))) {
+        // Ошибка подключения к localhost - не повторяем попытку, очищаем очередь
+        console.log('Localhost connection error, clearing sync queue to prevent infinite loop');
+        this.syncQueue = [];
+        this.saveSyncQueue();
         this.lastSyncAttempt = Date.now();
       } else {
         // Другие ошибки - оставляем операции в очереди для повторной попытки
@@ -256,10 +267,23 @@ class SyncAdapter {
 
   // Отправить операции на сервер
   private async sendOperationsToServer(operations: SyncOperation[]): Promise<any[]> {
-    const { getApiUrl, getAuthHeaders } = await import('../config/api');
+    const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
+    
+    // Проверяем доступность API
+    if (!isApiAvailable()) {
+      console.log('API not available, skipping server sync');
+      // Возвращаем пустой массив чтобы показать что API недоступен
+      return [];
+    }
     
     try {
       const apiUrl = getApiUrl('sync');
+      
+      // Дополнительная проверка на случай если getApiUrl вернул пустую строку
+      if (!apiUrl) {
+        console.log('API URL is empty, skipping server sync');
+        return [];
+      }
       
       // Проверяем, не пытаемся ли мы подключиться к localhost на Vercel
       if (apiUrl.includes('localhost') && window.location.hostname.includes('vercel.app')) {
@@ -395,6 +419,23 @@ class SyncAdapter {
 
   // Принудительная синхронизация
   async forceSync(): Promise<void> {
+    // Проверяем, не было ли недавно критических ошибок
+    if (this.lastSyncAttempt > 0) {
+      const timeSinceLastAttempt = Date.now() - this.lastSyncAttempt;
+      if (timeSinceLastAttempt < 30000) { // меньше 30 секунд
+        console.log('Skipping forceSync - too soon after critical error');
+        return;
+      }
+    }
+    
+    // Проверяем доступность API
+    const { isApiAvailable } = await import('../config/api');
+    if (!isApiAvailable()) {
+      console.log('API not available, using localStorage sync only for forceSync');
+      await this.pullOperationsFromLocalStorage();
+      return;
+    }
+    
     if (this.isOnline) {
       // Сначала отправляем свои операции
       if (this.syncQueue.length > 0) {
@@ -410,6 +451,12 @@ class SyncAdapter {
   clearSyncQueue(): void {
     this.syncQueue = [];
     this.saveSyncQueue();
+  }
+
+  // Сбросить флаг критических ошибок
+  resetCriticalErrorFlag(): void {
+    this.lastSyncAttempt = 0;
+    console.log('Critical error flag reset');
   }
 
   // Установить пользователя
@@ -436,6 +483,15 @@ class SyncAdapter {
     this.syncTimeout = setTimeout(async () => {
       try {
         console.log('Performing initial sync for new user...');
+        
+        // Проверяем доступность API
+        const { isApiAvailable } = await import('../config/api');
+        if (!isApiAvailable()) {
+          console.log('API not available, using localStorage sync only for initial sync');
+          await this.pullOperationsFromLocalStorage();
+          return;
+        }
+        
         await this.pullOperationsFromServer();
       } catch (error) {
         console.error('Initial sync failed:', error);
@@ -466,10 +522,24 @@ class SyncAdapter {
       this.lastSyncAttempt = now;
       console.log('Pulling operations from server...');
       
-      const { getApiUrl, getAuthHeaders } = await import('../config/api');
+      const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
+      
+      // Проверяем доступность API
+      if (!isApiAvailable()) {
+        console.log('API not available, using localStorage sync only');
+        await this.pullOperationsFromLocalStorage();
+        return;
+      }
       
       // Проверяем, доступен ли сервер
       const apiUrl = getApiUrl(`sync/operations?deviceId=${this.deviceId}&lastSync=${this.lastSync}`);
+      
+      // Дополнительная проверка на случай если getApiUrl вернул пустую строку
+      if (!apiUrl) {
+        console.log('API URL is empty, using localStorage sync only');
+        await this.pullOperationsFromLocalStorage();
+        return;
+      }
       
       // Если URL указывает на localhost, но мы на Vercel, пропускаем серверную синхронизацию
       if (apiUrl.includes('localhost') && window.location.hostname.includes('vercel.app')) {
@@ -693,9 +763,23 @@ class SyncAdapter {
   // НОВАЯ ФУНКЦИЯ: Подтверждение получения операции
   private async acknowledgeOperation(operationId: string): Promise<void> {
     try {
-      const { getApiUrl, getAuthHeaders } = await import('../config/api');
+      const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
       
-      await fetch(getApiUrl(`sync/operations/${operationId}/acknowledge`), {
+      // Проверяем доступность API
+      if (!isApiAvailable()) {
+        console.log('API not available, skipping operation acknowledgment');
+        return;
+      }
+      
+      const apiUrl = getApiUrl(`sync/operations/${operationId}/acknowledge`);
+      
+      // Дополнительная проверка на случай если getApiUrl вернул пустую строку
+      if (!apiUrl) {
+        console.log('API URL is empty, skipping operation acknowledgment');
+        return;
+      }
+      
+      await fetch(apiUrl, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -704,6 +788,7 @@ class SyncAdapter {
       });
     } catch (error) {
       console.error('Failed to acknowledge operation:', error);
+      // Не бросаем ошибку дальше, так как это не критично
     }
   }
 
@@ -729,6 +814,15 @@ class SyncAdapter {
         }
         
         this.lastSyncAttempt = now;
+        
+        // Проверяем доступность API перед попыткой синхронизации
+        const { isApiAvailable } = await import('../config/api');
+        if (!isApiAvailable()) {
+          console.log('API not available, skipping server sync in auto sync');
+          // Только проверяем localStorage для синхронизации между вкладками
+          await this.checkForTabOperations();
+          return;
+        }
         
         // Если есть операции для отправки, синхронизируем
         if (this.syncQueue.length > 0) {

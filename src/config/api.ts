@@ -7,12 +7,14 @@ export const API_CONFIG = {
       return import.meta.env.VITE_API_URL;
     }
     
-    // Если на Vercel, используем локальный сервер (для разработки)
+    // Если на Vercel, используем production API или отключаем синхронизацию
     if (window.location.hostname.includes('vercel.app')) {
-      return 'http://localhost:3001/api';
+      // В production на Vercel у нас нет backend сервера
+      // Возвращаем пустую строку чтобы отключить синхронизацию
+      return '';
     }
     
-    // По умолчанию локальный сервер
+    // По умолчанию локальный сервер для разработки
     return 'http://localhost:3001/api';
   })(),
   
@@ -36,9 +38,21 @@ export const API_CONFIG = {
 
 // Функция для получения полного URL API
 export const getApiUrl = (endpoint: string): string => {
-  const baseUrl = API_CONFIG.BASE_URL.replace(/\/$/, ''); // Убираем trailing slash
+  const baseUrl = API_CONFIG.BASE_URL;
+  
+  // Если базовый URL пустой (production без backend), возвращаем пустую строку
+  if (!baseUrl) {
+    return '';
+  }
+  
+  const cleanBaseUrl = baseUrl.replace(/\/$/, ''); // Убираем trailing slash
   const cleanEndpoint = endpoint.replace(/^\//, ''); // Убираем leading slash
-  return `${baseUrl}/${cleanEndpoint}`;
+  return `${cleanBaseUrl}/${cleanEndpoint}`;
+};
+
+// Функция для проверки доступности API
+export const isApiAvailable = (): boolean => {
+  return !!API_CONFIG.BASE_URL;
 };
 
 // Функция для получения заголовков с авторизацией
