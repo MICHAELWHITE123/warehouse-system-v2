@@ -13,7 +13,10 @@ import {
   Clock,
   Smartphone,
   Monitor,
-  Tablet
+  Tablet,
+  Server,
+  HardDrive,
+  Activity
 } from 'lucide-react';
 
 export const SyncStatus: React.FC = () => {
@@ -71,6 +74,32 @@ export const SyncStatus: React.FC = () => {
     }
   };
 
+  const getSyncModeIcon = (mode: string) => {
+    switch (mode) {
+      case 'server':
+        return <Server className="w-4 h-4" />;
+      case 'local':
+        return <HardDrive className="w-4 h-4" />;
+      case 'hybrid':
+        return <Activity className="w-4 h-4" />;
+      default:
+        return <Activity className="w-4 h-4" />;
+    }
+  };
+
+  const getSyncModeLabel = (mode: string) => {
+    switch (mode) {
+      case 'server':
+        return 'Сервер';
+      case 'local':
+        return 'Локально';
+      case 'hybrid':
+        return 'Гибрид';
+      default:
+        return 'Неизвестно';
+    }
+  };
+
   const formatTimestamp = (timestamp: number) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -99,7 +128,7 @@ export const SyncStatus: React.FC = () => {
     );
   }
 
-  const { isOnline, isSyncing, pendingOperations, conflicts, lastSync } = syncStatus;
+  const { isOnline, isSyncing, pendingOperations, conflicts, lastSync, syncMode, deviceId, userId } = syncStatus;
   const deviceInfo = syncAdapter.getDeviceInfo();
 
   return (
@@ -112,20 +141,10 @@ export const SyncStatus: React.FC = () => {
               variant="outline"
               size="sm"
               onClick={handleForceSync}
-              disabled={isSyncing || !isOnline}
+              disabled={isSyncing}
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
               Синхронизировать
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleForceSync}
-              disabled={isSyncing || !isOnline}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Получить изменения
             </Button>
             <Button
               variant="ghost"
@@ -165,6 +184,10 @@ export const SyncStatus: React.FC = () => {
             <Badge variant={isOnline ? "default" : "secondary"}>
               {isOnline ? 'Подключен' : 'Отключен'}
             </Badge>
+            <Badge variant="outline" className="flex items-center gap-1">
+              {getSyncModeIcon(syncMode)}
+              {getSyncModeLabel(syncMode)}
+            </Badge>
             {pendingOperations.length > 0 && (
               <Badge variant="outline" className="bg-yellow-50 text-yellow-700">
                 {pendingOperations.length} в очереди
@@ -184,12 +207,18 @@ export const SyncStatus: React.FC = () => {
             <div className="flex items-center gap-2">
               {getDeviceIcon()}
               <span className="font-medium">Устройство:</span>
-              <span className="text-gray-600">{deviceInfo.deviceId.substring(0, 8)}...</span>
+              <span className="text-gray-600">{deviceId.substring(0, 8)}...</span>
             </div>
             <div className="text-gray-500">
               Последнее обновление: {formatTimestamp(lastUpdate.getTime())}
             </div>
           </div>
+          {userId && (
+            <div className="flex items-center gap-2 mt-2 text-sm">
+              <span className="font-medium">Пользователь:</span>
+              <span className="text-gray-600">{userId}</span>
+            </div>
+          )}
         </div>
 
         {/* Расширенная информация */}
@@ -209,6 +238,11 @@ export const SyncStatus: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <span className="capitalize">{op.operation}</span>
                         <span className="text-gray-500">{op.table}</span>
+                        {op.retryCount > 0 && (
+                          <Badge variant="outline" className="text-xs">
+                            Попытка {op.retryCount}/3
+                          </Badge>
+                        )}
                       </div>
                       <span className="text-gray-400">
                         {formatTimestamp(op.timestamp)}
@@ -233,12 +267,12 @@ export const SyncStatus: React.FC = () => {
                 </h4>
                 <div className="space-y-2">
                   {conflicts.map((conflict) => (
-                    <Alert key={conflict.localOperation.id} className="border-red-200 bg-red-50">
+                    <Alert key={conflict.id} className="border-red-200 bg-red-50">
                       <AlertDescription className="text-sm">
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-medium">Конфликт в таблице {conflict.localOperation.table}</span>
                           <span className="text-xs text-gray-500">
-                            {formatTimestamp(conflict.localOperation.timestamp)}
+                            {formatTimestamp(conflict.createdAt)}
                           </span>
                         </div>
                         <div className="text-xs text-gray-600 mb-2">
@@ -248,14 +282,14 @@ export const SyncStatus: React.FC = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleResolveConflict(conflict.localOperation.id, 'local')}
+                            onClick={() => handleResolveConflict(conflict.id, 'local')}
                           >
                             Использовать локальную
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleResolveConflict(conflict.localOperation.id, 'remote')}
+                            onClick={() => handleResolveConflict(conflict.id, 'remote')}
                           >
                             Использовать удаленную
                           </Button>
@@ -276,7 +310,7 @@ export const SyncStatus: React.FC = () => {
             )}
 
             {/* Статистика */}
-            <div className="grid grid-cols-2 gap-4 pt-2">
+            <div className="grid grid-cols-3 gap-4 pt-2">
               <div className="text-center p-3 bg-blue-50 rounded-lg">
                 <div className="text-2xl font-bold text-blue-600">
                   {pendingOperations.length}
@@ -288,6 +322,12 @@ export const SyncStatus: React.FC = () => {
                   {conflicts.length}
                 </div>
                 <div className="text-xs text-red-600">Конфликтов</div>
+              </div>
+              <div className="text-center p-3 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  {deviceInfo.syncMode === 'hybrid' ? '✓' : deviceInfo.syncMode === 'local' ? 'HDD' : '🌐'}
+                </div>
+                <div className="text-xs text-green-600">Режим</div>
               </div>
             </div>
           </>

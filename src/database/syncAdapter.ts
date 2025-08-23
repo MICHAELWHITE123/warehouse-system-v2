@@ -9,12 +9,18 @@ export interface SyncOperation {
   timestamp: number;
   deviceId: string;
   userId?: string;
+  hash: string; // Хеш данных для предотвращения дублирования
+  status: 'pending' | 'synced' | 'failed' | 'conflict';
+  retryCount: number;
+  lastRetry?: number;
 }
 
 export interface SyncConflict {
+  id: string;
   localOperation: SyncOperation;
   remoteOperation: SyncOperation;
   resolution: 'local' | 'remote' | 'manual';
+  createdAt: number;
 }
 
 export interface SyncStatus {
@@ -23,6 +29,9 @@ export interface SyncStatus {
   conflicts: SyncConflict[];
   isOnline: boolean;
   isSyncing: boolean;
+  deviceId: string;
+  userId?: string;
+  syncMode: 'server' | 'local' | 'hybrid';
 }
 
 class SyncAdapter {
@@ -38,18 +47,18 @@ class SyncAdapter {
   private conflicts: SyncConflict[] = [];
   private lastSyncAttempt: number = 0;
   private syncRetryDelay: number = 30000; // 30 секунд между попытками
-  
-  // Добавляем новые переменные для предотвращения бесконечных циклов
-  private lastTabOperationCheck: number = 0;
-  private tabOperationCheckThrottle: number = 5000; // 5 секунд между проверками
-  private lastUserSet: number = 0;
-  private userSetThrottle: number = 1000; // 1 секунда между установками пользователя
   private isInitialized: boolean = false;
   private initializationTimeout: NodeJS.Timeout | null = null;
+  private syncMode: 'server' | 'local' | 'hybrid' = 'hybrid';
+  
+  // Throttling для предотвращения спама
+  private lastOperationAdd: number = 0;
+  private operationAddThrottle: number = 100; // 100ms между добавлениями операций
+  private lastStatusUpdate: number = 0;
+  private statusUpdateThrottle: number = 1000; // 1 секунда между обновлениями статуса
 
   constructor() {
     try {
-      // Проверяем, не инициализирован ли уже адаптер
       if (this.isInitialized) {
         console.log('SyncAdapter already initialized, skipping...');
         return;
@@ -62,20 +71,14 @@ class SyncAdapter {
       
       console.log('SyncAdapter initialized successfully');
       console.log('Device ID:', this.deviceId);
-      console.log('Database:', this.db ? 'OK' : 'FAILED');
-      
-      // Добавляем alert для критических проверок (временно для отладки)
-      if (typeof window !== 'undefined') {
-        console.log('DEBUG: SyncAdapter created, deviceId:', this.deviceId);
-      }
       
       // Запускаем автоматическую синхронизацию
       this.startAutoSync();
       
-      // Проверяем localStorage сразу после инициализации
+      // Инициализация через небольшую задержку
       this.initializationTimeout = setTimeout(() => {
-        this.checkForTabOperations();
         this.isInitialized = true;
+        this.performInitialSync();
       }, 1000);
       
     } catch (error) {
@@ -84,8 +87,14 @@ class SyncAdapter {
   }
 
   private generateDeviceId(): string {
-    // Генерируем уникальный ID для каждой вкладки
-    const deviceId = `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Генерируем уникальный ID для устройства
+    const existingId = localStorage.getItem('warehouse-device-id');
+    if (existingId) {
+      return existingId;
+    }
+    
+    const deviceId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem('warehouse-device-id', deviceId);
     return deviceId;
   }
 
@@ -93,32 +102,19 @@ class SyncAdapter {
     // Слушаем изменения в сети
     window.addEventListener('online', () => {
       this.isOnline = true;
+      this.syncMode = 'hybrid';
       this.scheduleSync();
     });
 
     window.addEventListener('offline', () => {
       this.isOnline = false;
+      this.syncMode = 'local';
     });
 
     // Слушаем изменения в localStorage для других вкладок
     window.addEventListener('storage', (event) => {
       if (event.key === 'warehouse-sync-queue') {
         this.loadSyncQueue();
-      }
-      
-      // Слушаем изменения операций синхронизации
-      if (event.key === 'warehouse-sync-updated') {
-        console.log('Storage change detected, checking for new operations...');
-        // Запускаем проверку новых операций через небольшую задержку
-        // Но только если прошло достаточно времени с последней проверки
-        const now = Date.now();
-        if (now - this.lastTabOperationCheck > this.tabOperationCheckThrottle) {
-          setTimeout(() => {
-            this.checkForTabOperations();
-          }, 100);
-        } else {
-          console.log('Skipping storage change handler - too soon after last check');
-        }
       }
     });
   }
@@ -128,6 +124,8 @@ class SyncAdapter {
       const stored = localStorage.getItem('warehouse-sync-queue');
       if (stored) {
         this.syncQueue = JSON.parse(stored);
+        // Фильтруем только pending операции
+        this.syncQueue = this.syncQueue.filter(op => op.status === 'pending');
       }
     } catch (error) {
       console.error('Error loading sync queue:', error);
@@ -138,7 +136,6 @@ class SyncAdapter {
   private saveSyncQueue(): void {
     try {
       localStorage.setItem('warehouse-sync-queue', JSON.stringify(this.syncQueue));
-      // Уведомляем другие вкладки об изменении
       localStorage.setItem('warehouse-sync-queue-updated', Date.now().toString());
     } catch (error) {
       console.error('Error saving sync queue:', error);
@@ -147,10 +144,36 @@ class SyncAdapter {
 
   // Добавить операцию в очередь синхронизации
   addToSyncQueue(table: string, operation: 'create' | 'update' | 'delete', data: any): void {
+    const now = Date.now();
+    
+    // Throttling для предотвращения спама
+    if (now - this.lastOperationAdd < this.operationAddThrottle) {
+      console.log('Operation add throttled, skipping...');
+      return;
+    }
+    
+    this.lastOperationAdd = now;
+
     // Проверяем, что адаптер инициализирован
     if (!this.db) {
       console.warn('SyncAdapter not initialized yet, retrying in 100ms...');
       setTimeout(() => this.addToSyncQueue(table, operation, data), 100);
+      return;
+    }
+
+    // Создаем хеш данных для предотвращения дублирования
+    const dataHash = this.createDataHash(data);
+    
+    // Проверяем, нет ли уже такой операции в очереди
+    const existingOperation = this.syncQueue.find(op => 
+      op.table === table && 
+      op.operation === operation && 
+      op.hash === dataHash &&
+      op.status === 'pending'
+    );
+    
+    if (existingOperation) {
+      console.log('Operation already in queue, skipping...', { table, operation, dataHash });
       return;
     }
 
@@ -159,34 +182,37 @@ class SyncAdapter {
       table,
       operation,
       data,
-      timestamp: Date.now(),
+      timestamp: now,
       deviceId: this.deviceId,
-      userId: this.userId
+      userId: this.userId,
+      hash: dataHash,
+      status: 'pending',
+      retryCount: 0
     };
 
     console.log(`Adding operation to sync queue: ${operation} on ${table}`, syncOp);
     
-    // Добавляем явный лог для отладки
-    console.log('DEBUG: addToSyncQueue called with:', { table, operation, data });
-
     this.syncQueue.push(syncOp);
     this.saveSyncQueue();
-
-    // Сохраняем операцию в localStorage для синхронизации между вкладками
-    this.saveOperationToLocalStorage(syncOp);
 
     // Если онлайн, сразу запускаем синхронизацию
     if (this.isOnline) {
       this.scheduleSync();
     }
-    
-    // Запускаем проверку localStorage для синхронизации между вкладками
-    // Но только если прошло достаточно времени с последней проверки
-    const now = Date.now();
-    if (now - this.lastTabOperationCheck > this.tabOperationCheckThrottle) {
-      setTimeout(() => {
-        this.checkForTabOperations();
-      }, 500);
+  }
+
+  private createDataHash(data: any): string {
+    try {
+      const dataStr = JSON.stringify(data);
+      let hash = 0;
+      for (let i = 0; i < dataStr.length; i++) {
+        const char = dataStr.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+      }
+      return hash.toString(36);
+    } catch (error) {
+      return Date.now().toString();
     }
   }
 
@@ -213,7 +239,6 @@ class SyncAdapter {
     console.log(`Scheduling sync in ${delay}ms`);
     
     this.syncTimeout = setTimeout(() => {
-      // Сбрасываем флаг критической ошибки перед новой попыткой
       this.lastSyncAttempt = 0;
       this.performSync();
     }, delay);
@@ -221,77 +246,103 @@ class SyncAdapter {
 
   // Выполнить синхронизацию
   private async performSync(): Promise<void> {
-    if (this.isSyncing || !this.isOnline || this.syncQueue.length === 0) {
+    if (this.isSyncing || this.syncQueue.length === 0) {
       return;
     }
 
     this.isSyncing = true;
     console.log('Starting sync...', this.syncQueue.length, 'operations pending');
 
+    // Получаем операции для синхронизации
+    const operationsToSync = [...this.syncQueue];
+
     try {
-      // Получаем операции для синхронизации
-      const operationsToSync = [...this.syncQueue];
-      
-      // Отправляем операции на сервер
-      const results = await this.sendOperationsToServer(operationsToSync);
-      
-      // Если API недоступен, results будет пустым массивом
-      if (results.length === 0) {
-        console.log('API not available, skipping server sync but keeping operations in queue');
-        // Проверяем, не застряли ли операции слишком долго
-        await this.checkForStuckOperations();
-        // Не удаляем операции из очереди, так как они не были отправлены
-        // Просто получаем операции от других устройств через localStorage
-        await this.pullOperationsFromLocalStorage();
-        return;
+      if (this.isOnline && this.syncMode !== 'local') {
+        // Пытаемся синхронизироваться с сервером
+        const results = await this.sendOperationsToServer(operationsToSync);
+        
+        if (results.length > 0) {
+          // Обрабатываем результаты
+          await this.processSyncResults(results);
+          
+          // Удаляем обработанные операции из очереди
+          this.syncQueue = this.syncQueue.filter(op => 
+            !operationsToSync.some(syncedOp => syncedOp.id === op.id)
+          );
+          this.saveSyncQueue();
+          
+          // Обновляем время последней синхронизации
+          this.lastSync = Date.now();
+          
+          console.log('Server sync completed successfully');
+          
+          // Получаем операции от других устройств
+          await this.pullOperationsFromServer();
+        } else {
+          // Сервер недоступен, переключаемся на локальную синхронизацию
+          console.log('Server not available, switching to local sync');
+          this.syncMode = 'local';
+          await this.performLocalSync(operationsToSync);
+        }
+      } else {
+        // Офлайн режим - только локальная синхронизация
+        await this.performLocalSync(operationsToSync);
       }
-      
-      // Обрабатываем результаты
-      await this.processSyncResults(results);
-      
-      // Удаляем обработанные операции из очереди
-      this.syncQueue = this.syncQueue.filter(op => 
-        !operationsToSync.some(syncedOp => syncedOp.id === op.id)
-      );
-      this.saveSyncQueue();
-      
-      // Обновляем время последней синхронизации ТОЛЬКО при успешной синхронизации
-      this.lastSync = Date.now();
-      
-      console.log('Sync completed successfully');
-      
-      // ПОСЛЕ отправки своих операций, получаем операции от других устройств
-      await this.pullOperationsFromServer();
       
     } catch (error) {
       console.error('Sync failed:', error);
       
-      // Обрабатываем разные типы ошибок
+      // Обрабатываем ошибки
       if (error instanceof Error && error.message.includes('401')) {
-        // Ошибка авторизации - не повторяем попытку, очищаем очередь
-        console.log('Authentication error (401), clearing sync queue to prevent infinite loop');
-        this.syncQueue = [];
-        this.saveSyncQueue();
-        this.lastSyncAttempt = Date.now();
-      } else if (error instanceof Error && (error.message.includes('localhost') || error.message.includes('Cannot connect to localhost'))) {
-        // Ошибка подключения к localhost - не повторяем попытку, очищаем очередь
-        console.log('Localhost connection error, clearing sync queue to prevent infinite loop');
+        console.log('Authentication error, clearing sync queue');
         this.syncQueue = [];
         this.saveSyncQueue();
         this.lastSyncAttempt = Date.now();
       } else {
-        // Другие ошибки - оставляем операции в очереди для повторной попытки
-        console.log('Other error, keeping operations in queue for retry');
-        // Но проверяем, не застряли ли операции слишком долго
-        await this.checkForStuckOperations();
+        // Увеличиваем счетчик попыток для неудачных операций
+        for (const op of operationsToSync) {
+          op.retryCount++;
+          op.lastRetry = Date.now();
+          if (op.retryCount >= 3) {
+            op.status = 'failed';
+          }
+        }
+        this.saveSyncQueue();
       }
     } finally {
       this.isSyncing = false;
       
       // Если есть еще операции и не было критической ошибки, планируем следующую синхронизацию
-      if (this.syncQueue.length > 0 && this.lastSyncAttempt === 0) {
+      if (this.syncQueue.filter(op => op.status === 'pending').length > 0 && this.lastSyncAttempt === 0) {
         this.scheduleSync();
       }
+    }
+  }
+
+  // Локальная синхронизация между вкладками
+  private async performLocalSync(operations: SyncOperation[]): Promise<void> {
+    try {
+      console.log('Performing local sync...');
+      
+      // Сохраняем операции в localStorage для других вкладок
+      for (const op of operations) {
+        this.saveOperationToLocalStorage(op);
+      }
+      
+      // Получаем операции от других вкладок
+      await this.pullOperationsFromLocalStorage();
+      
+      // Помечаем операции как синхронизированные
+      for (const op of operations) {
+        op.status = 'synced';
+      }
+      this.saveSyncQueue();
+      
+      this.lastSync = Date.now();
+      console.log('Local sync completed successfully');
+      
+    } catch (error) {
+      console.error('Local sync failed:', error);
     }
   }
 
@@ -299,17 +350,14 @@ class SyncAdapter {
   private async sendOperationsToServer(operations: SyncOperation[]): Promise<any[]> {
     const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
     
-    // Проверяем доступность API
     if (!isApiAvailable()) {
       console.log('API not available, skipping server sync');
-      // Возвращаем пустой массив чтобы показать что API недоступен
       return [];
     }
     
     try {
       const apiUrl = getApiUrl('sync');
       
-      // Дополнительная проверка на случай если getApiUrl вернул пустую строку
       if (!apiUrl) {
         console.log('API URL is empty, skipping server sync');
         return [];
@@ -353,10 +401,8 @@ class SyncAdapter {
   private async processSyncResults(results: any[]): Promise<void> {
     for (const result of results) {
       if (result.conflict) {
-        // Обрабатываем конфликт
         await this.handleConflict(result);
       } else if (result.success) {
-        // Операция успешно синхронизирована
         console.log(`Operation ${result.operationId} synced successfully`);
       }
     }
@@ -365,9 +411,11 @@ class SyncAdapter {
   // Обработать конфликт синхронизации
   private async handleConflict(conflictResult: any): Promise<void> {
     const conflict: SyncConflict = {
+      id: `conflict_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       localOperation: conflictResult.localOperation,
       remoteOperation: conflictResult.remoteOperation,
-      resolution: 'manual' // По умолчанию требует ручного разрешения
+      resolution: 'manual',
+      createdAt: Date.now()
     };
 
     this.conflicts.push(conflict);
@@ -378,7 +426,6 @@ class SyncAdapter {
 
   // Уведомить о конфликте
   private notifyConflict(conflict: SyncConflict): void {
-    // Создаем событие для уведомления UI
     const event = new CustomEvent('sync-conflict', {
       detail: { conflict }
     });
@@ -387,9 +434,7 @@ class SyncAdapter {
 
   // Разрешить конфликт
   resolveConflict(conflictId: string, resolution: 'local' | 'remote'): void {
-    const conflictIndex = this.conflicts.findIndex(c => 
-      c.localOperation.id === conflictId || c.remoteOperation.id === conflictId
-    );
+    const conflictIndex = this.conflicts.findIndex(c => c.id === conflictId);
 
     if (conflictIndex === -1) return;
 
@@ -398,12 +443,10 @@ class SyncAdapter {
 
     // Применяем разрешение
     if (resolution === 'local') {
-      // Локальная версия остается, удаляем удаленную
       this.syncQueue = this.syncQueue.filter(op => 
         op.id !== conflict.remoteOperation.id
       );
     } else {
-      // Удаленная версия побеждает, обновляем локальные данные
       this.applyRemoteOperation(conflict.remoteOperation);
       this.syncQueue = this.syncQueue.filter(op => 
         op.id !== conflict.localOperation.id
@@ -438,12 +481,33 @@ class SyncAdapter {
 
   // Получить статус синхронизации
   getSyncStatus(): SyncStatus {
+    const now = Date.now();
+    
+    // Throttling для обновления статуса
+    if (now - this.lastStatusUpdate < this.statusUpdateThrottle) {
+      return {
+        lastSync: this.lastSync,
+        pendingOperations: this.syncQueue.filter(op => op.status === 'pending'),
+        conflicts: [...this.conflicts],
+        isOnline: this.isOnline,
+        isSyncing: this.isSyncing,
+        deviceId: this.deviceId,
+        userId: this.userId,
+        syncMode: this.syncMode
+      };
+    }
+    
+    this.lastStatusUpdate = now;
+    
     return {
       lastSync: this.lastSync,
-      pendingOperations: [...this.syncQueue],
+      pendingOperations: this.syncQueue.filter(op => op.status === 'pending'),
       conflicts: [...this.conflicts],
       isOnline: this.isOnline,
-      isSyncing: this.isSyncing
+      isSyncing: this.isSyncing,
+      deviceId: this.deviceId,
+      userId: this.userId,
+      syncMode: this.syncMode
     };
   }
 
@@ -460,26 +524,21 @@ class SyncAdapter {
       }
     }
     
-    // Проверяем throttling для предотвращения множественных вызовов
-    if (now - this.lastTabOperationCheck < this.tabOperationCheckThrottle) {
-      console.log(`Skipping forceSync - too soon after last tab operation check (${now - this.lastTabOperationCheck}ms < ${this.tabOperationCheckThrottle}ms)`);
-      return;
-    }
-    
     // Проверяем доступность API
     const { isApiAvailable } = await import('../config/api');
     if (!isApiAvailable()) {
-      console.log('API not available, using localStorage sync only for forceSync');
-      await this.pullOperationsFromLocalStorage();
+      console.log('API not available, using local sync only for forceSync');
+      const pendingOperations = this.syncQueue.filter(op => op.status === 'pending');
+      if (pendingOperations.length > 0) {
+        await this.performLocalSync(pendingOperations);
+      }
       return;
     }
     
     if (this.isOnline) {
-      // Сначала отправляем свои операции
-      if (this.syncQueue.length > 0) {
+      if (this.syncQueue.filter(op => op.status === 'pending').length > 0) {
         await this.performSync();
       } else {
-        // Если нет операций для отправки, только получаем с сервера
         await this.pullOperationsFromServer();
       }
     }
@@ -499,15 +558,6 @@ class SyncAdapter {
 
   // Установить пользователя
   setUser(userId: string): void {
-    const now = Date.now();
-    
-    // Проверяем throttling для предотвращения множественных вызовов
-    if (now - this.lastUserSet < this.userSetThrottle) {
-      console.log(`Skipping setUser call - too soon (${now - this.lastUserSet}ms < ${this.userSetThrottle}ms)`);
-      return;
-    }
-    
-    // Проверяем, не тот же ли пользователь
     if (this.userId === userId) {
       console.log(`User already set to ${userId}, skipping...`);
       return;
@@ -515,19 +565,10 @@ class SyncAdapter {
     
     console.log('Setting user for sync:', userId);
     this.userId = userId;
-    this.lastUserSet = now;
     
     // При смене пользователя сразу синхронизируемся для получения данных
     if (this.isOnline) {
       this.scheduleInitialSync();
-    }
-    
-    // Также проверяем localStorage для синхронизации между вкладками
-    // Но только если прошло достаточно времени с последней проверки
-    if (now - this.lastTabOperationCheck > this.tabOperationCheckThrottle) {
-      setTimeout(() => {
-        this.checkForTabOperations();
-      }, 500);
     }
   }
 
@@ -541,31 +582,35 @@ class SyncAdapter {
       try {
         console.log('Performing initial sync for new user...');
         
-        // Проверяем throttling для предотвращения множественных вызовов
-        const now = Date.now();
-        if (now - this.lastTabOperationCheck < this.tabOperationCheckThrottle) {
-          console.log('Skipping initial sync - too soon after last tab operation check');
-          return;
-        }
-        
-        // Проверяем доступность API
-        const { isApiAvailable } = await import('../config/api');
-        if (!isApiAvailable()) {
-          console.log('API not available, using localStorage sync only for initial sync');
+        if (this.isOnline && this.syncMode !== 'local') {
+          await this.pullOperationsFromServer();
+        } else {
           await this.pullOperationsFromLocalStorage();
-          return;
         }
-        
-        await this.pullOperationsFromServer();
       } catch (error) {
         console.error('Initial sync failed:', error);
       }
-    }, 2000); // Задержка 2 секунды для стабилизации
+    }, 2000);
+  }
+
+  // Выполнить начальную синхронизацию
+  private async performInitialSync(): Promise<void> {
+    try {
+      console.log('Performing initial sync...');
+      
+      if (this.isOnline && this.syncMode !== 'local') {
+        await this.pullOperationsFromServer();
+      } else {
+        await this.pullOperationsFromLocalStorage();
+      }
+    } catch (error) {
+      console.error('Initial sync failed:', error);
+    }
   }
 
   // Получить количество операций в очереди
   getPendingOperationsCount(): number {
-    return this.syncQueue.length;
+    return this.syncQueue.filter(op => op.status === 'pending').length;
   }
 
   // Получить количество конфликтов
@@ -573,10 +618,9 @@ class SyncAdapter {
     return this.conflicts.length;
   }
 
-  // НОВАЯ ФУНКЦИЯ: Получение операций от других устройств с сервера
+  // Получение операций от других устройств с сервера
   private async pullOperationsFromServer(): Promise<void> {
     try {
-      // Проверяем, не слишком ли рано для повторной попытки
       const now = Date.now();
       if (now - this.lastSyncAttempt < this.syncRetryDelay) {
         console.log('Skipping server sync - too soon after last attempt');
@@ -588,31 +632,26 @@ class SyncAdapter {
       
       const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
       
-      // Проверяем доступность API
       if (!isApiAvailable()) {
-        console.log('API not available, using localStorage sync only');
+        console.log('API not available, using local sync only');
         await this.pullOperationsFromLocalStorage();
         return;
       }
       
-      // Проверяем, доступен ли сервер
       const apiUrl = getApiUrl(`sync/operations?deviceId=${this.deviceId}&lastSync=${this.lastSync}`);
       
-      // Дополнительная проверка на случай если getApiUrl вернул пустую строку
       if (!apiUrl) {
-        console.log('API URL is empty, using localStorage sync only');
+        console.log('API URL is empty, using local sync only');
         await this.pullOperationsFromLocalStorage();
         return;
       }
       
-      // Если URL указывает на localhost, но мы на Vercel, пропускаем серверную синхронизацию
       if (apiUrl.includes('localhost') && window.location.hostname.includes('vercel.app')) {
         console.log('On Vercel, skipping server sync to localhost');
         await this.pullOperationsFromLocalStorage();
         return;
       }
       
-      // Получаем операции от других устройств
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: getAuthHeaders()
@@ -620,7 +659,6 @@ class SyncAdapter {
 
       if (!response.ok) {
         if (response.status === 401) {
-          // Не авторизован - не повторяем попытку
           console.log('Not authenticated, skipping server sync');
           return;
         }
@@ -632,7 +670,6 @@ class SyncAdapter {
       if (result.success && result.data && result.data.length > 0) {
         console.log(`Received ${result.data.length} operations from other devices`);
         
-        // Применяем полученные операции к локальной базе
         for (const operation of result.data) {
           await this.applyRemoteOperation({
             id: operation.operation_id,
@@ -641,49 +678,43 @@ class SyncAdapter {
             data: JSON.parse(operation.data),
             timestamp: new Date(operation.timestamp).getTime(),
             deviceId: operation.source_device_id,
-            userId: operation.user_id
+            userId: operation.user_id,
+            hash: this.createDataHash(operation.data),
+            status: 'synced',
+            retryCount: 0
           });
           
-          // Подтверждаем получение операции
           await this.acknowledgeOperation(operation.operation_id);
         }
         
-        // Обновляем время последней синхронизации
         this.lastSync = Date.now();
-        
         console.log('Successfully applied operations from other devices');
       }
       
     } catch (error) {
       console.error('Failed to pull operations from server:', error);
-      
-      // FALLBACK: Если сервер недоступен, используем localStorage синхронизацию
-      console.log('Falling back to localStorage sync...');
+      console.log('Falling back to local sync...');
       await this.pullOperationsFromLocalStorage();
     }
   }
 
-  // НОВАЯ ФУНКЦИЯ: Fallback синхронизация через localStorage
+  // Fallback синхронизация через localStorage
   private async pullOperationsFromLocalStorage(): Promise<void> {
     try {
-      // Получаем операции из localStorage всех устройств/вкладок
       const allOperations = this.getAllOperationsFromLocalStorage();
       
       if (allOperations.length > 0) {
         console.log(`Found ${allOperations.length} operations from localStorage`);
         
-        // Сортируем по времени
         const sortedOperations = allOperations.sort((a, b) => a.timestamp - b.timestamp);
         
         let appliedOperations = 0;
         
-        // Применяем операции
         for (const operation of sortedOperations) {
           await this.applyRemoteOperation(operation);
           appliedOperations++;
         }
         
-        // Обновляем время последней синхронизации ТОЛЬКО если применили операции
         if (appliedOperations > 0) {
           this.lastSync = Date.now();
           console.log(`Successfully applied ${appliedOperations} operations from localStorage`);
@@ -697,93 +728,11 @@ class SyncAdapter {
     }
   }
 
-  // НОВАЯ ФУНКЦИЯ: Проверка операций из других вкладок
-  private async checkForTabOperations(): Promise<void> {
-    try {
-      const now = Date.now();
-      
-      // Проверяем throttling для предотвращения чрезмерных вызовов
-      if (now - this.lastTabOperationCheck < this.tabOperationCheckThrottle) {
-        console.log(`Skipping tab operations check - too soon (${now - this.lastTabOperationCheck}ms < ${this.tabOperationCheckThrottle}ms)`);
-        return;
-      }
-      
-      console.log('Checking for tab operations...');
-      console.log('Current deviceId:', this.deviceId);
-      console.log('Current lastSync:', this.lastSync);
-      
-      // Обновляем время последней проверки
-      this.lastTabOperationCheck = now;
-      
-      // Получаем операции от всех устройств/вкладок
-      const allOperations = this.getAllOperationsFromLocalStorage();
-      
-      console.log('All operations found:', allOperations);
-      
-      if (allOperations.length > 0) {
-        console.log(`Found ${allOperations.length} operations from other tabs/devices`);
-        
-        // Сортируем по времени
-        const sortedOperations = allOperations.sort((a, b) => a.timestamp - b.timestamp);
-        
-        let appliedOperations = 0;
-        
-        for (const operation of sortedOperations) {
-          // Проверяем, не применяли ли мы уже эту операцию
-          if (operation.timestamp > this.lastSync) {
-            console.log(`Applying operation: ${operation.operation} on ${operation.table}`, operation);
-            await this.applyRemoteOperation(operation);
-            console.log(`Applied operation: ${operation.operation} on ${operation.table}`);
-            appliedOperations++;
-          } else {
-            console.log(`Skipping operation ${operation.id} - already applied (timestamp: ${operation.timestamp}, lastSync: ${this.lastSync})`);
-          }
-        }
-        
-        // Обновляем время последней синхронизации ТОЛЬКО если применили операции
-        if (appliedOperations > 0) {
-          this.lastSync = Date.now();
-          console.log(`Successfully applied ${appliedOperations} operations from other tabs/devices`);
-        } else {
-          console.log('No new operations were applied');
-        }
-      } else {
-        console.log('No new operations found');
-      }
-    } catch (error) {
-      console.error('Tab operations check failed:', error);
-    }
-  }
-
-  // НОВАЯ ФУНКЦИЯ: Проверка застрявших операций
-  private async checkForStuckOperations(): Promise<void> {
-    const now = Date.now();
-    const stuckThreshold = 5 * 60 * 1000; // 5 минут
-    
-    // Фильтруем операции, которые застряли слишком долго
-    const stuckOperations = this.syncQueue.filter(op => {
-      const timeSinceCreation = now - op.timestamp;
-      return timeSinceCreation > stuckThreshold;
-    });
-    
-    if (stuckOperations.length > 0) {
-      console.log(`Found ${stuckOperations.length} stuck operations, removing them to prevent infinite loops`);
-      
-      // Удаляем застрявшие операции
-      this.syncQueue = this.syncQueue.filter(op => !stuckOperations.includes(op));
-      this.saveSyncQueue();
-      
-      // Обновляем время последней синхронизации чтобы не блокировать новые операции
-      this.lastSync = now;
-    }
-  }
-
-  // НОВАЯ ФУНКЦИЯ: Сохранение операции в localStorage для синхронизации между вкладками
+  // Сохранение операции в localStorage для синхронизации между вкладками
   private saveOperationToLocalStorage(operation: SyncOperation): void {
     try {
       const storageKey = `warehouse-sync-${this.deviceId}`;
       console.log('Saving operation to localStorage with key:', storageKey);
-      console.log('Operation to save:', operation);
       
       const existingOperations = localStorage.getItem(storageKey);
       let operations: SyncOperation[] = [];
@@ -791,7 +740,6 @@ class SyncAdapter {
       if (existingOperations) {
         try {
           operations = JSON.parse(existingOperations);
-          console.log('Existing operations:', operations);
         } catch (e) {
           console.warn('Failed to parse existing localStorage operations:', e);
         }
@@ -799,21 +747,14 @@ class SyncAdapter {
       
       // Добавляем новую операцию
       operations.push(operation);
-      console.log('Operations after adding new one:', operations);
       
       // Ограничиваем количество операций (последние 100)
       if (operations.length > 100) {
         operations = operations.slice(-100);
       }
       
-      // Сохраняем обратно в localStorage
       localStorage.setItem(storageKey, JSON.stringify(operations));
-      console.log('Operations saved to localStorage');
-      
-      // Уведомляем другие вкладки об изменении
-      // Используем общий ключ для всех вкладок
       localStorage.setItem('warehouse-sync-updated', Date.now().toString());
-      console.log('Updated warehouse-sync-updated key');
       
       console.log(`Operation saved to localStorage: ${operation.operation} on ${operation.table}`);
     } catch (error) {
@@ -821,7 +762,7 @@ class SyncAdapter {
     }
   }
 
-  // НОВАЯ ФУНКЦИЯ: Получение операций от всех устройств/вкладок из localStorage
+  // Получение операций от всех устройств/вкладок из localStorage
   private getAllOperationsFromLocalStorage(): SyncOperation[] {
     try {
       const allOperations: SyncOperation[] = [];
@@ -830,24 +771,18 @@ class SyncAdapter {
       
       console.log('Scanning localStorage for operations...');
       
-      // Получаем все операции из localStorage
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith('warehouse-sync-')) {
-          console.log('Found sync key:', key);
           try {
             const operations = JSON.parse(localStorage.getItem(key) || '[]');
-            console.log('Operations in key', key, ':', operations);
             if (Array.isArray(operations)) {
-              // Фильтруем операции по времени и новизне
               const validOperations = operations.filter((op: SyncOperation) => {
                 const isNew = op.timestamp > this.lastSync;
                 const isNotTooOld = (now - op.timestamp) < maxAge;
-                console.log(`Operation ${op.id}: timestamp ${op.timestamp}, lastSync ${this.lastSync}, isNew: ${isNew}, isNotTooOld: ${isNotTooOld}`);
                 return isNew && isNotTooOld;
               });
               
-              // Если есть старые операции, очищаем их
               if (validOperations.length < operations.length) {
                 const oldOperationsCount = operations.length - validOperations.length;
                 console.log(`Cleaning up ${oldOperationsCount} old operations from ${key}`);
@@ -858,7 +793,6 @@ class SyncAdapter {
             }
           } catch (e) {
             console.warn('Failed to parse localStorage operation:', e);
-            // Если не можем распарсить, очищаем поврежденные данные
             localStorage.removeItem(key);
           }
         }
@@ -872,22 +806,18 @@ class SyncAdapter {
     }
   }
 
-  // НОВАЯ ФУНКЦИЯ: Подтверждение получения операции
+  // Подтверждение получения операции
   private async acknowledgeOperation(operationId: string): Promise<void> {
     try {
       const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
       
-      // Проверяем доступность API
       if (!isApiAvailable()) {
-        console.log('API not available, skipping operation acknowledgment');
         return;
       }
       
       const apiUrl = getApiUrl(`sync/operations/${operationId}/acknowledge`);
       
-      // Дополнительная проверка на случай если getApiUrl вернул пустую строку
       if (!apiUrl) {
-        console.log('API URL is empty, skipping operation acknowledgment');
         return;
       }
       
@@ -900,7 +830,6 @@ class SyncAdapter {
       });
     } catch (error) {
       console.error('Failed to acknowledge operation:', error);
-      // Не бросаем ошибку дальше, так как это не критично
     }
   }
 
@@ -911,48 +840,22 @@ class SyncAdapter {
     }
 
     this.syncInterval = setInterval(async () => {
-      if (this.isOnline) {
-        // Проверяем, не слишком ли рано для повторной попытки
+      if (this.isOnline && this.syncQueue.filter(op => op.status === 'pending').length > 0) {
         const now = Date.now();
         if (now - this.lastSyncAttempt < this.syncRetryDelay) {
-          console.log('Skipping sync - too soon after last attempt');
-          return;
-        }
-        
-        // Дополнительная защита от зацикливания
-        if (this.lastSyncAttempt > 0 && this.syncQueue.length === 0) {
-          console.log('No operations to sync, skipping server sync to prevent loops');
           return;
         }
         
         this.lastSyncAttempt = now;
         
-        // Проверяем доступность API перед попыткой синхронизации
         const { isApiAvailable } = await import('../config/api');
         if (!isApiAvailable()) {
-          console.log('API not available, skipping server sync in auto sync');
-          // Только проверяем localStorage для синхронизации между вкладками
-          // Но с увеличенным интервалом для предотвращения спама
-          if (now - this.lastTabOperationCheck > this.tabOperationCheckThrottle * 2) {
-            await this.checkForTabOperations();
-          }
+          this.syncMode = 'local';
+          await this.performLocalSync([...this.syncQueue]);
           return;
         }
         
-        // Если есть операции для отправки, синхронизируем
-        if (this.syncQueue.length > 0) {
-          await this.performSync();
-        } else {
-          // Если нет операций для отправки, только получаем с сервера
-          await this.pullOperationsFromServer();
-        }
-      }
-      
-      // Проверяем localStorage для синхронизации между вкладками
-      // Но только если прошло достаточно времени с последней проверки
-      // и увеличиваем интервал для предотвращения спама
-      if (Date.now() - this.lastTabOperationCheck > this.tabOperationCheckThrottle * 2) {
-        await this.checkForTabOperations();
+        await this.performSync();
       }
     }, intervalMs);
   }
@@ -978,18 +881,17 @@ class SyncAdapter {
     console.log('Cleaning up SyncAdapter...');
     this.stopAutoSync();
     this.isInitialized = false;
-    this.lastTabOperationCheck = 0;
-    this.lastUserSet = 0;
     this.lastSyncAttempt = 0;
     console.log('SyncAdapter cleanup completed');
   }
 
   // Получить информацию об устройстве
-  getDeviceInfo(): { deviceId: string; userId?: string; lastSync: number } {
+  getDeviceInfo(): { deviceId: string; userId?: string; lastSync: number; syncMode: string } {
     return {
       deviceId: this.deviceId,
       userId: this.userId,
-      lastSync: this.lastSync
+      lastSync: this.lastSync,
+      syncMode: this.syncMode
     };
   }
 }

@@ -65,6 +65,12 @@ export const useSync = () => {
     return syncAdapter.getConflictsCount();
   }, []);
 
+  // Сброс флага критических ошибок
+  const resetCriticalErrorFlag = useCallback(() => {
+    syncAdapter.resetCriticalErrorFlag();
+    updateStatus();
+  }, [updateStatus]);
+
   useEffect(() => {
     // Устанавливаем пользователя в адаптер синхронизации
     if (user?.username) {
@@ -109,6 +115,7 @@ export const useSync = () => {
     getDeviceInfo,
     getPendingOperationsCount,
     getConflictsCount,
+    resetCriticalErrorFlag,
     updateStatus
   };
 };

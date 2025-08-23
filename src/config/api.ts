@@ -7,10 +7,13 @@ export const API_CONFIG = {
       return import.meta.env.VITE_API_URL;
     }
     
-    // Если на Vercel, используем production API или отключаем синхронизацию
+    // Если на Vercel, используем Supabase
     if (window.location.hostname.includes('vercel.app')) {
-      // В production на Vercel у нас нет backend сервера
-      // Возвращаем пустую строку чтобы отключить синхронизацию
+      // В production на Vercel используем Supabase
+      if (import.meta.env.VITE_SUPABASE_URL) {
+        return import.meta.env.VITE_SUPABASE_URL;
+      }
+      // Если Supabase не настроен, отключаем синхронизацию
       return '';
     }
     
@@ -45,6 +48,12 @@ export const getApiUrl = (endpoint: string): string => {
     return '';
   }
   
+  // Если это Supabase URL, используем REST API
+  if (baseUrl.includes('supabase.co')) {
+    const cleanBaseUrl = baseUrl.replace(/\/$/, ''); // Убираем trailing slash
+    return `${cleanBaseUrl}/rest/v1/${endpoint}`;
+  }
+  
   const cleanBaseUrl = baseUrl.replace(/\/$/, ''); // Убираем trailing slash
   const cleanEndpoint = endpoint.replace(/^\//, ''); // Убираем leading slash
   return `${cleanBaseUrl}/${cleanEndpoint}`;
@@ -58,6 +67,18 @@ export const isApiAvailable = (): boolean => {
 // Функция для получения заголовков с авторизацией
 export const getAuthHeaders = (): Record<string, string> => {
   const token = localStorage.getItem('auth-token');
+  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  
+  // Если используем Supabase, добавляем специальные заголовки
+  if (API_CONFIG.BASE_URL.includes('supabase.co')) {
+    return {
+      ...API_CONFIG.DEFAULT_HEADERS,
+      'apikey': supabaseKey || '',
+      'Authorization': `Bearer ${supabaseKey || ''}`,
+      ...(token && { 'Authorization': `Bearer ${token}` })
+    };
+  }
+  
   return {
     ...API_CONFIG.DEFAULT_HEADERS,
     ...(token && { 'Authorization': `Bearer ${token}` })
