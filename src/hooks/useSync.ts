@@ -71,6 +71,41 @@ export const useSync = () => {
     updateStatus();
   }, [updateStatus]);
 
+  // Очистка неудачных операций
+  const clearFailedOperations = useCallback(() => {
+    syncAdapter.clearFailedOperations();
+    updateStatus();
+  }, [updateStatus]);
+
+  // Очистка синхронизированных операций
+  const clearSyncedOperations = useCallback(() => {
+    syncAdapter.clearSyncedOperations();
+    updateStatus();
+  }, [updateStatus]);
+
+  // Автоматическое разрешение конфликтов
+  const autoResolveConflicts = useCallback(() => {
+    syncAdapter.autoResolveConflicts();
+    updateStatus();
+  }, [updateStatus]);
+
+  // Перезапуск синхронизации
+  const restartSync = useCallback(() => {
+    syncAdapter.restartSync();
+    updateStatus();
+  }, [updateStatus]);
+
+  // Получение статистики операций
+  const getOperationsStats = useCallback(() => {
+    return syncAdapter.getOperationsStats();
+  }, []);
+
+  // Очистка старых операций
+  const cleanupOldOperations = useCallback(() => {
+    syncAdapter.cleanupOldOperations();
+    updateStatus();
+  }, [updateStatus]);
+
   useEffect(() => {
     // Устанавливаем пользователя в адаптер синхронизации
     if (user?.username) {
@@ -116,6 +151,12 @@ export const useSync = () => {
     getPendingOperationsCount,
     getConflictsCount,
     resetCriticalErrorFlag,
+    clearFailedOperations,
+    clearSyncedOperations,
+    autoResolveConflicts,
+    restartSync,
+    getOperationsStats,
+    cleanupOldOperations,
     updateStatus
   };
 };

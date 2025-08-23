@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { syncAdapter, type SyncStatus as SyncStatusType } from '../database/syncAdapter';
+import { useSync } from '../hooks/useSync';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -16,51 +16,50 @@ import {
   Tablet,
   Server,
   HardDrive,
-  Activity
+  Activity,
+  Trash2,
+  RotateCcw,
+  CheckCircle
 } from 'lucide-react';
 
 export const SyncStatus: React.FC = () => {
-  const [syncStatus, setSyncStatus] = useState<SyncStatusType | null>(null);
+  const { 
+    syncStatus, 
+    forceSync, 
+    resolveConflict, 
+    clearFailedOperations, 
+    clearSyncedOperations, 
+    autoResolveConflicts, 
+    restartSync, 
+    getOperationsStats, 
+    cleanupOldOperations,
+    resetCriticalErrorFlag
+  } = useSync();
+  
   const [isExpanded, setIsExpanded] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   useEffect(() => {
-    // Обновляем статус каждые 5 секунд
+    // Обновляем время последнего обновления
     const interval = setInterval(() => {
-      updateSyncStatus();
+      setLastUpdate(new Date());
     }, 5000);
-
-    // Обновляем статус при монтировании
-    updateSyncStatus();
-
-    // Слушаем события синхронизации
-    const handleSyncEvent = () => updateSyncStatus();
-    window.addEventListener('sync-conflict', handleSyncEvent);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('sync-conflict', handleSyncEvent);
     };
   }, []);
 
-  const updateSyncStatus = () => {
-    const status = syncAdapter.getSyncStatus();
-    setSyncStatus(status);
-    setLastUpdate(new Date());
-  };
-
   const handleForceSync = async () => {
     try {
-      await syncAdapter.forceSync();
-      updateSyncStatus();
+      await forceSync();
     } catch (error) {
       console.error('Force sync failed:', error);
     }
   };
 
   const handleResolveConflict = (conflictId: string, resolution: 'local' | 'remote') => {
-    syncAdapter.resolveConflict(conflictId, resolution);
-    updateSyncStatus();
+    resolveConflict(conflictId, resolution);
   };
 
   const getDeviceIcon = (deviceType?: string) => {
@@ -129,7 +128,7 @@ export const SyncStatus: React.FC = () => {
   }
 
   const { isOnline, isSyncing, pendingOperations, conflicts, lastSync, syncMode, deviceId, userId } = syncStatus;
-  const deviceInfo = syncAdapter.getDeviceInfo();
+  const operationsStats = getOperationsStats();
 
   return (
     <Card className="w-full">
@@ -145,6 +144,15 @@ export const SyncStatus: React.FC = () => {
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
               Синхронизировать
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={restartSync}
+              disabled={isSyncing}
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Перезапуск
             </Button>
             <Button
               variant="ghost"
@@ -310,25 +318,86 @@ export const SyncStatus: React.FC = () => {
             )}
 
             {/* Статистика */}
-            <div className="grid grid-cols-3 gap-4 pt-2">
+            <div className="grid grid-cols-4 gap-3 pt-2">
               <div className="text-center p-3 bg-blue-50 rounded-lg">
                 <div className="text-2xl font-bold text-blue-600">
-                  {pendingOperations.length}
+                  {operationsStats.pending}
                 </div>
                 <div className="text-xs text-blue-600">В очереди</div>
               </div>
               <div className="text-center p-3 bg-red-50 rounded-lg">
                 <div className="text-2xl font-bold text-red-600">
-                  {conflicts.length}
+                  {operationsStats.failed}
                 </div>
-                <div className="text-xs text-red-600">Конфликтов</div>
+                <div className="text-xs text-red-600">Неудачных</div>
               </div>
               <div className="text-center p-3 bg-green-50 rounded-lg">
                 <div className="text-2xl font-bold text-green-600">
-                  {deviceInfo.syncMode === 'hybrid' ? '✓' : deviceInfo.syncMode === 'local' ? 'HDD' : '🌐'}
+                  {operationsStats.synced}
                 </div>
-                <div className="text-xs text-green-600">Режим</div>
+                <div className="text-xs text-green-600">Синхронизировано</div>
               </div>
+              <div className="text-center p-3 bg-gray-50 rounded-lg">
+                <div className="text-2xl font-bold text-gray-600">
+                  {conflicts.length}
+                </div>
+                <div className="text-xs text-gray-600">Конфликтов</div>
+              </div>
+            </div>
+
+            {/* Действия по управлению операциями */}
+            <div className="flex flex-wrap gap-2 pt-2">
+              {operationsStats.failed > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={clearFailedOperations}
+                  className="text-red-600 border-red-200"
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Очистить неудачные ({operationsStats.failed})
+                </Button>
+              )}
+              {operationsStats.synced > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={clearSyncedOperations}
+                  className="text-green-600 border-green-200"
+                >
+                  <CheckCircle className="w-4 h-4 mr-1" />
+                  Очистить синхронизированные ({operationsStats.synced})
+                </Button>
+              )}
+              {conflicts.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={autoResolveConflicts}
+                  className="text-orange-600 border-orange-200"
+                >
+                  <CheckCircle className="w-4 h-4 mr-1" />
+                  Авто-разрешить конфликты
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={cleanupOldOperations}
+                className="text-gray-600 border-gray-200"
+              >
+                <Trash2 className="w-4 h-4 mr-1" />
+                Очистить старые
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={resetCriticalErrorFlag}
+                className="text-purple-600 border-purple-200"
+              >
+                <RotateCcw className="w-4 h-4 mr-1" />
+                Сбросить ошибки
+              </Button>
             </div>
           </>
         )}

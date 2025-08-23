@@ -14,7 +14,13 @@ import {
 } from 'lucide-react';
 
 export const SyncNotifications: React.FC = () => {
-  const { syncStatus, forceSync, clearSyncQueue, resetCriticalErrorFlag } = useSync();
+  const { 
+    syncStatus, 
+    forceSync, 
+    clearSyncQueue, 
+    autoResolveConflicts, 
+    restartSync 
+  } = useSync();
   const [showNotifications, setShowNotifications] = useState(true);
 
   if (!syncStatus || !showNotifications) {
@@ -229,30 +235,39 @@ export const SyncNotifications: React.FC = () => {
     <div className="w-full space-y-2">
       {renderNotification()}
       
-      {/* Дополнительные действия для конфликтов */}
+            {/* Дополнительные действия для конфликтов */}
       {notificationType === 'conflict' && (
         <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
           <div className="text-sm text-red-700">
-            Для разрешения конфликтов перейдите в раздел "Статус синхронизации"
+            Обнаружены конфликты синхронизации. Выберите действие для их разрешения.
           </div>
           <div className="flex items-center gap-2">
             <Button
               size="sm"
               variant="outline"
-              onClick={clearSyncQueue}
+              onClick={autoResolveConflicts}
+              className="text-orange-600 border-orange-200"
             >
-              Очистить очередь
+              Авто-разрешить
             </Button>
             <Button
               size="sm"
               variant="outline"
-              onClick={resetCriticalErrorFlag}
+              onClick={restartSync}
+              className="text-blue-600 border-blue-200"
             >
-              Сбросить ошибки
+              Перезапустить
             </Button>
+              <Button
+                size="sm"
+              variant="outline"
+              onClick={clearSyncQueue}
+            >
+              Очистить очередь
+              </Button>
           </div>
-        </div>
-      )}
+            </div>
+          )}
     </div>
   );
 };

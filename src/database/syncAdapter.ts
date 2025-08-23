@@ -64,37 +64,202 @@ class SyncAdapter {
         return;
       }
       
-      this.db = getDatabase();
-      this.deviceId = this.generateDeviceId();
-      this.setupEventListeners();
-      this.loadSyncQueue();
+              try {
+          this.db = getDatabase();
+        } catch (error) {
+          try {
+            console.error('Failed to get database:', error);
+          } catch (consoleError) {
+            // Игнорируем ошибки console.error
+          }
+          throw new Error('Database initialization failed');
+        }
       
-      console.log('SyncAdapter initialized successfully');
-      console.log('Device ID:', this.deviceId);
+              try {
+          this.deviceId = this.generateDeviceId();
+        } catch (error) {
+          try {
+            console.error('Failed to generate device ID:', error);
+          } catch (consoleError) {
+            // Игнорируем ошибки console.error
+          }
+          this.deviceId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        }
+      
+              try {
+          this.setupEventListeners();
+        } catch (error) {
+          try {
+            console.error('Failed to setup event listeners:', error);
+          } catch (consoleError) {
+            // Игнорируем ошибки console.error
+          }
+        }
+      
+              try {
+          this.loadSyncQueue();
+        } catch (error) {
+          try {
+            console.error('Failed to load sync queue:', error);
+          } catch (consoleError) {
+            // Игнорируем ошибки console.error
+          }
+          this.syncQueue = [];
+        }
+      
+              try {
+          console.log('SyncAdapter initialized successfully');
+          console.log('Device ID:', this.deviceId);
+        } catch (error) {
+          // Игнорируем ошибки console.log
+        }
+      
+      // Проверяем доступность API и устанавливаем режим синхронизации
+      try {
+        this.checkApiAccessibilityOnInit();
+      } catch (error) {
+        try {
+          console.error('Failed to check API accessibility:', error);
+        } catch (consoleError) {
+          // Игнорируем ошибки console.error
+        }
+        this.syncMode = 'local';
+      }
       
       // Запускаем автоматическую синхронизацию
-      this.startAutoSync();
+      try {
+        this.startAutoSync();
+      } catch (error) {
+        try {
+          console.error('Failed to start auto sync:', error);
+        } catch (consoleError) {
+          // Игнорируем ошибки console.error
+        }
+        this.syncMode = 'local';
+      }
       
       // Инициализация через небольшую задержку
-      this.initializationTimeout = setTimeout(() => {
-        this.isInitialized = true;
-        this.performInitialSync();
+      this.initializationTimeout = setTimeout(async () => {
+        try {
+          this.isInitialized = true;
+          await this.performInitialSync();
+        } catch (error) {
+          try {
+            console.error('Initial sync failed:', error);
+          } catch (consoleError) {
+            // Игнорируем ошибки console.error
+          }
+          this.syncMode = 'local';
+        }
       }, 1000);
       
+      // Запускаем автоматическую очистку каждые 6 часов
+      setInterval(() => {
+        try {
+          this.cleanupOldOperations();
+          this.cleanupLocalStorage();
+        } catch (error) {
+          console.error('Auto cleanup failed:', error);
+        }
+      }, 6 * 60 * 60 * 1000);
+      
     } catch (error) {
-      console.error('Failed to initialize SyncAdapter:', error);
+      try {
+        console.error('Failed to initialize SyncAdapter:', error);
+      } catch (consoleError) {
+        // Игнорируем ошибки console.error
+      }
+      
+      // При ошибке инициализации переключаемся на локальный режим
+      this.syncMode = 'local';
+    }
+  }
+  
+  // Проверка доступности API при инициализации
+  private async checkApiAccessibilityOnInit(): Promise<void> {
+    try {
+      const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
+      
+      if (isApiAvailable()) {
+        const testUrl = getApiUrl('sync');
+        
+        if (testUrl && testUrl.includes('supabase.co')) {
+          try {
+            const testResponse = await fetch(testUrl.replace('/rest/v1/sync', '/rest/v1/'), {
+              method: 'HEAD',
+              headers: getAuthHeaders()
+            });
+            
+            if (!testResponse.ok && testResponse.status !== 404) {
+              console.log('Supabase not accessible on init, switching to local mode');
+              this.syncMode = 'local';
+              return;
+            }
+          } catch (testError) {
+            console.log('Supabase accessibility test failed on init, switching to local mode:', testError);
+            this.syncMode = 'local';
+            return;
+          }
+        }
+        
+        // API доступен, устанавливаем гибридный режим
+        this.syncMode = 'hybrid';
+        try {
+          console.log('API accessible, using hybrid sync mode');
+        } catch (error) {
+          // Игнорируем ошибки console.log
+        }
+      } else {
+        // API недоступен, устанавливаем локальный режим
+        this.syncMode = 'local';
+        try {
+          console.log('API not available, using local sync mode');
+        } catch (error) {
+          // Игнорируем ошибки console.log
+        }
+      }
+    } catch (error) {
+      try {
+        console.log('API accessibility check failed on init, using local mode:', error);
+      } catch (consoleError) {
+        // Игнорируем ошибки console.log
+      }
+      this.syncMode = 'local';
     }
   }
 
   private generateDeviceId(): string {
     // Генерируем уникальный ID для устройства
     const existingId = localStorage.getItem('warehouse-device-id');
-    if (existingId) {
+    if (existingId && existingId.length > 10) {
       return existingId;
     }
     
-    const deviceId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    localStorage.setItem('warehouse-device-id', deviceId);
+    // Создаем более стабильный ID на основе характеристик устройства
+    const deviceInfo = [
+      navigator.userAgent,
+      navigator.language,
+      screen.width,
+      screen.height,
+      new Date().getTimezoneOffset()
+    ].join('|');
+    
+    // Создаем хеш из характеристик устройства
+    let hash = 0;
+    for (let i = 0; i < deviceInfo.length; i++) {
+      const char = deviceInfo.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    
+    const deviceId = `device_${Math.abs(hash).toString(36)}_${Date.now().toString(36)}`;
+    
+    try {
+      localStorage.setItem('warehouse-device-id', deviceId);
+    } catch (error) {
+      console.warn('Failed to save device ID to localStorage:', error);
+    }
+    
     return deviceId;
   }
 
@@ -103,7 +268,9 @@ class SyncAdapter {
     window.addEventListener('online', () => {
       this.isOnline = true;
       this.syncMode = 'hybrid';
-      this.scheduleSync();
+      
+      // При восстановлении соединения проверяем доступность API
+      this.checkApiAccessibilityOnOnline();
     });
 
     window.addEventListener('offline', () => {
@@ -114,22 +281,113 @@ class SyncAdapter {
     // Слушаем изменения в localStorage для других вкладок
     window.addEventListener('storage', (event) => {
       if (event.key === 'warehouse-sync-queue') {
+        console.log('Storage change detected for sync queue');
         this.loadSyncQueue();
+      } else if (event.key === 'warehouse-sync-queue-updated') {
+        console.log('Storage change detected for sync queue update');
+        // Запускаем синхронизацию при изменении в других вкладках
+        if (this.isOnline && this.syncMode === 'local') {
+          setTimeout(() => {
+            this.performLocalSync([...this.syncQueue.filter(op => op.status === 'pending')]);
+          }, 1000);
+        }
       }
     });
+    
+    // Слушаем события видимости страницы
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && this.isOnline) {
+        console.log('Page became visible, checking for updates...');
+        // При возвращении на страницу проверяем обновления
+        setTimeout(() => {
+          if (this.syncMode === 'local') {
+            this.performLocalSync([...this.syncQueue.filter(op => op.status === 'pending')]);
+          } else {
+            this.forceSync();
+          }
+        }, 2000);
+      }
+    });
+  }
+  
+  // Проверка доступности API при восстановлении соединения
+  private async checkApiAccessibilityOnOnline(): Promise<void> {
+    try {
+      const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
+      
+      if (isApiAvailable()) {
+        const testUrl = getApiUrl('sync');
+        
+        if (testUrl && testUrl.includes('supabase.co')) {
+          try {
+            const testResponse = await fetch(testUrl.replace('/rest/v1/sync', '/rest/v1/'), {
+              method: 'HEAD',
+              headers: getAuthHeaders()
+            });
+            
+            if (!testResponse.ok && testResponse.status !== 404) {
+              console.log('Supabase not accessible after going online, staying in local mode');
+              this.syncMode = 'local';
+              return;
+            }
+          } catch (testError) {
+            console.log('Supabase accessibility test failed after going online, staying in local mode:', testError);
+            this.syncMode = 'local';
+            return;
+          }
+        }
+        
+        // API доступен, переключаемся на гибридный режим и планируем синхронизацию
+        this.syncMode = 'hybrid';
+        this.scheduleSync();
+      } else {
+        // API недоступен, остаемся в локальном режиме
+        this.syncMode = 'local';
+      }
+    } catch (error) {
+      console.log('API accessibility check failed after going online, staying in local mode:', error);
+      this.syncMode = 'local';
+    }
   }
 
   private loadSyncQueue(): void {
     try {
       const stored = localStorage.getItem('warehouse-sync-queue');
       if (stored) {
-        this.syncQueue = JSON.parse(stored);
-        // Фильтруем только pending операции
-        this.syncQueue = this.syncQueue.filter(op => op.status === 'pending');
+        const parsedQueue = JSON.parse(stored);
+        
+        // Валидируем загруженные данные
+        if (Array.isArray(parsedQueue)) {
+          this.syncQueue = parsedQueue.filter(op => {
+            // Проверяем, что операция имеет все необходимые поля
+            if (!op || typeof op !== 'object') return false;
+            if (!op.id || !op.table || !op.operation || !op.timestamp) return false;
+            if (!['create', 'update', 'delete'].includes(op.operation)) return false;
+            if (typeof op.timestamp !== 'number') return false;
+            
+            return true;
+          });
+          
+          // Фильтруем только pending операции
+          this.syncQueue = this.syncQueue.filter(op => op.status === 'pending');
+          
+          console.log(`Loaded ${this.syncQueue.length} pending operations from localStorage`);
+        } else {
+          console.warn('Invalid sync queue format in localStorage');
+          this.syncQueue = [];
+        }
       }
     } catch (error) {
       console.error('Error loading sync queue:', error);
       this.syncQueue = [];
+      
+      // Очищаем поврежденные данные
+      try {
+        localStorage.removeItem('warehouse-sync-queue');
+        console.log('Cleared corrupted sync queue data');
+      } catch (cleanupError) {
+        console.error('Failed to clear corrupted sync queue data:', cleanupError);
+      }
     }
   }
 
@@ -137,8 +395,27 @@ class SyncAdapter {
     try {
       localStorage.setItem('warehouse-sync-queue', JSON.stringify(this.syncQueue));
       localStorage.setItem('warehouse-sync-queue-updated', Date.now().toString());
+      
+      // Уведомляем об обновлении статуса
+      this.notifyStatusUpdate();
+      
     } catch (error) {
       console.error('Error saving sync queue:', error);
+      
+      // Если localStorage переполнен, очищаем старые данные
+      if (error instanceof Error && error.message.includes('QuotaExceededError')) {
+        console.log('localStorage quota exceeded, cleaning up old data...');
+        this.cleanupLocalStorage(12 * 60 * 60 * 1000); // Очищаем данные старше 12 часов
+        
+        // Повторяем попытку сохранения
+        try {
+          localStorage.setItem('warehouse-sync-queue', JSON.stringify(this.syncQueue));
+          localStorage.setItem('warehouse-sync-queue-updated', Date.now().toString());
+          console.log('Sync queue saved after cleanup');
+        } catch (retryError) {
+          console.error('Failed to save sync queue after cleanup:', retryError);
+        }
+      }
     }
   }
 
@@ -161,6 +438,12 @@ class SyncAdapter {
       return;
     }
 
+    // Валидация данных
+    if (!data || typeof data !== 'object') {
+      console.warn('Invalid data for sync operation, skipping...', { table, operation, data });
+      return;
+    }
+
     // Создаем хеш данных для предотвращения дублирования
     const dataHash = this.createDataHash(data);
     
@@ -175,6 +458,27 @@ class SyncAdapter {
     if (existingOperation) {
       console.log('Operation already in queue, skipping...', { table, operation, dataHash });
       return;
+    }
+
+    // Проверяем, нет ли такой операции в localStorage (для предотвращения дублирования между вкладками)
+    const localStorageKey = `warehouse-sync-${this.deviceId}`;
+    try {
+      const existingLocalOperations = localStorage.getItem(localStorageKey);
+      if (existingLocalOperations) {
+        const localOps = JSON.parse(existingLocalOperations);
+        const localDuplicate = localOps.find((op: SyncOperation) => 
+          op.table === table && 
+          op.operation === operation && 
+          op.hash === dataHash
+        );
+        
+        if (localDuplicate) {
+          console.log('Operation already exists in localStorage, skipping...', { table, operation, dataHash });
+          return;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to check localStorage for duplicates:', error);
     }
 
     const syncOp: SyncOperation = {
@@ -203,15 +507,40 @@ class SyncAdapter {
 
   private createDataHash(data: any): string {
     try {
-      const dataStr = JSON.stringify(data);
+      // Создаем стабильный хеш, исключая временные поля
+      const stableData = { ...data };
+      
+      // Убираем временные поля, которые могут изменяться
+      delete stableData.createdAt;
+      delete stableData.updatedAt;
+      delete stableData.timestamp;
+      delete stableData.id; // ID может быть разным в разных базах
+      delete stableData.uuid; // UUID может быть разным в разных базах
+      delete stableData.created_by; // Пользователь может быть разным
+      delete stableData.updated_by; // Пользователь может быть разным
+      
+      // Сортируем ключи для стабильного хеша
+      const sortedKeys = Object.keys(stableData).sort();
+      const sortedData: any = {};
+      
+      for (const key of sortedKeys) {
+        if (stableData[key] !== undefined && stableData[key] !== null) {
+          sortedData[key] = stableData[key];
+        }
+      }
+      
+      const dataStr = JSON.stringify(sortedData);
       let hash = 0;
+      
       for (let i = 0; i < dataStr.length; i++) {
         const char = dataStr.charCodeAt(i);
         hash = ((hash << 5) - hash) + char;
         hash = hash & hash; // Convert to 32bit integer
       }
+      
       return hash.toString(36);
     } catch (error) {
+      console.warn('Failed to create data hash, using timestamp:', error);
       return Date.now().toString();
     }
   }
@@ -236,7 +565,12 @@ class SyncAdapter {
       }
     }
 
-    console.log(`Scheduling sync in ${delay}ms`);
+    // Дополнительная задержка для локального режима
+    if (this.syncMode === 'local') {
+      delay = Math.max(delay, 5000); // минимум 5 секунд для локальной синхронизации
+    }
+
+    console.log(`Scheduling sync in ${delay}ms (mode: ${this.syncMode})`);
     
     this.syncTimeout = setTimeout(() => {
       this.lastSyncAttempt = 0;
@@ -285,7 +619,8 @@ class SyncAdapter {
           await this.performLocalSync(operationsToSync);
         }
       } else {
-        // Офлайн режим - только локальная синхронизация
+        // Офлайн режим или локальный режим - только локальная синхронизация
+        console.log(`Using local sync mode (${this.syncMode})`);
         await this.performLocalSync(operationsToSync);
       }
       
@@ -341,8 +676,43 @@ class SyncAdapter {
       this.lastSync = Date.now();
       console.log('Local sync completed successfully');
       
+      // Если мы в локальном режиме, но есть интернет, проверяем возможность переключения на гибридный
+      if (this.isOnline && this.syncMode === 'local') {
+        this.checkApiAccessibilityForModeSwitch();
+      }
+      
     } catch (error) {
       console.error('Local sync failed:', error);
+    }
+  }
+  
+  // Проверка возможности переключения на гибридный режим
+  private async checkApiAccessibilityForModeSwitch(): Promise<void> {
+    try {
+      const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
+      
+      if (isApiAvailable()) {
+        const testUrl = getApiUrl('sync');
+        
+        if (testUrl && testUrl.includes('supabase.co')) {
+          try {
+            const testResponse = await fetch(testUrl.replace('/rest/v1/sync', '/rest/v1/'), {
+              method: 'HEAD',
+              headers: getAuthHeaders()
+            });
+            
+            if (testResponse.ok || testResponse.status === 404) {
+              console.log('API became accessible, switching to hybrid mode');
+              this.syncMode = 'hybrid';
+            }
+          } catch (testError) {
+            // API все еще недоступен, остаемся в локальном режиме
+            console.log('API still not accessible, staying in local mode');
+          }
+        }
+      }
+    } catch (error) {
+      console.log('API accessibility check for mode switch failed:', error);
     }
   }
 
@@ -366,6 +736,25 @@ class SyncAdapter {
       // Проверяем, не пытаемся ли мы подключиться к localhost на Vercel
       if (apiUrl.includes('localhost') && window.location.hostname.includes('vercel.app')) {
         throw new Error('Cannot connect to localhost from Vercel deployment');
+      }
+      
+      // Дополнительная проверка доступности URL
+      if (apiUrl.includes('supabase.co')) {
+        try {
+          // Проверяем доступность Supabase URL
+          const testResponse = await fetch(apiUrl.replace('/rest/v1/sync', '/rest/v1/'), {
+            method: 'HEAD',
+            headers: getAuthHeaders()
+          });
+          
+          if (!testResponse.ok && testResponse.status !== 404) {
+            console.log('Supabase URL not accessible, switching to local sync');
+            return [];
+          }
+        } catch (testError) {
+          console.log('Supabase URL test failed, switching to local sync:', testError);
+          return [];
+        }
       }
       
       const response = await fetch(apiUrl, {
@@ -393,6 +782,17 @@ class SyncAdapter {
       return await response.json();
     } catch (error) {
       console.error('Failed to send operations to server:', error);
+      
+      // Если ошибка связана с недоступностью URL, возвращаем пустой массив
+      if (error instanceof Error && (
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('ERR_NAME_NOT_RESOLVED') ||
+        error.message.includes('ERR_CONNECTION_REFUSED')
+      )) {
+        console.log('Network error detected, switching to local sync');
+        return [];
+      }
+      
       throw error;
     }
   }
@@ -418,16 +818,76 @@ class SyncAdapter {
       createdAt: Date.now()
     };
 
+    console.log('New conflict detected:', conflict);
+
+    // Проверяем, нет ли уже такого конфликта
+    const existingConflict = this.conflicts.find(c => 
+      c.localOperation.hash === conflict.localOperation.hash &&
+      c.remoteOperation.hash === conflict.remoteOperation.hash
+    );
+
+    if (existingConflict) {
+      console.log('Conflict already exists, skipping...');
+      return;
+    }
+
     this.conflicts.push(conflict);
     
     // Уведомляем пользователя о конфликте
     this.notifyConflict(conflict);
+    
+    // Автоматически разрешаем простые конфликты
+    this.autoResolveSimpleConflicts();
+  }
+  
+  // Автоматическое разрешение простых конфликтов
+  private autoResolveSimpleConflicts(): void {
+    const simpleConflicts = this.conflicts.filter(conflict => 
+      conflict.resolution === 'manual' &&
+      conflict.localOperation.operation === conflict.remoteOperation.operation &&
+      conflict.localOperation.table === conflict.remoteOperation.table
+    );
+    
+    for (const conflict of simpleConflicts) {
+      try {
+        // Если операции одинаковые, выбираем более новую версию
+        const resolution = conflict.localOperation.timestamp > conflict.remoteOperation.timestamp 
+          ? 'local' 
+          : 'remote';
+        
+        this.resolveConflict(conflict.id, resolution);
+      } catch (error) {
+        console.error(`Failed to auto-resolve simple conflict ${conflict.id}:`, error);
+      }
+    }
   }
 
   // Уведомить о конфликте
   private notifyConflict(conflict: SyncConflict): void {
+    console.log('Notifying about conflict:', conflict.id);
+    
     const event = new CustomEvent('sync-conflict', {
       detail: { conflict }
+    });
+    window.dispatchEvent(event);
+    
+    // Также отправляем событие о статусе синхронизации
+    const statusEvent = new CustomEvent('sync-status-updated', {
+      detail: { 
+        status: this.getSyncStatus(),
+        conflictCount: this.conflicts.length
+      }
+    });
+    window.dispatchEvent(statusEvent);
+  }
+  
+  // Уведомить об обновлении статуса
+  private notifyStatusUpdate(): void {
+    const event = new CustomEvent('sync-status-updated', {
+      detail: { 
+        status: this.getSyncStatus(),
+        conflictCount: this.conflicts.length
+      }
     });
     window.dispatchEvent(event);
   }
@@ -436,31 +896,79 @@ class SyncAdapter {
   resolveConflict(conflictId: string, resolution: 'local' | 'remote'): void {
     const conflictIndex = this.conflicts.findIndex(c => c.id === conflictId);
 
-    if (conflictIndex === -1) return;
+    if (conflictIndex === -1) {
+      console.warn(`Conflict ${conflictId} not found`);
+      return;
+    }
 
     const conflict = this.conflicts[conflictIndex];
     conflict.resolution = resolution;
 
-    // Применяем разрешение
-    if (resolution === 'local') {
-      this.syncQueue = this.syncQueue.filter(op => 
-        op.id !== conflict.remoteOperation.id
-      );
-    } else {
-      this.applyRemoteOperation(conflict.remoteOperation);
-      this.syncQueue = this.syncQueue.filter(op => 
-        op.id !== conflict.localOperation.id
-      );
-    }
+    console.log(`Resolving conflict ${conflictId} with resolution: ${resolution}`);
 
-    // Удаляем конфликт из списка
-    this.conflicts.splice(conflictIndex, 1);
-    this.saveSyncQueue();
+    try {
+      // Применяем разрешение
+      if (resolution === 'local') {
+        // Локальная версия остается, удаляем удаленную
+        this.syncQueue = this.syncQueue.filter(op => 
+          op.id !== conflict.remoteOperation.id
+        );
+        console.log('Kept local operation, removed remote operation');
+      } else {
+        // Удаленная версия побеждает, обновляем локальные данные
+        this.applyRemoteOperation(conflict.remoteOperation);
+        this.syncQueue = this.syncQueue.filter(op => 
+          op.id !== conflict.localOperation.id
+        );
+        console.log('Applied remote operation, removed local operation');
+      }
+
+      // Удаляем конфликт из списка
+      this.conflicts.splice(conflictIndex, 1);
+      this.saveSyncQueue();
+      
+      console.log(`Conflict ${conflictId} resolved successfully`);
+      
+    } catch (error) {
+      console.error(`Failed to resolve conflict ${conflictId}:`, error);
+      // Возвращаем конфликт в список при ошибке
+      if (conflictIndex === -1) {
+        this.conflicts.push(conflict);
+      }
+    }
+  }
+  
+  // Автоматическое разрешение конфликтов
+  autoResolveConflicts(): void {
+    console.log('Auto-resolving conflicts...');
+    
+    const conflictsToResolve = [...this.conflicts];
+    
+    for (const conflict of conflictsToResolve) {
+      try {
+        // Автоматически выбираем более новую версию
+        const resolution = conflict.localOperation.timestamp > conflict.remoteOperation.timestamp 
+          ? 'local' 
+          : 'remote';
+        
+        this.resolveConflict(conflict.id, resolution);
+      } catch (error) {
+        console.error(`Failed to auto-resolve conflict ${conflict.id}:`, error);
+      }
+    }
+    
+    console.log(`Auto-resolved ${conflictsToResolve.length} conflicts`);
   }
 
   // Применить удаленную операцию
   private async applyRemoteOperation(operation: SyncOperation): Promise<void> {
     try {
+      // Проверяем, не применяли ли мы уже эту операцию
+      if (operation.timestamp <= this.lastSync) {
+        console.log(`Skipping already applied operation: ${operation.operation} on ${operation.table}`);
+        return;
+      }
+      
       switch (operation.operation) {
         case 'create':
           await this.db.insert(operation.table, operation.data);
@@ -471,10 +979,25 @@ class SyncAdapter {
         case 'delete':
           await this.db.delete(operation.table, operation.data.id);
           break;
+        default:
+          console.warn(`Unknown operation type: ${operation.operation}`);
+          return;
       }
+      
       console.log(`Applied remote operation: ${operation.operation} on ${operation.table}`);
+      
+      // Обновляем время последней синхронизации
+      this.lastSync = Math.max(this.lastSync, operation.timestamp);
+      
     } catch (error) {
       console.error(`Failed to apply remote operation ${operation.operation} on ${operation.table}:`, error);
+      
+      // Если это ошибка дублирования, игнорируем её
+      if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+        console.log(`Operation already exists, skipping: ${operation.operation} on ${operation.table}`);
+        return;
+      }
+      
       throw error;
     }
   }
@@ -485,23 +1008,20 @@ class SyncAdapter {
     
     // Throttling для обновления статуса
     if (now - this.lastStatusUpdate < this.statusUpdateThrottle) {
-      return {
-        lastSync: this.lastSync,
-        pendingOperations: this.syncQueue.filter(op => op.status === 'pending'),
-        conflicts: [...this.conflicts],
-        isOnline: this.isOnline,
-        isSyncing: this.isSyncing,
-        deviceId: this.deviceId,
-        userId: this.userId,
-        syncMode: this.syncMode
-      };
+      return this.createSyncStatus();
     }
     
     this.lastStatusUpdate = now;
+    return this.createSyncStatus();
+  }
+  
+  // Создать объект статуса синхронизации
+  private createSyncStatus(): SyncStatus {
+    const pendingOperations = this.syncQueue.filter(op => op.status === 'pending');
     
     return {
       lastSync: this.lastSync,
-      pendingOperations: this.syncQueue.filter(op => op.status === 'pending'),
+      pendingOperations,
       conflicts: [...this.conflicts],
       isOnline: this.isOnline,
       isSyncing: this.isSyncing,
@@ -535,6 +1055,39 @@ class SyncAdapter {
       return;
     }
     
+    // Дополнительная проверка доступности Supabase
+    if (this.isOnline && this.syncMode !== 'local') {
+      try {
+        const { getApiUrl, getAuthHeaders } = await import('../config/api');
+        const testUrl = getApiUrl('sync');
+        
+        if (testUrl && testUrl.includes('supabase.co')) {
+          const testResponse = await fetch(testUrl.replace('/rest/v1/sync', '/rest/v1/'), {
+            method: 'HEAD',
+            headers: getAuthHeaders()
+          });
+          
+          if (!testResponse.ok && testResponse.status !== 404) {
+            console.log('Supabase not accessible, switching to local sync mode');
+            this.syncMode = 'local';
+            const pendingOperations = this.syncQueue.filter(op => op.status === 'pending');
+            if (pendingOperations.length > 0) {
+              await this.performLocalSync(pendingOperations);
+            }
+            return;
+          }
+        }
+      } catch (testError) {
+        console.log('Supabase accessibility test failed, switching to local sync mode:', testError);
+        this.syncMode = 'local';
+        const pendingOperations = this.syncQueue.filter(op => op.status === 'pending');
+        if (pendingOperations.length > 0) {
+          await this.performLocalSync(pendingOperations);
+        }
+        return;
+      }
+    }
+    
     if (this.isOnline) {
       if (this.syncQueue.filter(op => op.status === 'pending').length > 0) {
         await this.performSync();
@@ -546,14 +1099,51 @@ class SyncAdapter {
 
   // Очистить очередь синхронизации
   clearSyncQueue(): void {
+    const queueSize = this.syncQueue.length;
     this.syncQueue = [];
     this.saveSyncQueue();
+    console.log(`Cleared ${queueSize} operations from sync queue`);
+  }
+  
+  // Очистить только неудачные операции
+  clearFailedOperations(): void {
+    const failedCount = this.syncQueue.filter(op => op.status === 'failed').length;
+    this.syncQueue = this.syncQueue.filter(op => op.status !== 'failed');
+    this.saveSyncQueue();
+    console.log(`Cleared ${failedCount} failed operations from sync queue`);
+  }
+  
+  // Очистить только успешно синхронизированные операции
+  clearSyncedOperations(): void {
+    const syncedCount = this.syncQueue.filter(op => op.status === 'synced').length;
+    this.syncQueue = this.syncQueue.filter(op => op.status !== 'synced');
+    this.saveSyncQueue();
+    console.log(`Cleared ${syncedCount} synced operations from sync queue`);
   }
 
   // Сбросить флаг критических ошибок
   resetCriticalErrorFlag(): void {
     this.lastSyncAttempt = 0;
-    console.log('Critical error flag reset');
+    this.lastOperationAdd = 0;
+    this.lastStatusUpdate = 0;
+    console.log('Critical error flags reset');
+  }
+  
+  // Сбросить все флаги и таймауты
+  resetAllFlags(): void {
+    this.lastSyncAttempt = 0;
+    this.lastOperationAdd = 0;
+    this.lastStatusUpdate = 0;
+    this.syncMode = 'hybrid';
+    console.log('All flags and timeouts reset');
+  }
+  
+  // Перезапустить синхронизацию
+  restartSync(): void {
+    console.log('Restarting sync...');
+    this.stopAutoSync();
+    this.resetAllFlags();
+    this.startAutoSync();
   }
 
   // Установить пользователя
@@ -568,7 +1158,53 @@ class SyncAdapter {
     
     // При смене пользователя сразу синхронизируемся для получения данных
     if (this.isOnline) {
-      this.scheduleInitialSync();
+      // Проверяем доступность API перед планированием синхронизации
+      this.checkApiAccessibilityAndScheduleSync();
+    }
+  }
+  
+  // Проверка доступности API и планирование синхронизации
+  private async checkApiAccessibilityAndScheduleSync(): Promise<void> {
+    try {
+      const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
+      
+      if (isApiAvailable()) {
+        const testUrl = getApiUrl('sync');
+        
+        if (testUrl && testUrl.includes('supabase.co')) {
+          try {
+            const testResponse = await fetch(testUrl.replace('/rest/v1/sync', '/rest/v1/'), {
+              method: 'HEAD',
+              headers: getAuthHeaders()
+            });
+            
+            if (!testResponse.ok && testResponse.status !== 404) {
+              console.log('Supabase not accessible, switching to local sync mode');
+              this.syncMode = 'local';
+              // Выполняем локальную синхронизацию сразу
+              await this.pullOperationsFromLocalStorage();
+              return;
+            }
+          } catch (testError) {
+            console.log('Supabase accessibility test failed, switching to local sync mode:', testError);
+            this.syncMode = 'local';
+            // Выполняем локальную синхронизацию сразу
+            await this.pullOperationsFromLocalStorage();
+            return;
+          }
+        }
+        
+        // API доступен, планируем обычную синхронизацию
+        this.scheduleInitialSync();
+      } else {
+        // API недоступен, переключаемся на локальный режим
+        this.syncMode = 'local';
+        await this.pullOperationsFromLocalStorage();
+      }
+    } catch (error) {
+      console.log('API accessibility check failed, switching to local sync mode:', error);
+      this.syncMode = 'local';
+      await this.pullOperationsFromLocalStorage();
     }
   }
 
@@ -582,13 +1218,45 @@ class SyncAdapter {
       try {
         console.log('Performing initial sync for new user...');
         
+        // Проверяем доступность API перед попыткой серверной синхронизации
         if (this.isOnline && this.syncMode !== 'local') {
-          await this.pullOperationsFromServer();
+          try {
+            const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
+            
+            if (isApiAvailable()) {
+              const testUrl = getApiUrl('sync');
+              
+              if (testUrl && testUrl.includes('supabase.co')) {
+                const testResponse = await fetch(testUrl.replace('/rest/v1/sync', '/rest/v1/'), {
+                  method: 'HEAD',
+                  headers: getAuthHeaders()
+                });
+                
+                if (!testResponse.ok && testResponse.status !== 404) {
+                  console.log('Supabase not accessible in initial sync, switching to local mode');
+                  this.syncMode = 'local';
+                  await this.pullOperationsFromLocalStorage();
+                  return;
+                }
+              }
+              
+              await this.pullOperationsFromServer();
+            } else {
+              await this.pullOperationsFromLocalStorage();
+            }
+          } catch (testError) {
+            console.log('API accessibility test failed in initial sync, switching to local mode:', testError);
+            this.syncMode = 'local';
+            await this.pullOperationsFromLocalStorage();
+          }
         } else {
           await this.pullOperationsFromLocalStorage();
         }
       } catch (error) {
         console.error('Initial sync failed:', error);
+        // При ошибке переключаемся на локальную синхронизацию
+        this.syncMode = 'local';
+        await this.pullOperationsFromLocalStorage();
       }
     }, 2000);
   }
@@ -598,19 +1266,80 @@ class SyncAdapter {
     try {
       console.log('Performing initial sync...');
       
+      // Проверяем доступность API перед попыткой серверной синхронизации
       if (this.isOnline && this.syncMode !== 'local') {
-        await this.pullOperationsFromServer();
+        try {
+          const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
+          
+          if (isApiAvailable()) {
+            const testUrl = getApiUrl('sync');
+            
+            if (testUrl && testUrl.includes('supabase.co')) {
+              const testResponse = await fetch(testUrl.replace('/rest/v1/sync', '/rest/v1/'), {
+                method: 'HEAD',
+                headers: getAuthHeaders()
+              });
+              
+              if (!testResponse.ok && testResponse.status !== 404) {
+                console.log('Supabase not accessible in performInitialSync, switching to local mode');
+                this.syncMode = 'local';
+                await this.pullOperationsFromLocalStorage();
+                return;
+              }
+            }
+            
+            await this.pullOperationsFromServer();
+          } else {
+            await this.pullOperationsFromLocalStorage();
+          }
+        } catch (testError) {
+          console.log('API accessibility test failed in performInitialSync, switching to local mode:', testError);
+          this.syncMode = 'local';
+          await this.pullOperationsFromLocalStorage();
+        }
       } else {
         await this.pullOperationsFromLocalStorage();
       }
     } catch (error) {
       console.error('Initial sync failed:', error);
+      // При ошибке переключаемся на локальную синхронизацию
+      this.syncMode = 'local';
+      await this.pullOperationsFromLocalStorage();
     }
   }
 
   // Получить количество операций в очереди
   getPendingOperationsCount(): number {
     return this.syncQueue.filter(op => op.status === 'pending').length;
+  }
+  
+  // Получить количество неудачных операций
+  getFailedOperationsCount(): number {
+    return this.syncQueue.filter(op => op.status === 'failed').length;
+  }
+  
+  // Получить количество успешно синхронизированных операций
+  getSyncedOperationsCount(): number {
+    return this.syncQueue.filter(op => op.status === 'synced').length;
+  }
+  
+  // Получить общую статистику операций
+  getOperationsStats(): {
+    pending: number;
+    failed: number;
+    synced: number;
+    total: number;
+  } {
+    const pending = this.getPendingOperationsCount();
+    const failed = this.getFailedOperationsCount();
+    const synced = this.getSyncedOperationsCount();
+    
+    return {
+      pending,
+      failed,
+      synced,
+      total: this.syncQueue.length
+    };
   }
 
   // Получить количество конфликтов
@@ -650,6 +1379,26 @@ class SyncAdapter {
         console.log('On Vercel, skipping server sync to localhost');
         await this.pullOperationsFromLocalStorage();
         return;
+      }
+      
+      // Дополнительная проверка доступности URL
+      if (apiUrl.includes('supabase.co')) {
+        try {
+          const testResponse = await fetch(apiUrl.replace('/rest/v1/sync/operations', '/rest/v1/'), {
+            method: 'HEAD',
+            headers: getAuthHeaders()
+          });
+          
+          if (!testResponse.ok && testResponse.status !== 404) {
+            console.log('Supabase URL not accessible, using local sync only');
+            await this.pullOperationsFromLocalStorage();
+            return;
+          }
+        } catch (testError) {
+          console.log('Supabase URL test failed, using local sync only:', testError);
+          await this.pullOperationsFromLocalStorage();
+          return;
+        }
       }
       
       const response = await fetch(apiUrl, {
@@ -693,6 +1442,19 @@ class SyncAdapter {
       
     } catch (error) {
       console.error('Failed to pull operations from server:', error);
+      
+      // Если ошибка связана с недоступностью URL, переключаемся на локальную синхронизацию
+      if (error instanceof Error && (
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('ERR_NAME_NOT_RESOLVED') ||
+        error.message.includes('ERR_CONNECTION_REFUSED')
+      )) {
+        console.log('Network error detected, switching to local sync');
+        this.syncMode = 'local';
+        await this.pullOperationsFromLocalStorage();
+        return;
+      }
+      
       console.log('Falling back to local sync...');
       await this.pullOperationsFromLocalStorage();
     }
@@ -709,18 +1471,36 @@ class SyncAdapter {
         const sortedOperations = allOperations.sort((a, b) => a.timestamp - b.timestamp);
         
         let appliedOperations = 0;
+        let skippedOperations = 0;
         
         for (const operation of sortedOperations) {
-          await this.applyRemoteOperation(operation);
-          appliedOperations++;
+          try {
+            // Проверяем, не применяли ли мы уже эту операцию
+            if (operation.timestamp <= this.lastSync) {
+              skippedOperations++;
+              continue;
+            }
+            
+            await this.applyRemoteOperation(operation);
+            appliedOperations++;
+            
+            // Обновляем время последней синхронизации после каждой успешной операции
+            this.lastSync = Math.max(this.lastSync, operation.timestamp);
+            
+          } catch (opError) {
+            console.error(`Failed to apply operation ${operation.id}:`, opError);
+            // Продолжаем с другими операциями
+          }
         }
         
         if (appliedOperations > 0) {
-          this.lastSync = Date.now();
           console.log(`Successfully applied ${appliedOperations} operations from localStorage`);
+          console.log(`Skipped ${skippedOperations} already applied operations`);
         } else {
           console.log('No new operations were applied from localStorage');
         }
+      } else {
+        console.log('No operations found in localStorage');
       }
       
     } catch (error) {
@@ -743,6 +1523,19 @@ class SyncAdapter {
         } catch (e) {
           console.warn('Failed to parse existing localStorage operations:', e);
         }
+      }
+      
+      // Проверяем, нет ли уже такой операции
+      const existingOperation = operations.find(op => 
+        op.id === operation.id || 
+        (op.table === operation.table && 
+         op.operation === operation.operation && 
+         op.hash === operation.hash)
+      );
+      
+      if (existingOperation) {
+        console.log('Operation already exists in localStorage, skipping...');
+        return;
       }
       
       // Добавляем новую операцию
@@ -780,7 +1573,8 @@ class SyncAdapter {
               const validOperations = operations.filter((op: SyncOperation) => {
                 const isNew = op.timestamp > this.lastSync;
                 const isNotTooOld = (now - op.timestamp) < maxAge;
-                return isNew && isNotTooOld;
+                const isNotFromCurrentDevice = op.deviceId !== this.deviceId;
+                return isNew && isNotTooOld && isNotFromCurrentDevice;
               });
               
               if (validOperations.length < operations.length) {
@@ -798,8 +1592,13 @@ class SyncAdapter {
         }
       }
       
-      console.log('Total operations found:', allOperations);
-      return allOperations;
+      // Убираем дубликаты по хешу
+      const uniqueOperations = allOperations.filter((op, index, self) => 
+        index === self.findIndex(o => o.hash === op.hash)
+      );
+      
+      console.log('Total operations found:', uniqueOperations.length);
+      return uniqueOperations;
     } catch (error) {
       console.error('Error getting operations from localStorage:', error);
       return [];
@@ -821,6 +1620,24 @@ class SyncAdapter {
         return;
       }
       
+      // Дополнительная проверка доступности URL
+      if (apiUrl.includes('supabase.co')) {
+        try {
+          const testResponse = await fetch(apiUrl.replace('/rest/v1/sync/operations', '/rest/v1/'), {
+            method: 'HEAD',
+            headers: getAuthHeaders()
+          });
+          
+          if (!testResponse.ok && testResponse.status !== 404) {
+            console.log('Supabase URL not accessible, skipping acknowledgment');
+            return;
+          }
+        } catch (testError) {
+          console.log('Supabase URL test failed, skipping acknowledgment:', testError);
+          return;
+        }
+      }
+      
       await fetch(apiUrl, {
         method: 'POST',
         headers: getAuthHeaders(),
@@ -830,6 +1647,16 @@ class SyncAdapter {
       });
     } catch (error) {
       console.error('Failed to acknowledge operation:', error);
+      
+      // Если ошибка связана с недоступностью URL, не повторяем попытку
+      if (error instanceof Error && (
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('ERR_NAME_NOT_RESOLVED') ||
+        error.message.includes('ERR_CONNECTION_REFUSED')
+      )) {
+        console.log('Network error detected, skipping acknowledgment');
+        return;
+      }
     }
   }
 
@@ -840,6 +1667,17 @@ class SyncAdapter {
     }
 
     this.syncInterval = setInterval(async () => {
+      // Периодическая очистка (каждые 10 циклов синхронизации)
+      const syncCount = Math.floor(Date.now() / intervalMs);
+      if (syncCount % 10 === 0) {
+        try {
+          this.cleanupOldOperations();
+          this.cleanupLocalStorage();
+        } catch (error) {
+          console.error('Periodic cleanup failed:', error);
+        }
+      }
+      
       if (this.isOnline && this.syncQueue.filter(op => op.status === 'pending').length > 0) {
         const now = Date.now();
         if (now - this.lastSyncAttempt < this.syncRetryDelay) {
@@ -853,6 +1691,33 @@ class SyncAdapter {
           this.syncMode = 'local';
           await this.performLocalSync([...this.syncQueue]);
           return;
+        }
+        
+        // Дополнительная проверка доступности Supabase
+        if (this.syncMode !== 'local') {
+          try {
+            const { getApiUrl, getAuthHeaders } = await import('../config/api');
+            const testUrl = getApiUrl('sync');
+            
+            if (testUrl && testUrl.includes('supabase.co')) {
+              const testResponse = await fetch(testUrl.replace('/rest/v1/sync', '/rest/v1/'), {
+                method: 'HEAD',
+                headers: getAuthHeaders()
+              });
+              
+              if (!testResponse.ok && testResponse.status !== 404) {
+                console.log('Supabase not accessible in auto sync, switching to local mode');
+                this.syncMode = 'local';
+                await this.performLocalSync([...this.syncQueue]);
+                return;
+              }
+            }
+          } catch (testError) {
+            console.log('Supabase accessibility test failed in auto sync, switching to local mode:', testError);
+            this.syncMode = 'local';
+            await this.performLocalSync([...this.syncQueue]);
+            return;
+          }
         }
         
         await this.performSync();
@@ -874,6 +1739,13 @@ class SyncAdapter {
       clearTimeout(this.initializationTimeout);
       this.initializationTimeout = null;
     }
+    
+    // Очищаем все таймауты
+    this.lastSyncAttempt = 0;
+    this.lastOperationAdd = 0;
+    this.lastStatusUpdate = 0;
+    
+    console.log('Auto sync stopped');
   }
 
   // Очистить все ресурсы и остановить работу
@@ -882,16 +1754,78 @@ class SyncAdapter {
     this.stopAutoSync();
     this.isInitialized = false;
     this.lastSyncAttempt = 0;
+    this.lastOperationAdd = 0;
+    this.lastStatusUpdate = 0;
+    this.syncMode = 'local';
     console.log('SyncAdapter cleanup completed');
+  }
+  
+  // Очистить старые операции из очереди
+  cleanupOldOperations(maxAge: number = 24 * 60 * 60 * 1000): void {
+    const now = Date.now();
+    const oldOperations = this.syncQueue.filter(op => 
+      (now - op.timestamp) > maxAge && op.status !== 'pending'
+    );
+    
+    if (oldOperations.length > 0) {
+      console.log(`Cleaning up ${oldOperations.length} old operations`);
+      this.syncQueue = this.syncQueue.filter(op => !oldOperations.includes(op));
+      this.saveSyncQueue();
+    }
+  }
+  
+  // Очистить localStorage от старых операций
+  cleanupLocalStorage(maxAge: number = 24 * 60 * 60 * 1000): void {
+    const now = Date.now();
+    
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('warehouse-sync-')) {
+        try {
+          const operations = JSON.parse(localStorage.getItem(key) || '[]');
+          if (Array.isArray(operations)) {
+            const validOperations = operations.filter((op: SyncOperation) => 
+              (now - op.timestamp) < maxAge
+            );
+            
+            if (validOperations.length < operations.length) {
+              const removedCount = operations.length - validOperations.length;
+              console.log(`Cleaned up ${removedCount} old operations from ${key}`);
+              localStorage.setItem(key, JSON.stringify(validOperations));
+            }
+          }
+        } catch (error) {
+          console.warn(`Failed to cleanup localStorage key ${key}:`, error);
+          // Удаляем поврежденные данные
+          localStorage.removeItem(key);
+        }
+      }
+    }
   }
 
   // Получить информацию об устройстве
-  getDeviceInfo(): { deviceId: string; userId?: string; lastSync: number; syncMode: string } {
+  getDeviceInfo(): { 
+    deviceId: string; 
+    userId?: string; 
+    lastSync: number; 
+    syncMode: string;
+    isOnline: boolean;
+    isSyncing: boolean;
+    operationsStats: {
+      pending: number;
+      failed: number;
+      synced: number;
+      total: number;
+    };
+  } {
     return {
       deviceId: this.deviceId,
       userId: this.userId,
       lastSync: this.lastSync,
-      syncMode: this.syncMode
+      syncMode: this.syncMode,
+      isOnline: this.isOnline,
+      isSyncing: this.isSyncing,
+      operationsStats: this.getOperationsStats()
     };
   }
 }
