@@ -71,6 +71,15 @@ class SyncAdapter {
       if (event.key === 'warehouse-sync-queue') {
         this.loadSyncQueue();
       }
+      
+      // Слушаем изменения операций синхронизации
+      if (event.key && event.key.startsWith('warehouse-sync-updated-')) {
+        console.log('Storage change detected, checking for new operations...');
+        // Запускаем проверку новых операций через небольшую задержку
+        setTimeout(() => {
+          this.checkForTabOperations();
+        }, 100);
+      }
     });
   }
 
@@ -110,6 +119,9 @@ class SyncAdapter {
 
     this.syncQueue.push(syncOp);
     this.saveSyncQueue();
+
+    // Сохраняем операцию в localStorage для синхронизации между вкладками
+    this.saveOperationToLocalStorage(syncOp);
 
     // Если онлайн, сразу запускаем синхронизацию
     if (this.isOnline) {
@@ -459,29 +471,64 @@ class SyncAdapter {
   // НОВАЯ ФУНКЦИЯ: Проверка операций из других вкладок
   private async checkForTabOperations(): Promise<void> {
     try {
-      // Слушаем изменения в localStorage от других вкладок
-      const storageKey = `warehouse-tab-sync-${this.deviceId}`;
-      const tabOperations = localStorage.getItem(storageKey);
+      // Получаем операции от всех устройств/вкладок
+      const allOperations = this.getOtherDeviceOperations();
       
-      if (tabOperations) {
-        const operations = JSON.parse(tabOperations);
-        const newOperations = operations.filter((op: SyncOperation) => 
-          op.timestamp > this.lastSync
-        );
+      if (allOperations.length > 0) {
+        console.log(`Found ${allOperations.length} operations from other tabs/devices`);
         
-        if (newOperations.length > 0) {
-          console.log(`Found ${newOperations.length} operations from other tabs`);
-          
-          for (const operation of newOperations) {
+        // Сортируем по времени
+        const sortedOperations = allOperations.sort((a, b) => a.timestamp - b.timestamp);
+        
+        for (const operation of sortedOperations) {
+          // Проверяем, не применяли ли мы уже эту операцию
+          if (operation.timestamp > this.lastSync) {
             await this.applyRemoteOperation(operation);
+            console.log(`Applied operation: ${operation.operation} on ${operation.table}`);
           }
-          
-          this.lastSync = Date.now();
-          console.log('Successfully applied operations from other tabs');
         }
+        
+        // Обновляем время последней синхронизации
+        this.lastSync = Date.now();
+        console.log('Successfully applied operations from other tabs/devices');
       }
     } catch (error) {
       console.error('Tab operations check failed:', error);
+    }
+  }
+
+  // НОВАЯ ФУНКЦИЯ: Сохранение операции в localStorage для синхронизации между вкладками
+  private saveOperationToLocalStorage(operation: SyncOperation): void {
+    try {
+      const storageKey = `warehouse-sync-${this.deviceId}`;
+      const existingOperations = localStorage.getItem(storageKey);
+      let operations: SyncOperation[] = [];
+      
+      if (existingOperations) {
+        try {
+          operations = JSON.parse(existingOperations);
+        } catch (e) {
+          console.warn('Failed to parse existing localStorage operations:', e);
+        }
+      }
+      
+      // Добавляем новую операцию
+      operations.push(operation);
+      
+      // Ограничиваем количество операций (последние 100)
+      if (operations.length > 100) {
+        operations = operations.slice(-100);
+      }
+      
+      // Сохраняем обратно в localStorage
+      localStorage.setItem(storageKey, JSON.stringify(operations));
+      
+      // Уведомляем другие вкладки об изменении
+      localStorage.setItem(`warehouse-sync-updated-${this.deviceId}`, Date.now().toString());
+      
+      console.log(`Operation saved to localStorage: ${operation.operation} on ${operation.table}`);
+    } catch (error) {
+      console.error('Failed to save operation to localStorage:', error);
     }
   }
 
