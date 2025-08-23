@@ -47,11 +47,8 @@ class SyncAdapter {
   }
 
   private generateDeviceId(): string {
-    let deviceId = localStorage.getItem('device-id');
-    if (!deviceId) {
-      deviceId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem('device-id', deviceId);
-    }
+    // Генерируем уникальный ID для каждой вкладки
+    const deviceId = `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     return deviceId;
   }
 
@@ -73,7 +70,7 @@ class SyncAdapter {
       }
       
       // Слушаем изменения операций синхронизации
-      if (event.key && event.key.startsWith('warehouse-sync-updated-')) {
+      if (event.key === 'warehouse-sync-updated') {
         console.log('Storage change detected, checking for new operations...');
         // Запускаем проверку новых операций через небольшую задержку
         setTimeout(() => {
@@ -117,6 +114,8 @@ class SyncAdapter {
       userId: this.userId
     };
 
+    console.log(`Adding operation to sync queue: ${operation} on ${table}`, syncOp);
+
     this.syncQueue.push(syncOp);
     this.saveSyncQueue();
 
@@ -127,6 +126,11 @@ class SyncAdapter {
     if (this.isOnline) {
       this.scheduleSync();
     }
+    
+    // Всегда запускаем проверку localStorage для синхронизации между вкладками
+    setTimeout(() => {
+      this.checkForTabOperations();
+    }, 500);
   }
 
   // Запланировать синхронизацию
@@ -443,14 +447,17 @@ class SyncAdapter {
   // НОВАЯ ФУНКЦИЯ: Fallback синхронизация через localStorage
   private async pullOperationsFromLocalStorage(): Promise<void> {
     try {
-      // Получаем операции из localStorage других устройств
-      const otherDeviceOperations = this.getOtherDeviceOperations();
+      // Получаем операции из localStorage всех устройств/вкладок
+      const allOperations = this.getAllOperationsFromLocalStorage();
       
-      if (otherDeviceOperations.length > 0) {
-        console.log(`Found ${otherDeviceOperations.length} operations from other devices in localStorage`);
+      if (allOperations.length > 0) {
+        console.log(`Found ${allOperations.length} operations from localStorage`);
+        
+        // Сортируем по времени
+        const sortedOperations = allOperations.sort((a, b) => a.timestamp - b.timestamp);
         
         // Применяем операции
-        for (const operation of otherDeviceOperations) {
+        for (const operation of sortedOperations) {
           await this.applyRemoteOperation(operation);
         }
         
@@ -459,9 +466,6 @@ class SyncAdapter {
         
         console.log('Successfully applied operations from localStorage');
       }
-      
-      // Также проверяем операции из других вкладок
-      await this.checkForTabOperations();
       
     } catch (error) {
       console.error('LocalStorage sync failed:', error);
@@ -472,7 +476,7 @@ class SyncAdapter {
   private async checkForTabOperations(): Promise<void> {
     try {
       // Получаем операции от всех устройств/вкладок
-      const allOperations = this.getOtherDeviceOperations();
+      const allOperations = this.getAllOperationsFromLocalStorage();
       
       if (allOperations.length > 0) {
         console.log(`Found ${allOperations.length} operations from other tabs/devices`);
@@ -524,7 +528,8 @@ class SyncAdapter {
       localStorage.setItem(storageKey, JSON.stringify(operations));
       
       // Уведомляем другие вкладки об изменении
-      localStorage.setItem(`warehouse-sync-updated-${this.deviceId}`, Date.now().toString());
+      // Используем общий ключ для всех вкладок
+      localStorage.setItem('warehouse-sync-updated', Date.now().toString());
       
       console.log(`Operation saved to localStorage: ${operation.operation} on ${operation.table}`);
     } catch (error) {
@@ -532,8 +537,8 @@ class SyncAdapter {
     }
   }
 
-  // НОВАЯ ФУНКЦИЯ: Получение операций других устройств из localStorage
-  private getOtherDeviceOperations(): SyncOperation[] {
+  // НОВАЯ ФУНКЦИЯ: Получение операций от всех устройств/вкладок из localStorage
+  private getAllOperationsFromLocalStorage(): SyncOperation[] {
     try {
       const allOperations: SyncOperation[] = [];
       
@@ -544,11 +549,11 @@ class SyncAdapter {
           try {
             const operations = JSON.parse(localStorage.getItem(key) || '[]');
             if (Array.isArray(operations)) {
-              // Фильтруем операции от других устройств
-              const otherDeviceOps = operations.filter((op: SyncOperation) => 
-                op.deviceId !== this.deviceId && op.timestamp > this.lastSync
+              // Добавляем все операции, которые новее последней синхронизации
+              const newOperations = operations.filter((op: SyncOperation) => 
+                op.timestamp > this.lastSync
               );
-              allOperations.push(...otherDeviceOps);
+              allOperations.push(...newOperations);
             }
           } catch (e) {
             console.warn('Failed to parse localStorage operation:', e);
@@ -558,7 +563,7 @@ class SyncAdapter {
       
       return allOperations;
     } catch (error) {
-      console.error('Error getting other device operations:', error);
+      console.error('Error getting operations from localStorage:', error);
       return [];
     }
   }
@@ -605,6 +610,10 @@ class SyncAdapter {
           await this.pullOperationsFromServer();
         }
       }
+      
+      // Всегда проверяем localStorage для синхронизации между вкладками
+      // (независимо от онлайн статуса)
+      await this.checkForTabOperations();
     }, intervalMs);
   }
 
