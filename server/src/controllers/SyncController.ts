@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { BaseController } from './BaseController';
-import { Database } from '../config/database';
+import { query, queryOne } from '../config/database-sqlite';
 
 interface SyncOperation {
   id: string;
@@ -30,11 +30,11 @@ interface SyncResult {
 }
 
 export class SyncController extends BaseController {
-  private db: Database;
+  private db: any;
 
   constructor() {
     super();
-    this.db = new Database();
+    this.db = { query, queryOne };
   }
 
   // Основная функция синхронизации
@@ -44,7 +44,7 @@ export class SyncController extends BaseController {
       const userId = (req as any).user?.id;
 
       if (!operations || !Array.isArray(operations)) {
-        this.sendError(res, 'Invalid operations format', 400);
+        this.error(res, 'Invalid operations format', 400);
         return;
       }
 
@@ -86,7 +86,7 @@ export class SyncController extends BaseController {
 
     } catch (error) {
       console.error('Sync error:', error);
-      this.sendError(res, 'Sync failed', 500);
+      this.error(res, 'Sync failed', 500);
     }
   }
 
@@ -192,23 +192,26 @@ export class SyncController extends BaseController {
     try {
       switch (operation.operation) {
         case 'create':
+          const columns = Object.keys(operation.data).join(', ');
+          const values = Object.keys(operation.data).map((_, i) => `$${i + 1}`).join(', ');
           await this.db.query(
-            `INSERT INTO ${operation.table} SET ?`,
-            [operation.data]
+            `INSERT INTO ${operation.table} (${columns}) VALUES (${values})`,
+            Object.values(operation.data)
           );
           break;
 
         case 'update':
           const { id, ...updateData } = operation.data;
+          const setClause = Object.keys(updateData).map((key, i) => `${key} = $${i + 1}`).join(', ');
           await this.db.query(
-            `UPDATE ${operation.table} SET ? WHERE id = ?`,
-            [updateData, id]
+            `UPDATE ${operation.table} SET ${setClause} WHERE id = $${Object.keys(updateData).length + 1}`,
+            [...Object.values(updateData), id]
           );
           break;
 
         case 'delete':
           await this.db.query(
-            `DELETE FROM ${operation.table} WHERE id = ?`,
+            `DELETE FROM ${operation.table} WHERE id = $1`,
             [operation.data.id]
           );
           break;
@@ -226,13 +229,11 @@ export class SyncController extends BaseController {
   private async saveOperationsForOtherDevices(operations: SyncOperation[], deviceId: string, userId?: string): Promise<void> {
     try {
       for (const operation of operations) {
+        // Для SQLite используем INSERT OR REPLACE
         await this.db.query(
-          `INSERT INTO pending_sync_operations 
+          `INSERT OR REPLACE INTO pending_sync_operations 
            (operation_id, table_name, operation_type, data, source_device_id, user_id, timestamp, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
-           ON DUPLICATE KEY UPDATE
-           timestamp = VALUES(timestamp),
-           status = 'pending'`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             operation.id,
             operation.table,
@@ -240,7 +241,8 @@ export class SyncController extends BaseController {
             JSON.stringify(operation.data),
             deviceId,
             userId,
-            new Date(operation.timestamp)
+            new Date(operation.timestamp),
+            'pending'
           ]
         );
       }
@@ -257,20 +259,20 @@ export class SyncController extends BaseController {
       const deviceId = req.query.deviceId as string;
 
       if (!deviceId) {
-        this.sendError(res, 'Device ID required', 400);
+        this.error(res, 'Device ID required', 400);
         return;
       }
 
       // Получаем количество операций в очереди
       const pendingCount = await this.db.query(
-        'SELECT COUNT(*) as count FROM pending_sync_operations WHERE source_device_id != ? AND status = "pending"',
-        [deviceId]
+        'SELECT COUNT(*) as count FROM pending_sync_operations WHERE source_device_id != ? AND status = ?',
+        [deviceId, 'pending']
       );
 
       // Получаем количество конфликтов
       const conflictsCount = await this.db.query(
-        'SELECT COUNT(*) as count FROM sync_conflicts WHERE device_id = ? AND resolved = 0',
-        [deviceId]
+        'SELECT COUNT(*) as count FROM sync_conflicts WHERE device_id = ? AND resolved = ?',
+        [deviceId, 0]
       );
 
       // Получаем время последней синхронизации
@@ -291,7 +293,7 @@ export class SyncController extends BaseController {
 
     } catch (error) {
       console.error('Error getting sync status:', error);
-      this.sendError(res, 'Failed to get sync status', 500);
+      this.error(res, 'Failed to get sync status', 500);
     }
   }
 
@@ -302,15 +304,15 @@ export class SyncController extends BaseController {
       const deviceId = req.query.deviceId as string;
 
       if (!deviceId) {
-        this.sendError(res, 'Device ID required', 400);
+        this.error(res, 'Device ID required', 400);
         return;
       }
 
       const conflicts = await this.db.query(
         `SELECT * FROM sync_conflicts 
-         WHERE device_id = ? AND resolved = 0
+         WHERE device_id = ? AND resolved = ?
          ORDER BY created_at DESC`,
-        [deviceId]
+        [deviceId, 0]
       );
 
       res.json({
@@ -320,7 +322,7 @@ export class SyncController extends BaseController {
 
     } catch (error) {
       console.error('Error getting conflicts:', error);
-      this.sendError(res, 'Failed to get conflicts', 500);
+      this.error(res, 'Failed to get conflicts', 500);
     }
   }
 
@@ -332,14 +334,14 @@ export class SyncController extends BaseController {
       const userId = (req as any).user?.id;
 
       if (!resolution || !deviceId) {
-        this.sendError(res, 'Resolution and device ID required', 400);
+        this.error(res, 'Resolution and device ID required', 400);
         return;
       }
 
       // Обновляем статус конфликта
       await this.db.query(
-        'UPDATE sync_conflicts SET resolved = 1, resolution = ?, resolved_by = ?, resolved_at = ? WHERE id = ?',
-        [resolution, userId, new Date(), conflictId]
+        'UPDATE sync_conflicts SET resolved = ?, resolution = ?, resolved_by = ?, resolved_at = ? WHERE id = ?',
+        [1, resolution, userId, new Date(), conflictId]
       );
 
       res.json({
@@ -349,7 +351,7 @@ export class SyncController extends BaseController {
 
     } catch (error) {
       console.error('Error resolving conflict:', error);
-      this.sendError(res, 'Failed to resolve conflict', 500);
+      this.error(res, 'Failed to resolve conflict', 500);
     }
   }
 
@@ -361,12 +363,12 @@ export class SyncController extends BaseController {
       const lastSync = req.query.lastSync as string;
 
       if (!deviceId) {
-        this.sendError(res, 'Device ID required', 400);
+        this.error(res, 'Device ID required', 400);
         return;
       }
 
-      let query = 'SELECT * FROM pending_sync_operations WHERE source_device_id != ? AND status = "pending"';
-      const params: any[] = [deviceId];
+      let query = 'SELECT * FROM pending_sync_operations WHERE source_device_id != ? AND status = ?';
+      const params: any[] = [deviceId, 'pending'];
 
       if (lastSync) {
         query += ' AND timestamp > ?';
@@ -384,7 +386,7 @@ export class SyncController extends BaseController {
 
     } catch (error) {
       console.error('Error getting operations:', error);
-      this.sendError(res, 'Failed to get operations', 500);
+      this.error(res, 'Failed to get operations', 500);
     }
   }
 
@@ -395,14 +397,14 @@ export class SyncController extends BaseController {
       const { deviceId } = req.body;
 
       if (!deviceId) {
-        this.sendError(res, 'Device ID required', 400);
+        this.error(res, 'Device ID required', 400);
         return;
       }
 
       // Помечаем операцию как полученную
       await this.db.query(
-        'UPDATE pending_sync_operations SET status = "acknowledged", acknowledged_by = ?, acknowledged_at = ? WHERE operation_id = ?',
-        [deviceId, new Date(), operationId]
+        'UPDATE pending_sync_operations SET status = ?, acknowledged_by = ?, acknowledged_at = ? WHERE operation_id = ?',
+        ['acknowledged', deviceId, new Date(), operationId]
       );
 
       res.json({
@@ -412,7 +414,7 @@ export class SyncController extends BaseController {
 
     } catch (error) {
       console.error('Error acknowledging operation:', error);
-      this.sendError(res, 'Failed to acknowledge operation', 500);
+      this.error(res, 'Failed to acknowledge operation', 500);
     }
   }
 }

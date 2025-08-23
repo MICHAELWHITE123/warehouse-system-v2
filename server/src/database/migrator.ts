@@ -38,7 +38,8 @@ export class DatabaseMigrator {
   getMigrationFiles(): string[] {
     const files = [
       '001_create_tables_sqlite.sql',
-      '002_seed_data_sqlite.sql'
+      '002_seed_data_sqlite.sql',
+      '005_sync_tables_sqlite.sql'
     ];
     return files.sort();
   }
