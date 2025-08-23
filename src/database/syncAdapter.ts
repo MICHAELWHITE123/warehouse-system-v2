@@ -26,8 +26,8 @@ export interface SyncStatus {
 }
 
 class SyncAdapter {
-  private db: BrowserDatabase;
-  private deviceId: string;
+  private db!: BrowserDatabase;
+  private deviceId!: string;
   private userId?: string;
   private syncQueue: SyncOperation[] = [];
   private isOnline: boolean = navigator.onLine;
@@ -40,18 +40,26 @@ class SyncAdapter {
   private syncRetryDelay: number = 30000; // 30 секунд между попытками
 
   constructor() {
-    this.db = getDatabase();
-    this.deviceId = this.generateDeviceId();
-    this.setupEventListeners();
-    this.loadSyncQueue();
-    
-    // Запускаем автоматическую синхронизацию
-    this.startAutoSync();
-    
-    // Проверяем localStorage сразу после инициализации
-    setTimeout(() => {
-      this.checkForTabOperations();
-    }, 1000);
+    try {
+      this.db = getDatabase();
+      this.deviceId = this.generateDeviceId();
+      this.setupEventListeners();
+      this.loadSyncQueue();
+      
+      console.log('SyncAdapter initialized successfully');
+      console.log('Device ID:', this.deviceId);
+      console.log('Database:', this.db ? 'OK' : 'FAILED');
+      
+      // Запускаем автоматическую синхронизацию
+      this.startAutoSync();
+      
+      // Проверяем localStorage сразу после инициализации
+      setTimeout(() => {
+        this.checkForTabOperations();
+      }, 1000);
+    } catch (error) {
+      console.error('Failed to initialize SyncAdapter:', error);
+    }
   }
 
   private generateDeviceId(): string {
@@ -112,6 +120,13 @@ class SyncAdapter {
 
   // Добавить операцию в очередь синхронизации
   addToSyncQueue(table: string, operation: 'create' | 'update' | 'delete', data: any): void {
+    // Проверяем, что адаптер инициализирован
+    if (!this.db) {
+      console.warn('SyncAdapter not initialized yet, retrying in 100ms...');
+      setTimeout(() => this.addToSyncQueue(table, operation, data), 100);
+      return;
+    }
+
     const syncOp: SyncOperation = {
       id: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       table,
@@ -343,11 +358,17 @@ class SyncAdapter {
 
   // Установить пользователя
   setUser(userId: string): void {
+    console.log('Setting user for sync:', userId);
     this.userId = userId;
     // При смене пользователя сразу синхронизируемся для получения данных
     if (this.isOnline) {
       this.scheduleInitialSync();
     }
+    
+    // Также проверяем localStorage для синхронизации между вкладками
+    setTimeout(() => {
+      this.checkForTabOperations();
+    }, 500);
   }
 
   // Запланировать начальную синхронизацию для нового пользователя
