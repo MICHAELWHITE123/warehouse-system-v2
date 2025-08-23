@@ -35,7 +35,8 @@ export const SyncStatus: React.FC = () => {
     cleanupOldOperations,
     resetCriticalErrorFlag,
     forceLocalMode,
-    tryHybridMode
+    tryHybridMode,
+    forceServerMode
   } = useSync();
   
   const [isExpanded, setIsExpanded] = useState(false);
@@ -155,6 +156,16 @@ export const SyncStatus: React.FC = () => {
             >
               <RotateCcw className="w-4 h-4 mr-2" />
               Перезапуск
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={forceServerMode}
+              disabled={isSyncing}
+              className="text-green-600 border-green-200"
+            >
+              <Server className="w-4 h-4 mr-2" />
+              К серверу!
             </Button>
             <Button
               variant="ghost"

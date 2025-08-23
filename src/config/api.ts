@@ -18,7 +18,7 @@ export const API_CONFIG = {
     }
     
     // По умолчанию локальный сервер для разработки
-    return 'http://localhost:3001/api';
+    return 'http://localhost:3001';
   })(),
   
   // Таймауты

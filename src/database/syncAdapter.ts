@@ -1188,6 +1188,25 @@ class SyncAdapter {
     this.syncRetryDelay = 30000; // Возвращаем к 30 секундам
     this.restartSync();
   }
+  
+  // Принудительно сбросить все блокировки и попробовать подключиться к серверу
+  forceServerMode(): void {
+    console.log('Forcing server connection attempt...');
+    this.syncMode = 'hybrid';
+    this.isForcedLocalMode = false;
+    this.lastSyncAttempt = 0;
+    this.syncRetryDelay = 30000;
+    this.lastOperationAdd = 0;
+    this.lastStatusUpdate = 0;
+    
+    // Перезапускаем систему
+    this.restartSync();
+    
+    // Сразу пытаемся подключиться
+    setTimeout(() => {
+      this.forceSync();
+    }, 1000);
+  }
 
   // Установить пользователя
   setUser(userId: string): void {

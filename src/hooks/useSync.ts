@@ -118,6 +118,12 @@ export const useSync = () => {
     updateStatus();
   }, [updateStatus]);
 
+  // Принудительно попробовать подключиться к серверу
+  const forceServerMode = useCallback(() => {
+    syncAdapter.forceServerMode();
+    updateStatus();
+  }, [updateStatus]);
+
   useEffect(() => {
     // Устанавливаем пользователя в адаптер синхронизации
     if (user?.username) {
@@ -171,6 +177,7 @@ export const useSync = () => {
     cleanupOldOperations,
     forceLocalMode,
     tryHybridMode,
+    forceServerMode,
     updateStatus
   };
 };
