@@ -50,6 +50,7 @@ class SyncAdapter {
   private isInitialized: boolean = false;
   private initializationTimeout: NodeJS.Timeout | null = null;
   private syncMode: 'server' | 'local' | 'hybrid' = 'hybrid';
+  private isForcedLocalMode: boolean = false;
   
   // Throttling для предотвращения спама
   private lastOperationAdd: number = 0;
@@ -301,6 +302,7 @@ class SyncAdapter {
         // При возвращении на страницу проверяем обновления
         setTimeout(() => {
           if (this.syncMode === 'local') {
+            console.log('In local mode, performing local sync only');
             this.performLocalSync([...this.syncQueue.filter(op => op.status === 'pending')]);
           } else {
             this.forceSync();
@@ -688,6 +690,12 @@ class SyncAdapter {
   
   // Проверка возможности переключения на гибридный режим
   private async checkApiAccessibilityForModeSwitch(): Promise<void> {
+    // Не пытаемся переключиться обратно, если режим был принудительно установлен
+    if (this.isForcedLocalMode) {
+      console.log('Local mode was forced, skipping API accessibility check');
+      return;
+    }
+    
     try {
       const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
       
@@ -1145,8 +1153,11 @@ class SyncAdapter {
     this.lastSyncAttempt = 0;
     this.lastOperationAdd = 0;
     this.lastStatusUpdate = 0;
-    this.syncMode = 'hybrid';
-    console.log('All flags and timeouts reset');
+    // Не сбрасываем syncMode если он был принудительно установлен в local
+    if (!this.isForcedLocalMode && this.syncMode !== 'local') {
+      this.syncMode = 'hybrid';
+    }
+    console.log('All flags and timeouts reset, mode:', this.syncMode, 'forced:', this.isForcedLocalMode);
   }
   
   // Перезапустить синхронизацию
@@ -1161,6 +1172,7 @@ class SyncAdapter {
   forceLocalMode(): void {
     console.log('Forcing local mode permanently...');
     this.syncMode = 'local';
+    this.isForcedLocalMode = true;
     this.lastSyncAttempt = Date.now();
     this.syncRetryDelay = 300000; // 5 минут
     this.stopAutoSync();
@@ -1171,6 +1183,7 @@ class SyncAdapter {
   tryHybridMode(): void {
     console.log('Attempting to switch back to hybrid mode...');
     this.syncMode = 'hybrid';
+    this.isForcedLocalMode = false;
     this.lastSyncAttempt = 0;
     this.syncRetryDelay = 30000; // Возвращаем к 30 секундам
     this.restartSync();
@@ -1856,6 +1869,7 @@ class SyncAdapter {
     syncMode: string;
     isOnline: boolean;
     isSyncing: boolean;
+    isForcedLocalMode: boolean;
     operationsStats: {
       pending: number;
       failed: number;
@@ -1870,6 +1884,7 @@ class SyncAdapter {
       syncMode: this.syncMode,
       isOnline: this.isOnline,
       isSyncing: this.isSyncing,
+      isForcedLocalMode: this.isForcedLocalMode,
       operationsStats: this.getOperationsStats()
     };
   }
