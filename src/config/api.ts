@@ -17,6 +17,23 @@ export const API_CONFIG = {
     return 'http://localhost:3001';
   })(),
   
+  // Upstash Redis конфигурация (KV)
+  REDIS: {
+    URL: import.meta.env.VITE_UPSTASH_REDIS_REST_URL || '',
+    TOKEN: import.meta.env.VITE_UPSTASH_REDIS_REST_TOKEN || '',
+    ENABLED: !!(import.meta.env.VITE_UPSTASH_REDIS_REST_URL && import.meta.env.VITE_UPSTASH_REDIS_REST_TOKEN)
+  },
+  
+  // Neon Postgres конфигурация
+  POSTGRES: {
+    URL: import.meta.env.VITE_NEON_DATABASE_URL || '',
+    HOST: import.meta.env.VITE_NEON_HOST || '',
+    DATABASE: import.meta.env.VITE_NEON_DATABASE || '',
+    USERNAME: import.meta.env.VITE_NEON_USERNAME || '',
+    PASSWORD: import.meta.env.VITE_NEON_PASSWORD || '',
+    ENABLED: !!(import.meta.env.VITE_NEON_DATABASE_URL && import.meta.env.VITE_NEON_PASSWORD)
+  },
+  
   // Таймауты
   TIMEOUT: 30000, // 30 секунд
   
@@ -67,6 +84,16 @@ export const isApiAvailable = (): boolean => {
   return !!API_CONFIG.BASE_URL;
 };
 
+// Функция для проверки доступности Redis
+export const isRedisAvailable = (): boolean => {
+  return API_CONFIG.REDIS.ENABLED;
+};
+
+// Функция для проверки доступности Postgres
+export const isPostgresAvailable = (): boolean => {
+  return API_CONFIG.POSTGRES.ENABLED;
+};
+
 // Функция для получения заголовков с авторизацией
 export const getAuthHeaders = (): Record<string, string> => {
   const token = localStorage.getItem('auth-token');
@@ -93,5 +120,20 @@ export const getAuthHeaders = (): Record<string, string> => {
   return {
     ...API_CONFIG.DEFAULT_HEADERS,
     ...(token && { 'Authorization': `Bearer ${token}` })
+  };
+};
+
+// Функция для получения заголовков Redis
+export const getRedisHeaders = (): Record<string, string> => {
+  return {
+    'Authorization': `Bearer ${API_CONFIG.REDIS.TOKEN}`,
+    'Content-Type': 'application/json'
+  };
+};
+
+// Функция для получения заголовков Postgres
+export const getPostgresHeaders = (): Record<string, string> => {
+  return {
+    'Content-Type': 'application/json'
   };
 };
