@@ -170,9 +170,27 @@ class SyncAdapter {
       clearTimeout(this.syncTimeout);
     }
 
+    // Увеличиваем задержку если была критическая ошибка
+    let delay = 1000; // базовая задержка 1 секунда
+    
+    if (this.lastSyncAttempt > 0) {
+      const timeSinceLastAttempt = Date.now() - this.lastSyncAttempt;
+      if (timeSinceLastAttempt < 60000) { // меньше минуты
+        delay = 30000; // увеличиваем до 30 секунд
+      } else if (timeSinceLastAttempt < 300000) { // меньше 5 минут
+        delay = 60000; // увеличиваем до 1 минуты
+      } else {
+        delay = 300000; // увеличиваем до 5 минут
+      }
+    }
+
+    console.log(`Scheduling sync in ${delay}ms`);
+    
     this.syncTimeout = setTimeout(() => {
+      // Сбрасываем флаг критической ошибки перед новой попыткой
+      this.lastSyncAttempt = 0;
       this.performSync();
-    }, 1000); // Задержка 1 секунда
+    }, delay);
   }
 
   // Выполнить синхронизацию
@@ -210,12 +228,27 @@ class SyncAdapter {
       
     } catch (error) {
       console.error('Sync failed:', error);
-      // При ошибке оставляем операции в очереди для повторной попытки
+      
+      // Обрабатываем разные типы ошибок
+      if (error instanceof Error && error.message.includes('401')) {
+        // Ошибка авторизации - не повторяем попытку, очищаем очередь
+        console.log('Authentication error (401), clearing sync queue to prevent infinite loop');
+        this.syncQueue = [];
+        this.saveSyncQueue();
+        this.lastSyncAttempt = Date.now();
+      } else if (error instanceof Error && error.message.includes('localhost')) {
+        // Ошибка подключения к localhost - не повторяем попытку
+        console.log('Localhost connection error, skipping retry');
+        this.lastSyncAttempt = Date.now();
+      } else {
+        // Другие ошибки - оставляем операции в очереди для повторной попытки
+        console.log('Other error, keeping operations in queue for retry');
+      }
     } finally {
       this.isSyncing = false;
       
-      // Если есть еще операции, планируем следующую синхронизацию
-      if (this.syncQueue.length > 0) {
+      // Если есть еще операции и не было критической ошибки, планируем следующую синхронизацию
+      if (this.syncQueue.length > 0 && this.lastSyncAttempt === 0) {
         this.scheduleSync();
       }
     }
@@ -226,7 +259,14 @@ class SyncAdapter {
     const { getApiUrl, getAuthHeaders } = await import('../config/api');
     
     try {
-      const response = await fetch(getApiUrl('sync'), {
+      const apiUrl = getApiUrl('sync');
+      
+      // Проверяем, не пытаемся ли мы подключиться к localhost на Vercel
+      if (apiUrl.includes('localhost') && window.location.hostname.includes('vercel.app')) {
+        throw new Error('Cannot connect to localhost from Vercel deployment');
+      }
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -237,7 +277,15 @@ class SyncAdapter {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        if (response.status === 401) {
+          throw new Error(`HTTP 401: Unauthorized - Authentication failed`);
+        } else if (response.status === 404) {
+          throw new Error(`HTTP 404: Not Found - Server endpoint not available`);
+        } else if (response.status >= 500) {
+          throw new Error(`HTTP ${response.status}: Server error`);
+        } else {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
       }
 
       return await response.json();
@@ -671,6 +719,12 @@ class SyncAdapter {
         const now = Date.now();
         if (now - this.lastSyncAttempt < this.syncRetryDelay) {
           console.log('Skipping sync - too soon after last attempt');
+          return;
+        }
+        
+        // Дополнительная защита от зацикливания
+        if (this.lastSyncAttempt > 0 && this.syncQueue.length === 0) {
+          console.log('No operations to sync, skipping server sync to prevent loops');
           return;
         }
         
