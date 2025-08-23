@@ -1035,10 +1035,20 @@ class SyncAdapter {
   async forceSync(): Promise<void> {
     const now = Date.now();
     
+    // Если уже в локальном режиме, не пытаемся подключиться к серверу
+    if (this.syncMode === 'local') {
+      console.log('In local mode, performing local sync only');
+      const pendingOperations = this.syncQueue.filter(op => op.status === 'pending');
+      if (pendingOperations.length > 0) {
+        await this.performLocalSync(pendingOperations);
+      }
+      return;
+    }
+    
     // Проверяем, не слишком ли рано для повторной попытки
     if (this.lastSyncAttempt > 0) {
       const timeSinceLastAttempt = now - this.lastSyncAttempt;
-      if (timeSinceLastAttempt < 30000) { // меньше 30 секунд
+      if (timeSinceLastAttempt < 60000) { // увеличиваем до 1 минуты
         console.log('Skipping forceSync - too soon after critical error');
         return;
       }
@@ -1056,7 +1066,7 @@ class SyncAdapter {
     }
     
     // Дополнительная проверка доступности Supabase
-    if (this.isOnline && this.syncMode !== 'local') {
+    if (this.isOnline) {
       try {
         const { getApiUrl, getAuthHeaders } = await import('../config/api');
         const testUrl = getApiUrl('sync');
@@ -1078,8 +1088,9 @@ class SyncAdapter {
           }
         }
       } catch (testError) {
-        console.log('Supabase accessibility test failed, switching to local sync mode:', testError);
+        console.log('Supabase accessibility test failed, switching to local sync mode permanently:', testError);
         this.syncMode = 'local';
+        this.lastSyncAttempt = now; // Устанавливаем время последней попытки
         const pendingOperations = this.syncQueue.filter(op => op.status === 'pending');
         if (pendingOperations.length > 0) {
           await this.performLocalSync(pendingOperations);
@@ -1144,6 +1155,25 @@ class SyncAdapter {
     this.stopAutoSync();
     this.resetAllFlags();
     this.startAutoSync();
+  }
+  
+  // Принудительно переключиться в локальный режим
+  forceLocalMode(): void {
+    console.log('Forcing local mode permanently...');
+    this.syncMode = 'local';
+    this.lastSyncAttempt = Date.now();
+    this.syncRetryDelay = 300000; // 5 минут
+    this.stopAutoSync();
+    this.startAutoSync();
+  }
+  
+  // Попытаться вернуться в гибридный режим
+  tryHybridMode(): void {
+    console.log('Attempting to switch back to hybrid mode...');
+    this.syncMode = 'hybrid';
+    this.lastSyncAttempt = 0;
+    this.syncRetryDelay = 30000; // Возвращаем к 30 секундам
+    this.restartSync();
   }
 
   // Установить пользователя
@@ -1350,6 +1380,13 @@ class SyncAdapter {
   // Получение операций от других устройств с сервера
   private async pullOperationsFromServer(): Promise<void> {
     try {
+      // Если уже в локальном режиме, не пытаемся подключиться к серверу
+      if (this.syncMode === 'local') {
+        console.log('In local mode, using localStorage only');
+        await this.pullOperationsFromLocalStorage();
+        return;
+      }
+      
       const now = Date.now();
       if (now - this.lastSyncAttempt < this.syncRetryDelay) {
         console.log('Skipping server sync - too soon after last attempt');
@@ -1678,6 +1715,14 @@ class SyncAdapter {
         }
       }
       
+      // Если в локальном режиме, работаем только с localStorage
+      if (this.syncMode === 'local') {
+        if (this.syncQueue.filter(op => op.status === 'pending').length > 0) {
+          await this.performLocalSync([...this.syncQueue.filter(op => op.status === 'pending')]);
+        }
+        return;
+      }
+      
       if (this.isOnline && this.syncQueue.filter(op => op.status === 'pending').length > 0) {
         const now = Date.now();
         if (now - this.lastSyncAttempt < this.syncRetryDelay) {
@@ -1694,7 +1739,7 @@ class SyncAdapter {
         }
         
         // Дополнительная проверка доступности Supabase
-        if (this.syncMode !== 'local') {
+        if (this.syncMode === 'hybrid' || this.syncMode === 'server') {
           try {
             const { getApiUrl, getAuthHeaders } = await import('../config/api');
             const testUrl = getApiUrl('sync');

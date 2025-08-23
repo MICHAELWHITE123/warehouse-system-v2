@@ -106,6 +106,18 @@ export const useSync = () => {
     updateStatus();
   }, [updateStatus]);
 
+  // Принудительно переключиться в локальный режим
+  const forceLocalMode = useCallback(() => {
+    syncAdapter.forceLocalMode();
+    updateStatus();
+  }, [updateStatus]);
+
+  // Попытаться вернуться в гибридный режим
+  const tryHybridMode = useCallback(() => {
+    syncAdapter.tryHybridMode();
+    updateStatus();
+  }, [updateStatus]);
+
   useEffect(() => {
     // Устанавливаем пользователя в адаптер синхронизации
     if (user?.username) {
@@ -157,6 +169,8 @@ export const useSync = () => {
     restartSync,
     getOperationsStats,
     cleanupOldOperations,
+    forceLocalMode,
+    tryHybridMode,
     updateStatus
   };
 };

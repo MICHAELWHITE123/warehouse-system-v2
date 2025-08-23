@@ -33,7 +33,9 @@ export const SyncStatus: React.FC = () => {
     restartSync, 
     getOperationsStats, 
     cleanupOldOperations,
-    resetCriticalErrorFlag
+    resetCriticalErrorFlag,
+    forceLocalMode,
+    tryHybridMode
   } = useSync();
   
   const [isExpanded, setIsExpanded] = useState(false);
@@ -398,6 +400,28 @@ export const SyncStatus: React.FC = () => {
                 <RotateCcw className="w-4 h-4 mr-1" />
                 Сбросить ошибки
               </Button>
+              {syncMode !== 'local' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={forceLocalMode}
+                  className="text-yellow-600 border-yellow-200"
+                >
+                  <HardDrive className="w-4 h-4 mr-1" />
+                  Локальный режим
+                </Button>
+              )}
+              {syncMode === 'local' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={tryHybridMode}
+                  className="text-blue-600 border-blue-200"
+                >
+                  <Server className="w-4 h-4 mr-1" />
+                  Попробовать сервер
+                </Button>
+              )}
             </div>
           </>
         )}
