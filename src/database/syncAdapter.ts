@@ -38,9 +38,23 @@ class SyncAdapter {
   private conflicts: SyncConflict[] = [];
   private lastSyncAttempt: number = 0;
   private syncRetryDelay: number = 30000; // 30 секунд между попытками
+  
+  // Добавляем новые переменные для предотвращения бесконечных циклов
+  private lastTabOperationCheck: number = 0;
+  private tabOperationCheckThrottle: number = 5000; // 5 секунд между проверками
+  private lastUserSet: number = 0;
+  private userSetThrottle: number = 1000; // 1 секунда между установками пользователя
+  private isInitialized: boolean = false;
+  private initializationTimeout: NodeJS.Timeout | null = null;
 
   constructor() {
     try {
+      // Проверяем, не инициализирован ли уже адаптер
+      if (this.isInitialized) {
+        console.log('SyncAdapter already initialized, skipping...');
+        return;
+      }
+      
       this.db = getDatabase();
       this.deviceId = this.generateDeviceId();
       this.setupEventListeners();
@@ -59,9 +73,11 @@ class SyncAdapter {
       this.startAutoSync();
       
       // Проверяем localStorage сразу после инициализации
-      setTimeout(() => {
+      this.initializationTimeout = setTimeout(() => {
         this.checkForTabOperations();
+        this.isInitialized = true;
       }, 1000);
+      
     } catch (error) {
       console.error('Failed to initialize SyncAdapter:', error);
     }
@@ -94,9 +110,15 @@ class SyncAdapter {
       if (event.key === 'warehouse-sync-updated') {
         console.log('Storage change detected, checking for new operations...');
         // Запускаем проверку новых операций через небольшую задержку
-        setTimeout(() => {
-          this.checkForTabOperations();
-        }, 100);
+        // Но только если прошло достаточно времени с последней проверки
+        const now = Date.now();
+        if (now - this.lastTabOperationCheck > this.tabOperationCheckThrottle) {
+          setTimeout(() => {
+            this.checkForTabOperations();
+          }, 100);
+        } else {
+          console.log('Skipping storage change handler - too soon after last check');
+        }
       }
     });
   }
@@ -158,10 +180,14 @@ class SyncAdapter {
       this.scheduleSync();
     }
     
-    // Всегда запускаем проверку localStorage для синхронизации между вкладками
-    setTimeout(() => {
-      this.checkForTabOperations();
-    }, 500);
+    // Запускаем проверку localStorage для синхронизации между вкладками
+    // Но только если прошло достаточно времени с последней проверки
+    const now = Date.now();
+    if (now - this.lastTabOperationCheck > this.tabOperationCheckThrottle) {
+      setTimeout(() => {
+        this.checkForTabOperations();
+      }, 500);
+    }
   }
 
   // Запланировать синхронизацию
@@ -419,13 +445,21 @@ class SyncAdapter {
 
   // Принудительная синхронизация
   async forceSync(): Promise<void> {
-    // Проверяем, не было ли недавно критических ошибок
+    const now = Date.now();
+    
+    // Проверяем, не слишком ли рано для повторной попытки
     if (this.lastSyncAttempt > 0) {
-      const timeSinceLastAttempt = Date.now() - this.lastSyncAttempt;
+      const timeSinceLastAttempt = now - this.lastSyncAttempt;
       if (timeSinceLastAttempt < 30000) { // меньше 30 секунд
         console.log('Skipping forceSync - too soon after critical error');
         return;
       }
+    }
+    
+    // Проверяем throttling для предотвращения множественных вызовов
+    if (now - this.lastTabOperationCheck < this.tabOperationCheckThrottle) {
+      console.log(`Skipping forceSync - too soon after last tab operation check (${now - this.lastTabOperationCheck}ms < ${this.tabOperationCheckThrottle}ms)`);
+      return;
     }
     
     // Проверяем доступность API
@@ -461,17 +495,36 @@ class SyncAdapter {
 
   // Установить пользователя
   setUser(userId: string): void {
+    const now = Date.now();
+    
+    // Проверяем throttling для предотвращения множественных вызовов
+    if (now - this.lastUserSet < this.userSetThrottle) {
+      console.log(`Skipping setUser call - too soon (${now - this.lastUserSet}ms < ${this.userSetThrottle}ms)`);
+      return;
+    }
+    
+    // Проверяем, не тот же ли пользователь
+    if (this.userId === userId) {
+      console.log(`User already set to ${userId}, skipping...`);
+      return;
+    }
+    
     console.log('Setting user for sync:', userId);
     this.userId = userId;
+    this.lastUserSet = now;
+    
     // При смене пользователя сразу синхронизируемся для получения данных
     if (this.isOnline) {
       this.scheduleInitialSync();
     }
     
     // Также проверяем localStorage для синхронизации между вкладками
-    setTimeout(() => {
-      this.checkForTabOperations();
-    }, 500);
+    // Но только если прошло достаточно времени с последней проверки
+    if (now - this.lastTabOperationCheck > this.tabOperationCheckThrottle) {
+      setTimeout(() => {
+        this.checkForTabOperations();
+      }, 500);
+    }
   }
 
   // Запланировать начальную синхронизацию для нового пользователя
@@ -483,6 +536,13 @@ class SyncAdapter {
     this.syncTimeout = setTimeout(async () => {
       try {
         console.log('Performing initial sync for new user...');
+        
+        // Проверяем throttling для предотвращения множественных вызовов
+        const now = Date.now();
+        if (now - this.lastTabOperationCheck < this.tabOperationCheckThrottle) {
+          console.log('Skipping initial sync - too soon after last tab operation check');
+          return;
+        }
         
         // Проверяем доступность API
         const { isApiAvailable } = await import('../config/api');
@@ -636,9 +696,20 @@ class SyncAdapter {
   // НОВАЯ ФУНКЦИЯ: Проверка операций из других вкладок
   private async checkForTabOperations(): Promise<void> {
     try {
+      const now = Date.now();
+      
+      // Проверяем throttling для предотвращения чрезмерных вызовов
+      if (now - this.lastTabOperationCheck < this.tabOperationCheckThrottle) {
+        console.log(`Skipping tab operations check - too soon (${now - this.lastTabOperationCheck}ms < ${this.tabOperationCheckThrottle}ms)`);
+        return;
+      }
+      
       console.log('Checking for tab operations...');
       console.log('Current deviceId:', this.deviceId);
       console.log('Current lastSync:', this.lastSync);
+      
+      // Обновляем время последней проверки
+      this.lastTabOperationCheck = now;
       
       // Получаем операции от всех устройств/вкладок
       const allOperations = this.getAllOperationsFromLocalStorage();
@@ -820,7 +891,10 @@ class SyncAdapter {
         if (!isApiAvailable()) {
           console.log('API not available, skipping server sync in auto sync');
           // Только проверяем localStorage для синхронизации между вкладками
-          await this.checkForTabOperations();
+          // Но с увеличенным интервалом для предотвращения спама
+          if (now - this.lastTabOperationCheck > this.tabOperationCheckThrottle * 2) {
+            await this.checkForTabOperations();
+          }
           return;
         }
         
@@ -833,9 +907,12 @@ class SyncAdapter {
         }
       }
       
-      // Всегда проверяем localStorage для синхронизации между вкладками
-      // (независимо от онлайн статуса)
-      await this.checkForTabOperations();
+      // Проверяем localStorage для синхронизации между вкладками
+      // Но только если прошло достаточно времени с последней проверки
+      // и увеличиваем интервал для предотвращения спама
+      if (Date.now() - this.lastTabOperationCheck > this.tabOperationCheckThrottle * 2) {
+        await this.checkForTabOperations();
+      }
     }, intervalMs);
   }
 
@@ -849,6 +926,21 @@ class SyncAdapter {
       clearTimeout(this.syncTimeout);
       this.syncTimeout = null;
     }
+    if (this.initializationTimeout) {
+      clearTimeout(this.initializationTimeout);
+      this.initializationTimeout = null;
+    }
+  }
+
+  // Очистить все ресурсы и остановить работу
+  cleanup(): void {
+    console.log('Cleaning up SyncAdapter...');
+    this.stopAutoSync();
+    this.isInitialized = false;
+    this.lastTabOperationCheck = 0;
+    this.lastUserSet = 0;
+    this.lastSyncAttempt = 0;
+    console.log('SyncAdapter cleanup completed');
   }
 
   // Получить информацию об устройстве
