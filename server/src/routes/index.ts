@@ -7,6 +7,7 @@ import equipmentRoutes from './equipment';
 import stackRoutes from './stacks';
 import shipmentRoutes from './shipments';
 import statisticsRoutes from './statistics';
+import eventsRoutes from './events';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ router.get('/', (req, res) => {
   res.json({
     success: true,
     message: 'API is working',
-    routes: ['/auth', '/users', '/categories', '/locations', '/equipment', '/stacks', '/shipments', '/statistics']
+    routes: ['/auth', '/users', '/categories', '/locations', '/equipment', '/stacks', '/shipments', '/statistics', '/events']
   });
 });
 
@@ -28,5 +29,6 @@ router.use('/equipment', equipmentRoutes);
 router.use('/stacks', stackRoutes);
 router.use('/shipments', shipmentRoutes);
 router.use('/statistics', statisticsRoutes);
+router.use('/events', eventsRoutes);
 
 export default router;

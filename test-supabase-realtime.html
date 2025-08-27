@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест Supabase Realtime</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status { 
+            padding: 15px; 
+            margin: 15px 0; 
+            border-radius: 8px; 
+            border-left: 4px solid;
+        }
+        .connected { 
+            background-color: #d4edda; 
+            color: #155724; 
+            border-left-color: #28a745;
+        }
+        .disconnected { 
+            background-color: #f8d7da; 
+            color: #721c24; 
+            border-left-color: #dc3545;
+        }
+        .log { 
+            background-color: #f8f9fa; 
+            border: 1px solid #dee2e6; 
+            padding: 20px; 
+            height: 350px; 
+            overflow-y: auto; 
+            font-family: 'Courier New', monospace; 
+            font-size: 13px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+        }
+        button { 
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white; 
+            border: none; 
+            padding: 12px 20px; 
+            margin: 8px; 
+            border-radius: 6px; 
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        button:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+        }
+        button:disabled { 
+            background: #6c757d; 
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .config {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .config input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .event-item {
+            background: #f0f8ff;
+            border-left: 3px solid #2196f3;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Тест Supabase Realtime</h1>
+        
+        <!-- Конфигурация -->
+        <div class="config">
+            <h3>Настройки подключения:</h3>
+            <input id="supabaseUrl" type="text" placeholder="Supabase URL" value="https://your-project.supabase.co">
+            <input id="supabaseKey" type="text" placeholder="Supabase Anon Key" value="your-anon-key">
+            <button onclick="initSupabase()">Инициализировать Supabase</button>
+        </div>
+        
+        <!-- Статус подключения -->
+        <div id="status" class="status disconnected">
+            ❌ Не подключено к Supabase Realtime
+        </div>
+        
+        <!-- Управление -->
+        <div>
+            <button id="connectBtn" onclick="connect()">Подключиться</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>Отключиться</button>
+            <button onclick="clearLog()">Очистить лог</button>
+            <button onclick="testConnection()">Тест соединения</button>
+        </div>
+        
+        <!-- Тестовые действия -->
+        <h3>Тестовые операции с данными:</h3>
+        <div>
+            <button onclick="insertTestEquipment()">Добавить тестовое оборудование</button>
+            <button onclick="updateTestEquipment()">Обновить тестовое оборудование</button>
+            <button onclick="deleteTestEquipment()">Удалить тестовое оборудование</button>
+            <button onclick="fetchEquipment()">Загрузить список оборудования</button>
+        </div>
+        
+        <!-- Лог событий -->
+        <h3>Лог событий Realtime:</h3>
+        <div id="log" class="log">Лог будет отображаться здесь...</div>
+    </div>
+
+    <script>
+        let supabase = null;
+        let channel = null;
+        let testEquipmentId = null;
+        
+        const statusEl = document.getElementById('status');
+        const logEl = document.getElementById('log');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            logEl.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+        
+        function updateStatus(connected, message = '') {
+            if (connected) {
+                statusEl.innerHTML = '✅ Подключено к Supabase Realtime ' + message;
+                statusEl.className = 'status connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            } else {
+                statusEl.innerHTML = '❌ Не подключено к Supabase Realtime ' + message;
+                statusEl.className = 'status disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+            }
+        }
+        
+        function initSupabase() {
+            const url = document.getElementById('supabaseUrl').value;
+            const key = document.getElementById('supabaseKey').value;
+            
+            if (!url || !key) {
+                addLog('❌ Введите URL и ключ Supabase', 'error');
+                return;
+            }
+            
+            try {
+                supabase = window.supabase.createClient(url, key, {
+                    realtime: {
+                        params: {
+                            eventsPerSecond: 10
+                        }
+                    }
+                });
+                addLog('✅ Supabase клиент инициализирован', 'success');
+            } catch (error) {
+                addLog('❌ Ошибка инициализации Supabase: ' + error.message, 'error');
+            }
+        }
+        
+        function connect() {
+            if (!supabase) {
+                addLog('❌ Сначала инициализируйте Supabase', 'error');
+                return;
+            }
+            
+            addLog('🔗 Подключение к Supabase Realtime...');
+            
+            try {
+                // Создаем канал для таблицы equipment
+                channel = supabase
+                    .channel('public:equipment')
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: '*',
+                            schema: 'public',
+                            table: 'equipment'
+                        },
+                        (payload) => {
+                            addLog('📨 Получено событие: ' + JSON.stringify({
+                                event: payload.eventType,
+                                table: payload.table,
+                                record: payload.new || payload.old
+                            }, null, 2), 'success');
+                        }
+                    )
+                    .subscribe((status) => {
+                        addLog(`📡 Статус канала: ${status}`);
+                        
+                        if (status === 'SUBSCRIBED') {
+                            updateStatus(true);
+                            addLog('✅ Успешно подключен к Realtime', 'success');
+                        } else if (status === 'CHANNEL_ERROR') {
+                            updateStatus(false, '(ошибка канала)');
+                            addLog('❌ Ошибка канала Realtime', 'error');
+                        } else if (status === 'TIMED_OUT') {
+                            updateStatus(false, '(таймаут)');
+                            addLog('❌ Таймаут подключения к Realtime', 'error');
+                        }
+                    });
+                    
+            } catch (error) {
+                addLog('❌ Ошибка подключения: ' + error.message, 'error');
+                updateStatus(false, '(ошибка)');
+            }
+        }
+        
+        function disconnect() {
+            if (channel) {
+                supabase.removeChannel(channel);
+                channel = null;
+                addLog('🔌 Отключено от Realtime', 'info');
+                updateStatus(false);
+            }
+        }
+        
+        async function testConnection() {
+            if (!supabase) {
+                addLog('❌ Supabase не инициализирован', 'error');
+                return;
+            }
+            
+            try {
+                addLog('🔍 Тестирование подключения к базе данных...');
+                const { data, error } = await supabase
+                    .from('equipment')
+                    .select('count', { count: 'exact', head: true });
+                
+                if (error) {
+                    addLog('❌ Ошибка подключения к БД: ' + error.message, 'error');
+                } else {
+                    addLog(`✅ Подключение к БД успешно. Записей в equipment: ${data}`, 'success');
+                }
+            } catch (error) {
+                addLog('❌ Ошибка тестирования: ' + error.message, 'error');
+            }
+        }
+        
+        async function insertTestEquipment() {
+            if (!supabase) {
+                addLog('❌ Supabase не инициализирован', 'error');
+                return;
+            }
+            
+            try {
+                const testData = {
+                    uuid: 'test_' + Date.now(),
+                    name: 'Тестовое оборудование ' + new Date().toLocaleTimeString(),
+                    status: 'available',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+                
+                addLog('📤 Добавление тестового оборудования...');
+                const { data, error } = await supabase
+                    .from('equipment')
+                    .insert(testData)
+                    .select()
+                    .single();
+                
+                if (error) {
+                    addLog('❌ Ошибка добавления: ' + error.message, 'error');
+                } else {
+                    testEquipmentId = data.uuid;
+                    addLog('✅ Оборудование добавлено: ' + JSON.stringify(data), 'success');
+                }
+            } catch (error) {
+                addLog('❌ Ошибка: ' + error.message, 'error');
+            }
+        }
+        
+        async function updateTestEquipment() {
+            if (!supabase || !testEquipmentId) {
+                addLog('❌ Сначала добавьте тестовое оборудование', 'error');
+                return;
+            }
+            
+            try {
+                addLog('📝 Обновление тестового оборудования...');
+                const { data, error } = await supabase
+                    .from('equipment')
+                    .update({
+                        name: 'Обновленное оборудование ' + new Date().toLocaleTimeString(),
+                        status: 'in-use',
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('uuid', testEquipmentId)
+                    .select()
+                    .single();
+                
+                if (error) {
+                    addLog('❌ Ошибка обновления: ' + error.message, 'error');
+                } else {
+                    addLog('✅ Оборудование обновлено: ' + JSON.stringify(data), 'success');
+                }
+            } catch (error) {
+                addLog('❌ Ошибка: ' + error.message, 'error');
+            }
+        }
+        
+        async function deleteTestEquipment() {
+            if (!supabase || !testEquipmentId) {
+                addLog('❌ Сначала добавьте тестовое оборудование', 'error');
+                return;
+            }
+            
+            try {
+                addLog('🗑️ Удаление тестового оборудования...');
+                const { error } = await supabase
+                    .from('equipment')
+                    .delete()
+                    .eq('uuid', testEquipmentId);
+                
+                if (error) {
+                    addLog('❌ Ошибка удаления: ' + error.message, 'error');
+                } else {
+                    addLog('✅ Оборудование удалено: ' + testEquipmentId, 'success');
+                    testEquipmentId = null;
+                }
+            } catch (error) {
+                addLog('❌ Ошибка: ' + error.message, 'error');
+            }
+        }
+        
+        async function fetchEquipment() {
+            if (!supabase) {
+                addLog('❌ Supabase не инициализирован', 'error');
+                return;
+            }
+            
+            try {
+                addLog('📋 Загрузка списка оборудования...');
+                const { data, error } = await supabase
+                    .from('equipment')
+                    .select('uuid, name, status, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+                
+                if (error) {
+                    addLog('❌ Ошибка загрузки: ' + error.message, 'error');
+                } else {
+                    addLog('✅ Загружено записей: ' + data.length);
+                    data.forEach(item => {
+                        addLog(`  • ${item.name} (${item.status}) - ${item.uuid}`);
+                    });
+                }
+            } catch (error) {
+                addLog('❌ Ошибка: ' + error.message, 'error');
+            }
+        }
+        
+        function clearLog() {
+            logEl.innerHTML = 'Лог очищен...\n';
+        }
+        
+        // Инициализация при загрузке
+        addLog('🚀 Страница загружена. Введите данные Supabase и нажмите "Инициализировать"');
+        addLog('💡 После инициализации нажмите "Подключиться" для начала тестирования Realtime');
+        addLog('📝 Откройте эту страницу в нескольких вкладках для тестирования синхронизации');
+    </script>
+</body>
+</html>
