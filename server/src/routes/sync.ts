@@ -13,7 +13,45 @@ import {
 const router = Router();
 const syncController = new SyncController();
 
-// Все маршруты требуют авторизации
+// Legacy endpoint БЕЗ авторизации для обратной совместимости
+/**
+ * @route GET /api/sync/operations
+ * @desc Legacy PULL операции (без авторизации для старых клиентов)
+ * @access Public (Legacy compatibility)
+ */
+router.get('/operations', async (req, res) => {
+  try {
+    const { deviceId, lastSync } = req.query;
+    const lastSyncTime = parseInt(lastSync as string) || 0;
+    
+    console.log(`📥 Legacy PULL: device=${deviceId}, lastSync=${lastSyncTime}`);
+    
+    // Пока возвращаем пустой массив операций
+    const operations: any[] = [];
+    
+    console.log(`📤 Legacy PULL: Returned ${operations.length} operations to device ${deviceId}`);
+    
+    return res.status(200).json({
+      operations,
+      serverTime: Date.now(),
+      debug: {
+        message: 'Legacy endpoint without auth',
+        deviceId,
+        lastSyncTime,
+        note: 'This endpoint is for backward compatibility'
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Legacy Operations API Error:', error);
+    return res.status(500).json({ 
+      error: 'Failed to fetch operations',
+      legacy: true 
+    });
+  }
+});
+
+// Все остальные маршруты требуют авторизации
 router.use(auth);
 
 /**

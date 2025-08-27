@@ -23,6 +23,21 @@ router.get('/', (req, res) => {
   });
 });
 
+// Debug endpoint
+router.get('/debug/status', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Debug endpoint working',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    version: '2.0.0',
+    endpoints: {
+      legacy_sync: '/api/sync/operations (no auth)',
+      modern_sync: '/api/sync/* (with auth)'
+    }
+  });
+});
+
 // Подключаем все маршруты
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
