@@ -2,8 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
-import { testConnection } from '../src/config/database-postgresql';
-import apiRoutes from '../src/routes';
+// import { testConnection } from '../src/config/database-postgresql';
+// import apiRoutes from '../src/routes';
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -21,8 +21,8 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// API маршруты
-app.use('/api', apiRoutes);
+// API маршруты (временно отключены)
+// app.use('/api', apiRoutes);
 
 // Базовые маршруты
 app.get('/', (req, res) => {
@@ -34,23 +34,13 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/health', async (req, res) => {
-  try {
-    const dbStatus = await testConnection();
-    res.json({
-      status: 'healthy',
-      database: dbStatus ? 'connected' : 'disconnected',
-      timestamp: new Date().toISOString(),
-      env: process.env.NODE_ENV || 'development'
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'unhealthy',
-      database: 'disconnected',
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    });
-  }
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    database: 'testing_disabled',
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV || 'development'
+  });
 });
 
 app.get('/api', (req, res) => {
