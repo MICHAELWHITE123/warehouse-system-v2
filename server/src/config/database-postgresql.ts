@@ -23,20 +23,32 @@ pool.on('error', (err) => {
 export const testConnection = async (): Promise<boolean> => {
   try {
     console.log('🔌 Testing database connection...');
-    console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
-    console.log('DB_SSL:', process.env.DB_SSL);
+    console.log('Environment variables check:');
+    console.log('- DATABASE_URL exists:', !!process.env.DATABASE_URL);
+    console.log('- DATABASE_URL length:', process.env.DATABASE_URL?.length || 0);
+    console.log('- DATABASE_URL starts with:', process.env.DATABASE_URL?.substring(0, 20) || 'N/A');
+    console.log('- DB_SSL:', process.env.DB_SSL);
+    console.log('- SUPABASE_URL:', process.env.SUPABASE_URL);
+    
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
     
     const client = await pool.connect();
-    const result = await client.query('SELECT NOW() as current_time');
+    const result = await client.query('SELECT NOW() as current_time, version() as version');
     client.release();
     
-    console.log('✅ Database connection successful, time:', result.rows[0]?.current_time);
+    console.log('✅ Database connection successful!');
+    console.log('- Time:', result.rows[0]?.current_time);
+    console.log('- Version:', result.rows[0]?.version);
     return true;
   } catch (error) {
     console.error('❌ Database connection failed:', {
       message: error instanceof Error ? error.message : 'Unknown error',
       code: (error as any)?.code,
-      stack: error instanceof Error ? error.stack : undefined
+      detail: (error as any)?.detail,
+      hint: (error as any)?.hint,
+      stack: error instanceof Error ? error.stack?.split('\n')[0] : undefined
     });
     return false;
   }
