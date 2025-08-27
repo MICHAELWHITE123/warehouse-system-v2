@@ -36,14 +36,22 @@ app.get('/', (req, res) => {
 
 app.get('/health', async (req, res) => {
   try {
+    console.log('=== HEALTH CHECK START ===');
+    console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+    console.log('DATABASE_URL preview:', process.env.DATABASE_URL?.substring(0, 50) + '...');
+    console.log('SUPABASE_URL:', process.env.SUPABASE_URL);
+    
     const dbStatus = await testConnection();
     res.json({
       status: 'healthy',
       database: dbStatus ? 'connected' : 'disconnected',
       timestamp: new Date().toISOString(),
-      env: process.env.NODE_ENV || 'development'
+      env: process.env.NODE_ENV || 'development',
+      hasDbUrl: !!process.env.DATABASE_URL,
+      dbUrlLength: process.env.DATABASE_URL?.length || 0
     });
   } catch (error) {
+    console.error('Health check error:', error);
     res.status(500).json({
       status: 'unhealthy',
       database: 'disconnected',
