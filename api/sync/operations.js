@@ -26,26 +26,41 @@ export default async function handler(req, res) {
       const { deviceId, lastSync } = req.query;
       const lastSyncTime = parseInt(lastSync) || 0;
       
-      console.log(`📥 Pulling operations for device: ${deviceId}, since: ${lastSyncTime}`);
+      console.log(`📥 Legacy PULL: device=${deviceId}, lastSync=${lastSyncTime}`);
       
       // Получаем операции от других устройств
       const keys = await kv.keys('operation:*');
+      console.log(`🔍 Found ${keys.length} operation keys in KV`);
+      
       const operations = [];
+      let processedCount = 0;
+      let filteredCount = 0;
       
       for (const key of keys) {
         const operation = await kv.get(key);
+        processedCount++;
+        
         if (operation && 
             operation.deviceId !== deviceId && 
             operation.timestamp > lastSyncTime) {
           operations.push(operation);
+          filteredCount++;
         }
       }
       
-      console.log(`📤 Returning ${operations.length} operations`);
+      console.log(`📊 Processed ${processedCount} operations, filtered ${filteredCount}, returning ${operations.length}`);
+      console.log(`📤 Legacy PULL: Returned ${operations.length} operations to device ${deviceId}`);
       
       return res.status(200).json({
         operations,
-        serverTime: Date.now()
+        serverTime: Date.now(),
+        debug: {
+          totalKeys: keys.length,
+          processedOperations: processedCount,
+          filteredOperations: filteredCount,
+          deviceId,
+          lastSyncTime
+        }
       });
     }
     

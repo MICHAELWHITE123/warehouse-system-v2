@@ -74,7 +74,7 @@ export default async function handler(req, res) {
         }
       }
       
-      console.log(`📤 Returning ${operations.length} operations`);
+      console.log(`📤 Legacy PULL: Returning ${operations.length} operations to device ${deviceId}`);
       
       return res.status(200).json({
         operations,
