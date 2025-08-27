@@ -29,7 +29,7 @@ export default async function handler(req, res) {
       // Получение операций от клиента
       const { operations, deviceId, userId } = req.body;
       
-      console.log('🔄 Received sync request from device:', deviceId);
+      console.log(`🔄 Legacy PUSH: Received ${operations?.length || 0} operations from device:`, deviceId);
       
       if (operations && operations.length > 0) {
         // Сохраняем каждую операцию
@@ -37,11 +37,16 @@ export default async function handler(req, res) {
           const key = `operation:${operation.id}`;
           await kv.set(key, {
             ...operation,
+            deviceId, // Убеждаемся что deviceId сохранен
             receivedAt: new Date().toISOString()
           }, { ex: 86400 * 7 }); // TTL 7 дней
           
-          console.log(`✅ Saved operation: ${operation.operation} on ${operation.table}`);
+          console.log(`✅ Legacy PUSH: Saved operation ${operation.operation} on ${operation.table} from device ${deviceId}`);
         }
+        
+        console.log(`📦 Legacy PUSH: Successfully saved ${operations.length} operations to KV`);
+      } else {
+        console.log('⚠️ Legacy PUSH: No operations to save');
       }
       
       // Обновляем время последней синхронизации для устройства
