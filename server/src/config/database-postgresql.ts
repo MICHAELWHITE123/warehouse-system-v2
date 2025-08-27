@@ -4,14 +4,11 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const poolConfig: PoolConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'warehouse_db',
-  user: process.env.DB_USER || 'warehouse_user',
-  password: process.env.DB_PASSWORD || '',
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
   max: 20, // максимальное количество подключений в пуле
   idleTimeoutMillis: 30000, // время ожидания перед закрытием неактивного подключения
-  connectionTimeoutMillis: 2000, // время ожидания подключения
+  connectionTimeoutMillis: 10000, // увеличиваем время ожидания подключения
 };
 
 export const pool = new Pool(poolConfig);
@@ -25,13 +22,22 @@ pool.on('error', (err) => {
 // Тестирование подключения
 export const testConnection = async (): Promise<boolean> => {
   try {
+    console.log('🔌 Testing database connection...');
+    console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+    console.log('DB_SSL:', process.env.DB_SSL);
+    
     const client = await pool.connect();
-    await client.query('SELECT NOW()');
+    const result = await client.query('SELECT NOW() as current_time');
     client.release();
-    console.log('✅ Database connection successful');
+    
+    console.log('✅ Database connection successful, time:', result.rows[0]?.current_time);
     return true;
   } catch (error) {
-    console.error('❌ Database connection failed:', error);
+    console.error('❌ Database connection failed:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      code: (error as any)?.code,
+      stack: error instanceof Error ? error.stack : undefined
+    });
     return false;
   }
 };
