@@ -28,38 +28,50 @@ export default async function handler(req, res) {
       
       console.log(`📥 Legacy PULL: device=${deviceId}, lastSync=${lastSyncTime}`);
       
-      // Получаем операции от других устройств
-      const keys = await kv.keys('operation:*');
-      console.log(`🔍 Found ${keys.length} operation keys in KV`);
+      // Проверяем доступность KV
+      let operations = [];
+      let kvError = null;
       
-      const operations = [];
-      let processedCount = 0;
-      let filteredCount = 0;
-      
-      for (const key of keys) {
-        const operation = await kv.get(key);
-        processedCount++;
+      try {
+        // Получаем операции от других устройств
+        const keys = await kv.keys('operation:*');
+        console.log(`🔍 Found ${keys.length} operation keys in KV`);
         
-        if (operation && 
-            operation.deviceId !== deviceId && 
-            operation.timestamp > lastSyncTime) {
-          operations.push(operation);
-          filteredCount++;
+        let processedCount = 0;
+        let filteredCount = 0;
+        
+        for (const key of keys) {
+          const operation = await kv.get(key);
+          processedCount++;
+          
+          if (operation && 
+              operation.deviceId !== deviceId && 
+              operation.timestamp > lastSyncTime) {
+            operations.push(operation);
+            filteredCount++;
+          }
         }
+        
+        console.log(`📊 Processed ${processedCount} operations, filtered ${filteredCount}, returning ${operations.length}`);
+        
+      } catch (error) {
+        console.error('❌ KV Error in legacy API:', error);
+        kvError = error.message;
+        // Возвращаем пустой массив если KV недоступен
+        operations = [];
       }
       
-      console.log(`📊 Processed ${processedCount} operations, filtered ${filteredCount}, returning ${operations.length}`);
       console.log(`📤 Legacy PULL: Returned ${operations.length} operations to device ${deviceId}`);
       
       return res.status(200).json({
         operations,
         serverTime: Date.now(),
         debug: {
-          totalKeys: keys.length,
-          processedOperations: processedCount,
-          filteredOperations: filteredCount,
           deviceId,
-          lastSyncTime
+          lastSyncTime,
+          kvError,
+          message: 'Legacy API endpoint without auth',
+          operationsCount: operations.length
         }
       });
     }

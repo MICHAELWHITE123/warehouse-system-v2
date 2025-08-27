@@ -59,19 +59,29 @@ export default async function handler(req, res) {
       // Получение операций для устройства
       const { deviceId, lastSync } = req.query;
       
-      console.log(`📥 Pulling operations for device: ${deviceId}`);
+      console.log(`📥 Legacy PULL: device=${deviceId}, lastSync=${lastSync}`);
       
       const lastSyncTime = parseInt(lastSync) || 0;
       
-      // Получаем все операции (в реальном проекте лучше использовать pagination)
-      const keys = await kv.keys('operation:*');
-      const operations = [];
+      // Проверяем доступность KV
+      let operations = [];
+      let kvError = null;
       
-      for (const key of keys) {
-        const operation = await kv.get(key);
-        if (operation && operation.deviceId !== deviceId && operation.timestamp > lastSyncTime) {
-          operations.push(operation);
+      try {
+        // Получаем все операции (в реальном проекте лучше использовать pagination)
+        const keys = await kv.keys('operation:*');
+        console.log(`🔍 Found ${keys.length} operation keys in KV`);
+        
+        for (const key of keys) {
+          const operation = await kv.get(key);
+          if (operation && operation.deviceId !== deviceId && operation.timestamp > lastSyncTime) {
+            operations.push(operation);
+          }
         }
+      } catch (error) {
+        console.error('❌ KV Error in main sync API:', error);
+        kvError = error.message;
+        operations = [];
       }
       
       console.log(`📤 Legacy PULL: Returning ${operations.length} operations to device ${deviceId}`);
