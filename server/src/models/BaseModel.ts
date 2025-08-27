@@ -1,4 +1,4 @@
-import { query, queryOne } from '../config/database-sqlite';
+import { query, queryOne } from '../config/database-postgresql';
 
 export abstract class BaseModel {
   protected async executeQuery<T = any>(queryText: string, params: any[] = []): Promise<T[]> {

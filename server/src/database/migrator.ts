@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { query, queryOne } from '../config/database-sqlite';
+import { query, queryOne } from '../config/database-postgresql';
 
 interface Migration {
   id: number;
