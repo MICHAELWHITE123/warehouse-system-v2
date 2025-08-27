@@ -8,6 +8,7 @@ import stackRoutes from './stacks';
 import shipmentRoutes from './shipments';
 import statisticsRoutes from './statistics';
 import syncRoutes from './sync';
+import deviceRoutes from './devices';
 
 const router = Router();
 
@@ -16,7 +17,9 @@ router.get('/', (req, res) => {
   res.json({
     success: true,
     message: 'API is working',
-    routes: ['/auth', '/users', '/categories', '/locations', '/equipment', '/stacks', '/shipments', '/statistics', '/sync']
+    version: '2.0.0',
+    features: ['auth', 'sync', 'devices', 'inventory'],
+    routes: ['/auth', '/users', '/categories', '/locations', '/equipment', '/stacks', '/shipments', '/statistics', '/sync', '/devices']
   });
 });
 
@@ -30,5 +33,6 @@ router.use('/stacks', stackRoutes);
 router.use('/shipments', shipmentRoutes);
 router.use('/statistics', statisticsRoutes);
 router.use('/sync', syncRoutes);
+router.use('/devices', deviceRoutes);
 
 export default router;

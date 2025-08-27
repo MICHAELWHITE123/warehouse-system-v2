@@ -3,10 +3,12 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { BaseController } from './BaseController';
 import { UserModel } from '../models/UserModel';
+import { DeviceModel, CreateDevice } from '../models/DeviceModel';
 import { CreateUser } from '../types/database';
 
 export class AuthController extends BaseController {
   private userModel = new UserModel();
+  private deviceModel = new DeviceModel();
 
   public login = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -156,6 +158,57 @@ export class AuthController extends BaseController {
 
     } catch (error) {
       this.unauthorized(res, 'Invalid or expired token');
+    }
+  };
+
+  public registerDevice = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = (req as any).user?.userId;
+      
+      if (!userId) {
+        this.unauthorized(res);
+        return;
+      }
+
+      const { device_id, device_name, device_type, platform } = req.body;
+
+      // Проверить, не зарегистрировано ли уже это устройство
+      const existingDevice = await this.deviceModel.findByDeviceId(device_id);
+      
+      if (existingDevice) {
+        if (existingDevice.user_id !== userId) {
+          this.error(res, 'Device is already registered to another user', 409);
+          return;
+        }
+        
+        // Если устройство уже принадлежит пользователю, активируем его
+        const updatedDevice = await this.deviceModel.update(existingDevice.id, {
+          device_name,
+          device_type,
+          platform,
+          is_active: true,
+          last_sync: new Date()
+        });
+        
+        this.success(res, updatedDevice, 'Device reactivated successfully');
+        return;
+      }
+
+      // Создать новое устройство
+      const deviceData: CreateDevice = {
+        user_id: userId,
+        device_id,
+        device_name,
+        device_type,
+        platform
+      };
+
+      const newDevice = await this.deviceModel.create(deviceData);
+
+      this.success(res, newDevice, 'Device registered successfully');
+
+    } catch (error) {
+      this.serverError(res, error as Error);
     }
   };
 }

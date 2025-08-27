@@ -504,3 +504,201 @@ export const validateUpdateShipment = [
   
   handleValidationErrors
 ];
+
+// Валидация для регистрации устройства
+export const validateDeviceRegistration = [
+  body('device_id')
+    .notEmpty()
+    .withMessage('Device ID is required')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Device ID must be between 1 and 255 characters')
+    .matches(/^[a-zA-Z0-9_-]+$/)
+    .withMessage('Device ID can only contain letters, numbers, underscores and hyphens'),
+  
+  body('device_name')
+    .notEmpty()
+    .withMessage('Device name is required')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Device name must be between 1 and 255 characters'),
+  
+  body('device_type')
+    .optional()
+    .isIn(['desktop', 'mobile', 'tablet', 'web'])
+    .withMessage('Device type must be one of: desktop, mobile, tablet, web'),
+  
+  body('platform')
+    .optional()
+    .isIn(['windows', 'macos', 'ios', 'android', 'linux', 'web'])
+    .withMessage('Platform must be one of: windows, macos, ios, android, linux, web'),
+  
+  handleValidationErrors
+];
+
+// Валидация для обновления устройства
+export const validateDeviceUpdate = [
+  body('device_name')
+    .optional()
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Device name must be between 1 and 255 characters'),
+  
+  body('device_type')
+    .optional()
+    .isIn(['desktop', 'mobile', 'tablet', 'web'])
+    .withMessage('Device type must be one of: desktop, mobile, tablet, web'),
+  
+  body('platform')
+    .optional()
+    .isIn(['windows', 'macos', 'ios', 'android', 'linux', 'web'])
+    .withMessage('Platform must be one of: windows, macos, ios, android, linux, web'),
+  
+  body('is_active')
+    .optional()
+    .isBoolean()
+    .withMessage('is_active must be a boolean'),
+  
+  handleValidationErrors
+];
+
+// Валидация для PUSH синхронизации
+export const validateSyncPush = [
+  body('device_id')
+    .notEmpty()
+    .withMessage('Device ID is required')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Device ID must be between 1 and 255 characters'),
+  
+  body('changes')
+    .isArray({ min: 1 })
+    .withMessage('Changes must be a non-empty array'),
+  
+  body('changes.*.table')
+    .notEmpty()
+    .withMessage('Table name is required for each change')
+    .isIn(['equipment', 'categories', 'locations', 'shipments', 'stacks', 'users'])
+    .withMessage('Table must be one of: equipment, categories, locations, shipments, stacks, users'),
+  
+  body('changes.*.operation')
+    .notEmpty()
+    .withMessage('Operation is required for each change')
+    .isIn(['CREATE', 'UPDATE', 'DELETE'])
+    .withMessage('Operation must be one of: CREATE, UPDATE, DELETE'),
+  
+  body('changes.*.record_id')
+    .notEmpty()
+    .withMessage('Record ID is required for each change')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Record ID must be between 1 and 255 characters'),
+  
+  body('changes.*.data')
+    .exists()
+    .withMessage('Data is required for each change'),
+  
+  body('changes.*.timestamp')
+    .isInt({ min: 0 })
+    .withMessage('Timestamp must be a valid Unix timestamp'),
+  
+  handleValidationErrors
+];
+
+// Валидация для PULL синхронизации
+export const validateSyncPull = [
+  body('device_id')
+    .notEmpty()
+    .withMessage('Device ID is required')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Device ID must be between 1 and 255 characters'),
+  
+  body('last_sync')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Last sync must be a valid Unix timestamp'),
+  
+  handleValidationErrors
+];
+
+// Валидация для получения статуса синхронизации
+export const validateSyncStatus = [
+  query('device_id')
+    .optional()
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Device ID must be between 1 and 255 characters'),
+  
+  handleValidationErrors
+];
+
+// Валидация для разрешения конфликта
+export const validateConflictResolution = [
+  body('resolution')
+    .notEmpty()
+    .withMessage('Resolution is required')
+    .isIn(['local_wins', 'remote_wins', 'merged', 'manual'])
+    .withMessage('Resolution must be one of: local_wins, remote_wins, merged, manual'),
+  
+  body('resolved_data')
+    .optional()
+    .isObject()
+    .withMessage('Resolved data must be an object'),
+  
+  handleValidationErrors
+];
+
+// Валидация для подтверждения операции синхронизации
+export const validateSyncAcknowledge = [
+  body('device_id')
+    .notEmpty()
+    .withMessage('Device ID is required')
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Device ID must be between 1 and 255 characters'),
+  
+  handleValidationErrors
+];
+
+// Валидация query параметров для пагинации
+export const validatePagination = [
+  query('page')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Page must be a positive integer'),
+  
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100'),
+  
+  query('search')
+    .optional()
+    .isLength({ max: 255 })
+    .withMessage('Search query must not exceed 255 characters'),
+  
+  handleValidationErrors
+];
+
+// Валидация для фильтров синхронизации
+export const validateSyncFilters = [
+  query('status')
+    .optional()
+    .isIn(['pending', 'processed', 'failed', 'conflict'])
+    .withMessage('Status must be one of: pending, processed, failed, conflict'),
+  
+  query('table_name')
+    .optional()
+    .isIn(['equipment', 'categories', 'locations', 'shipments', 'stacks', 'users'])
+    .withMessage('Table name must be one of: equipment, categories, locations, shipments, stacks, users'),
+  
+  query('device_id')
+    .optional()
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Device ID must be between 1 and 255 characters'),
+  
+  query('date_from')
+    .optional()
+    .isISO8601()
+    .withMessage('Date from must be a valid ISO 8601 date'),
+  
+  query('date_to')
+    .optional()
+    .isISO8601()
+    .withMessage('Date to must be a valid ISO 8601 date'),
+  
+  handleValidationErrors
+];
