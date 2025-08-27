@@ -1,4 +1,4 @@
-import { isRedisAvailable, isPostgresAvailable, getRedisHeaders, getPostgresHeaders } from '../config/api';
+import { isRedisAvailable, isPostgresAvailable } from '../config/api';
 import VercelKVAdapter, { VercelKVConfig } from './vercelKVAdapter';
 
 export interface HybridDatabaseConfig {
@@ -22,7 +22,7 @@ export interface DatabaseOperation {
 
 class HybridDatabaseAdapter {
   private redisAdapter?: VercelKVAdapter;
-  private postgresAdapter?: any; // Будет добавлен позже
+  // private postgresAdapter?: any; // Будет добавлен позже
   private config: HybridDatabaseConfig;
   private isInitialized: boolean = false;
   private fallbackToLocal: boolean = true;
@@ -316,7 +316,7 @@ class HybridDatabaseAdapter {
   }
 
   // Postgres операции (заглушки для будущего)
-  private async setInPostgres(key: string, value: any, table: string): Promise<DatabaseOperation> {
+  private async setInPostgres(key: string, _value: any, table: string): Promise<DatabaseOperation> {
     // TODO: Реализовать Postgres операции
     console.log(`Postgres set not implemented yet: ${key} -> ${table}`);
     throw new Error('Postgres operations not implemented yet');

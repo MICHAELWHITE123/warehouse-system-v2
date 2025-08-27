@@ -1,6 +1,6 @@
 import express from 'express';
 import { DeviceController } from '../controllers/DeviceController';
-import { authenticateToken } from '../middleware/auth';
+import { auth } from '../middleware/auth';
 import { 
   validateDeviceRegistration,
   validateDeviceUpdate,
@@ -12,7 +12,7 @@ const router = express.Router();
 const deviceController = new DeviceController();
 
 // Все роуты требуют аутентификации
-router.use(authenticateToken);
+router.use(auth);
 
 /**
  * @route POST /api/devices/register

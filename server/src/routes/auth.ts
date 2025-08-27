@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/AuthController';
-import { authenticateToken } from '../middleware/auth';
+import { auth } from '../middleware/auth';
 import { validateLogin, validateRegister, validateDeviceRegistration } from '../middleware/validation';
 
 const router = Router();
@@ -22,6 +22,6 @@ router.get('/me', authController.getCurrentUser);
 router.post('/refresh', authController.refreshToken);
 
 // POST /api/auth/device - Регистрация устройства (требует аутентификации)
-router.post('/device', authenticateToken, validateDeviceRegistration, authController.registerDevice);
+router.post('/device', auth, validateDeviceRegistration, authController.registerDevice);
 
 export default router;

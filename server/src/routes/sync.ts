@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { auth } from '../middleware/auth';
 import { SyncController } from '../controllers/SyncController';
 import {
   validateSyncPush,
@@ -14,7 +14,7 @@ const router = Router();
 const syncController = new SyncController();
 
 // Все маршруты требуют авторизации
-router.use(authenticateToken);
+router.use(auth);
 
 /**
  * @route POST /api/sync/push
@@ -42,7 +42,7 @@ router.get('/status', validateSyncStatus, syncController.getSyncStatus);
  * @desc Получение истории синхронизации с фильтрацией и пагинацией
  * @access Private
  */
-router.get('/history', [validatePagination, validateSyncFilters], syncController.getSyncHistory);
+router.get('/history', validatePagination, validateSyncFilters, syncController.getSyncHistory);
 
 /**
  * @route GET /api/sync/conflicts
