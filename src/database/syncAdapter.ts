@@ -186,8 +186,9 @@ class SyncAdapter {
         
         if (testUrl && testUrl.includes('supabase.co')) {
           try {
-            const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/'), {
-              method: 'HEAD',
+            // Проверяем доступность Supabase Edge Functions
+            const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
+              method: 'GET',
               headers: getAuthHeaders()
             });
             
@@ -322,8 +323,9 @@ class SyncAdapter {
         
         if (testUrl && testUrl.includes('supabase.co')) {
           try {
-            const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/'), {
-              method: 'HEAD',
+            // Проверяем доступность Supabase Edge Functions
+            const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
+              method: 'GET',
               headers: getAuthHeaders()
             });
             
@@ -704,8 +706,9 @@ class SyncAdapter {
         
         if (testUrl && testUrl.includes('supabase.co')) {
           try {
-            const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/'), {
-              method: 'HEAD',
+            // Проверяем доступность Supabase Edge Functions
+            const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
+              method: 'GET',
               headers: getAuthHeaders()
             });
             
@@ -749,9 +752,9 @@ class SyncAdapter {
       // Дополнительная проверка доступности URL
       if (apiUrl.includes('supabase.co')) {
         try {
-          // Проверяем доступность Supabase URL
-          const testResponse = await fetch(apiUrl.replace('/functions/v1/sync', '/functions/v1/'), {
-            method: 'HEAD',
+          // Проверяем доступность Supabase Edge Functions
+          const testResponse = await fetch(apiUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
+            method: 'GET',
             headers: getAuthHeaders()
           });
           
@@ -1080,8 +1083,9 @@ class SyncAdapter {
         const testUrl = getApiUrl('sync');
         
         if (testUrl && testUrl.includes('supabase.co')) {
-          const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/'), {
-            method: 'HEAD',
+          // Проверяем доступность Supabase Edge Functions
+          const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
+            method: 'GET',
             headers: getAuthHeaders()
           });
           
@@ -1235,8 +1239,9 @@ class SyncAdapter {
         
                     if (testUrl && testUrl.includes('supabase.co')) {
               try {
-                const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/'), {
-                  method: 'HEAD',
+                // Проверяем доступность Supabase Edge Functions
+                const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
+                  method: 'GET',
                   headers: getAuthHeaders()
                 });
                 
@@ -1289,8 +1294,9 @@ class SyncAdapter {
               const testUrl = getApiUrl('sync');
               
               if (testUrl && testUrl.includes('supabase.co')) {
-                const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/'), {
-                  method: 'HEAD',
+                // Проверяем доступность Supabase Edge Functions
+                const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
+                  method: 'GET',
                   headers: getAuthHeaders()
                 });
                 
@@ -1337,8 +1343,9 @@ class SyncAdapter {
               const testUrl = getApiUrl('sync');
               
               if (testUrl && testUrl.includes('supabase.co')) {
-                const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/'), {
-                  method: 'HEAD',
+                // Проверяем доступность Supabase Edge Functions
+                const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
+                  method: 'GET',
                   headers: getAuthHeaders()
                 });
                 
@@ -1450,25 +1457,26 @@ class SyncAdapter {
         return;
       }
       
-      // Дополнительная проверка доступности URL
-      if (apiUrl.includes('supabase.co')) {
-        try {
-          const testResponse = await fetch(apiUrl.replace('/functions/v1/sync/operations', '/functions/v1/'), {
-            method: 'HEAD',
-            headers: getAuthHeaders()
-          });
-          
-          if (!testResponse.ok && testResponse.status !== 404) {
-            console.log('Supabase URL not accessible, using local sync only');
+              // Дополнительная проверка доступности URL
+        if (apiUrl.includes('supabase.co')) {
+          try {
+            // Проверяем доступность Supabase Edge Functions
+            const testResponse = await fetch(apiUrl.replace('/functions/v1/sync/operations', '/functions/v1/health'), {
+              method: 'GET',
+              headers: getAuthHeaders()
+            });
+            
+            if (!testResponse.ok && testResponse.status !== 404) {
+              console.log('Supabase URL not accessible, using local sync only');
+              await this.pullOperationsFromLocalStorage();
+              return;
+            }
+          } catch (testError) {
+            console.log('Supabase URL test failed, using local sync only:', testError);
             await this.pullOperationsFromLocalStorage();
             return;
           }
-        } catch (testError) {
-          console.log('Supabase URL test failed, using local sync only:', testError);
-          await this.pullOperationsFromLocalStorage();
-          return;
         }
-      }
       
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -1692,8 +1700,9 @@ class SyncAdapter {
       // Дополнительная проверка доступности URL
       if (apiUrl.includes('supabase.co')) {
         try {
-          const testResponse = await fetch(apiUrl.replace('/functions/v1/sync/operations', '/functions/v1/'), {
-            method: 'HEAD',
+          // Проверяем доступность Supabase Edge Functions
+          const testResponse = await fetch(apiUrl.replace('/functions/v1/sync/operations', '/functions/v1/health'), {
+            method: 'GET',
             headers: getAuthHeaders()
           });
           
@@ -1777,8 +1786,9 @@ class SyncAdapter {
             const testUrl = getApiUrl('sync');
             
             if (testUrl && testUrl.includes('supabase.co')) {
-              const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/'), {
-                method: 'HEAD',
+              // Проверяем доступность Supabase Edge Functions
+              const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
+                method: 'GET',
                 headers: getAuthHeaders()
               });
               

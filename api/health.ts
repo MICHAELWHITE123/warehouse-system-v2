@@ -1,51 +1,49 @@
-export default function handler(req: any, res: any) {
-  // Устанавливаем CORS заголовки
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+}
+
+serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Проверяем переменные окружения
-    const envCheck = {
-      SUPABASE_URL: !!process.env.SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      NODE_ENV: process.env.NODE_ENV || 'development'
-    };
-
-    // Базовая информация о системе
-    const systemInfo = {
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime ? process.uptime() : 'N/A',
-      memory: process.memoryUsage ? process.memoryUsage() : 'N/A',
-      nodeVersion: process.version || 'N/A'
-    };
-
-    const response = {
+    // Простой health check
+    const healthData = {
       status: 'healthy',
-      message: 'WeareHouse API is running',
-      environment: envCheck,
-      system: systemInfo,
-      endpoints: {
-        health: '/api/health',
-        realtime_notify: '/api/realtime/notify'
+      timestamp: new Date().toISOString(),
+      service: 'warehouse-sync-api',
+      version: '1.0.0'
+    }
+
+    return new Response(
+      JSON.stringify(healthData),
+      { 
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        } 
       }
-    };
-
-    res.status(200).json(response);
-
+    )
   } catch (error) {
-    const errorResponse = {
-      status: 'error',
-      message: 'Health check failed',
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    };
-
-    res.status(500).json(errorResponse);
+    return new Response(
+      JSON.stringify({ 
+        status: 'error', 
+        message: error.message,
+        timestamp: new Date().toISOString()
+      }),
+      { 
+        status: 500,
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        } 
+      }
+    )
   }
-}
+})

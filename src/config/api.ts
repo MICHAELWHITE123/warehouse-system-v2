@@ -63,7 +63,7 @@ export const getApiUrl = (endpoint: string): string => {
   
   // Если это Supabase URL, используем Edge Functions API
   if (baseUrl.includes('supabase.co')) {
-    const cleanBaseUrl = baseUrl.replace(/\/$/, ''); // Убираем trailing slash
+    const cleanBaseUrl = baseUrl.replace(/\.supabase\.co.*$/, '.supabase.co'); // Убираем все после .supabase.co
     return `${cleanBaseUrl}/functions/v1/${endpoint}`;
   }
   
