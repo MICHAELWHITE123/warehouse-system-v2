@@ -6,13 +6,21 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:local": "cp env.development .env.local && vite",
+    "dev:prod": "cp env.production .env.local && vite",
     "build": "tsc && vite build",
+    "build:dev": "cp env.development .env.local && npm run build",
+    "build:prod": "cp env.production .env.local && npm run build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "start": "npm run build && npm run preview",
     "api": "node api-server.cjs",
     "api:json": "json-server --watch db.json --port 3002 --host 0.0.0.0",
-    "vercel-build": "npm run build"
+    "vercel-build": "npm run build",
+    "env:check": "node -e \"console.log('Checking environment variables...'); console.log('VITE_SUPABASE_URL:', process.env.VITE_SUPABASE_URL ? 'SET' : 'NOT SET'); console.log('VITE_API_URL:', process.env.VITE_API_URL ? 'SET' : 'NOT SET');\"",
+    "env:dev": "cp env.development .env.local && echo 'Development environment variables copied to .env.local'",
+    "env:prod": "cp env.production .env.local && echo 'Production environment variables copied to .env.local'",
+    "env:reset": "rm -f .env.local && echo 'Local environment file removed'"
   },
   "dependencies": {
     "@fontsource/noto-sans": "^5.2.7",
