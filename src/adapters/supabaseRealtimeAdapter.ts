@@ -63,6 +63,8 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
   
   const supabaseRef = useRef<SupabaseClient | null>(null);
   const channelsRef = useRef<RealtimeChannel[]>([]);
+  const isConnectingRef = useRef(false);
+  const isDisconnectingRef = useRef(false);
 
   // Инициализация Supabase клиента
   useEffect(() => {
@@ -110,12 +112,15 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
     onAnyChange?.(event);
   }, [onEquipmentChange, onShipmentChange, onCategoryChange, onLocationChange, onStackChange, onAnyChange]);
 
+
+
   // Подключение к таблицам
   const connect = useCallback(() => {
-    if (!supabaseRef.current) {
-      setConnectionError('Supabase client not initialized');
+    if (!supabaseRef.current || isConnectingRef.current || isDisconnectingRef.current) {
       return;
     }
+
+    isConnectingRef.current = true;
 
     // Отключаем существующие каналы
     channelsRef.current.forEach(channel => {
@@ -145,9 +150,11 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
             if (status === 'SUBSCRIBED') {
               setIsConnected(true);
               setConnectionError(null);
+              isConnectingRef.current = false;
             } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
               setIsConnected(false);
               setConnectionError(`Connection error for table ${table}`);
+              isConnectingRef.current = false;
               
               if (autoReconnect) {
                 setTimeout(() => connect(), 5000);
@@ -161,6 +168,7 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
     } catch (error) {
       console.error('❌ Failed to connect to Supabase Realtime:', error);
       setConnectionError(error instanceof Error ? error.message : 'Connection failed');
+      isConnectingRef.current = false;
     }
   }, [tables, handleRealtimeEvent, autoReconnect]);
 

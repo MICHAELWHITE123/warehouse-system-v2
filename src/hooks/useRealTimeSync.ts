@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useMemo } from 'react';
 import { useSupabaseRealtime } from '../adapters/supabaseRealtimeAdapter';
 
 interface RealTimeEvent {
@@ -33,15 +33,9 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<RealTimeEvent | null>(null);
 
-  // Используем Supabase Realtime адаптер
-  const {
-    isConnected: supabaseConnected,
-    connectionError: supabaseError,
-    connect: supabaseConnect,
-    disconnect: supabaseDisconnect
-  } = useSupabaseRealtime({
-    tables: ['equipment', 'shipments', 'categories', 'locations', 'equipment_stacks'],
-    onEquipmentChange: (event) => {
+  // Мемоизируем обработчики для стабильности
+  const memoizedHandlers = useMemo(() => ({
+    onEquipmentChange: (event: any) => {
       const realtimeEvent: RealTimeEvent = {
         type: 'equipment_update',
         action: event.type === 'INSERT' ? 'create' : event.type === 'UPDATE' ? 'update' : 'delete',
@@ -52,7 +46,7 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
       onAnyUpdate?.(realtimeEvent);
       setLastUpdate(realtimeEvent);
     },
-    onShipmentChange: (event) => {
+    onShipmentChange: (event: any) => {
       const realtimeEvent: RealTimeEvent = {
         type: 'shipment_update',
         action: event.type === 'INSERT' ? 'create' : event.type === 'UPDATE' ? 'update' : 'delete',
@@ -63,7 +57,7 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
       onAnyUpdate?.(realtimeEvent);
       setLastUpdate(realtimeEvent);
     },
-    onCategoryChange: (event) => {
+    onCategoryChange: (event: any) => {
       const realtimeEvent: RealTimeEvent = {
         type: 'category_update',
         action: event.type === 'INSERT' ? 'create' : event.type === 'UPDATE' ? 'update' : 'delete',
@@ -74,7 +68,7 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
       onAnyUpdate?.(realtimeEvent);
       setLastUpdate(realtimeEvent);
     },
-    onLocationChange: (event) => {
+    onLocationChange: (event: any) => {
       const realtimeEvent: RealTimeEvent = {
         type: 'location_update',
         action: event.type === 'INSERT' ? 'create' : event.type === 'UPDATE' ? 'update' : 'delete',
@@ -85,7 +79,7 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
       onAnyUpdate?.(realtimeEvent);
       setLastUpdate(realtimeEvent);
     },
-    onStackChange: (event) => {
+    onStackChange: (event: any) => {
       const realtimeEvent: RealTimeEvent = {
         type: 'stack_update',
         action: event.type === 'INSERT' ? 'create' : event.type === 'UPDATE' ? 'update' : 'delete',
@@ -95,7 +89,18 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
       onStackUpdate?.(realtimeEvent);
       onAnyUpdate?.(realtimeEvent);
       setLastUpdate(realtimeEvent);
-    },
+    }
+  }), [onEquipmentUpdate, onShipmentUpdate, onCategoryUpdate, onLocationUpdate, onStackUpdate, onAnyUpdate]);
+
+  // Используем Supabase Realtime адаптер
+  const {
+    isConnected: supabaseConnected,
+    connectionError: supabaseError,
+    connect: supabaseConnect,
+    disconnect: supabaseDisconnect
+  } = useSupabaseRealtime({
+    tables: ['equipment', 'shipments', 'categories', 'locations', 'equipment_stacks'],
+    ...memoizedHandlers,
     autoReconnect
   });
 
