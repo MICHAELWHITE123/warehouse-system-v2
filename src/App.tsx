@@ -22,6 +22,7 @@ import { calculateStats } from "./utils/statistics";
 import { useTheme } from "./hooks/useTheme";
 import { useAuth } from "./hooks/useAuth";
 import { useDatabase, useEquipment, useCategories, useLocations, useStacks, useShipments, useStatistics } from "./hooks/useDatabase";
+import { useRealTimeSync } from "./hooks/useRealTimeSync";
 import { 
   adaptEquipmentFromDB, 
   adaptStackFromDB, 
@@ -34,6 +35,14 @@ import {
 } from "./adapters/databaseAdapter";
 import { stackService } from "./database/services";
 
+// Тип для realtime событий
+interface RealTimeEvent {
+  type: string;
+  action: 'create' | 'update' | 'delete';
+  data: any;
+  timestamp: string;
+}
+
 export default function App() {
   const { user, handleLogin, handleLogout } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
@@ -42,11 +51,11 @@ export default function App() {
   const { isInitialized, error: dbError } = useDatabase();
   
   // Хуки для работы с данными из БД
-  const { equipment: dbEquipment, createEquipment, updateEquipment, deleteEquipment } = useEquipment();
-  const { categories: dbCategories } = useCategories();
-  const { locations: dbLocations } = useLocations();
-  const { stacks: dbStacks, createStack, updateStack, deleteStack } = useStacks();
-  const { shipments: dbShipments, createShipmentWithDetails, updateShipment, deleteShipment } = useShipments();
+  const { equipment: dbEquipment, createEquipment, updateEquipment, deleteEquipment, loadEquipment } = useEquipment();
+  const { categories: dbCategories, loadCategories } = useCategories();
+  const { locations: dbLocations, loadLocations } = useLocations();
+  const { stacks: dbStacks, createStack, updateStack, deleteStack, loadStacks } = useStacks();
+  const { shipments: dbShipments, createShipmentWithDetails, updateShipment, deleteShipment, loadShipments } = useShipments();
   const { stats: dbStats } = useStatistics();
   
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
@@ -84,6 +93,58 @@ export default function App() {
   const stats = dbStats || calculateStats(equipment, stacks, shipments);
 
   const notificationCount = stats.maintenanceEquipment;
+
+  // Real-time синхронизация для автоматического обновления UI
+  const { isConnected: realtimeConnected, lastUpdate } = useRealTimeSync({
+    onEquipmentUpdate: (event: RealTimeEvent) => {
+      console.log('🔄 Real-time equipment update received:', event);
+      // Обновляем данные оборудования при получении realtime события
+      if (loadEquipment) {
+        loadEquipment();
+      }
+    },
+    onShipmentUpdate: (event: RealTimeEvent) => {
+      console.log('🔄 Real-time shipment update received:', event);
+      // Обновляем данные поставок при получении realtime события
+      if (loadShipments) {
+        loadShipments();
+      }
+    },
+    onStackUpdate: (event: RealTimeEvent) => {
+      console.log('🔄 Real-time stack update received:', event);
+      // Обновляем данные стеков при получении realtime события
+      if (loadStacks) {
+        loadStacks();
+      }
+    },
+    onCategoryUpdate: (event: RealTimeEvent) => {
+      console.log('🔄 Real-time category update received:', event);
+      // Обновляем данные категорий при получении realtime события
+      if (loadCategories) {
+        loadCategories();
+      }
+    },
+    onLocationUpdate: (event: RealTimeEvent) => {
+      console.log('🔄 Real-time location update received:', event);
+      // Обновляем данные локаций при получении realtime события
+      if (loadLocations) {
+        loadLocations();
+      }
+    },
+    onAnyUpdate: (event: RealTimeEvent) => {
+      console.log('🔄 Real-time update received:', event);
+      // Показываем уведомление пользователю
+      toast.success(`Данные обновлены: ${event.type}`);
+    }
+  });
+
+  // Логируем статус realtime подключения для отладки
+  useEffect(() => {
+    console.log('🔄 Realtime connection status:', realtimeConnected);
+    if (lastUpdate) {
+      console.log('🔄 Last realtime update:', lastUpdate);
+    }
+  }, [realtimeConnected, lastUpdate]);
 
   // Обработчики для оборудования
   const handleAddEquipment = async (newEquipment: Omit<Equipment, 'id'>) => {

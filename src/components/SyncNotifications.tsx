@@ -235,7 +235,7 @@ export const SyncNotifications: React.FC = () => {
     <div className="w-full space-y-2">
       {renderNotification()}
       
-            {/* Дополнительные действия для конфликтов */}
+      {/* Дополнительные действия для конфликтов */}
       {notificationType === 'conflict' && (
         <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
           <div className="text-sm text-red-700">
@@ -258,16 +258,16 @@ export const SyncNotifications: React.FC = () => {
             >
               Перезапустить
             </Button>
-              <Button
-                size="sm"
+            <Button
+              size="sm"
               variant="outline"
               onClick={clearSyncQueue}
             >
               Очистить очередь
-              </Button>
+            </Button>
           </div>
-            </div>
-          )}
+        </div>
+      )}
     </div>
   );
 };
