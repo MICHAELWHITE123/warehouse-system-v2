@@ -1099,16 +1099,15 @@ class SyncAdapter {
             return;
           }
         }
-      } catch (testError) {
-        console.log('Supabase accessibility test failed, switching to local sync mode permanently:', testError);
-        this.syncMode = 'local';
-        this.lastSyncAttempt = now; // Устанавливаем время последней попытки
-        const pendingOperations = this.syncQueue.filter(op => op.status === 'pending');
-        if (pendingOperations.length > 0) {
-          await this.performLocalSync(pendingOperations);
-        }
-        return;
-      }
+             } catch (testError) {
+         console.log('Supabase accessibility test failed, but continuing with hybrid mode:', testError);
+         // Не переключаемся в локальный режим принудительно, продолжаем работать в гибридном
+         const pendingOperations = this.syncQueue.filter(op => op.status === 'pending');
+         if (pendingOperations.length > 0) {
+           await this.performLocalSync(pendingOperations);
+         }
+         return;
+       }
     }
     
     if (this.isOnline) {
@@ -1157,8 +1156,8 @@ class SyncAdapter {
     this.lastSyncAttempt = 0;
     this.lastOperationAdd = 0;
     this.lastStatusUpdate = 0;
-    // Не сбрасываем syncMode если он был принудительно установлен в local
-    if (!this.isForcedLocalMode && this.syncMode !== 'local') {
+    // Разрешаем возврат в гибридный режим, если не было принудительного переключения
+    if (!this.isForcedLocalMode) {
       this.syncMode = 'hybrid';
     }
     console.log('All flags and timeouts reset, mode:', this.syncMode, 'forced:', this.isForcedLocalMode);
