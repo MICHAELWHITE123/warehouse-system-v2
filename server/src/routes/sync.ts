@@ -1,11 +1,22 @@
 import { Router } from 'express';
 import { deviceAuth, hybridAuth, logRequest } from '../middleware/auth';
-import { syncRateLimit } from '../middleware/rateLimit';
+import { syncRateLimit, deviceSyncRateLimit } from '../middleware/rateLimit';
 
 const router = Router();
 
-// Rate limiting для всех sync endpoints
-router.use(syncRateLimit);
+// Rate limiting для legacy endpoints (более мягкий)
+// Можно отключить в production, установив SYNC_RATE_LIMIT_DISABLED=true
+if (process.env.SYNC_RATE_LIMIT_DISABLED !== 'true') {
+  router.use('/operations', deviceSyncRateLimit);
+  router.use('/', deviceSyncRateLimit);
+  
+  // Rate limiting для modern endpoints (стандартный)
+  router.use('/v2', syncRateLimit);
+  
+  console.log('🛡️ Rate limiting enabled for sync endpoints');
+} else {
+  console.log('⚠️ Rate limiting disabled for sync endpoints');
+}
 
 // ========================================
 // LEGACY ENDPOINTS (DEVICE AUTHENTICATION)

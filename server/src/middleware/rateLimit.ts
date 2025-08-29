@@ -64,10 +64,10 @@ export const apiRateLimit = createRateLimiter({
   message: 'Too many requests from this IP, please try again later.'
 });
 
-// Rate limiter для sync endpoints
+// Rate limiter для sync endpoints (увеличен лимит)
 export const syncRateLimit = createRateLimiter({
   windowMs: 60000, // 1 минута
-  maxRequests: 30, // 30 запросов в минуту
+  maxRequests: 100, // 100 запросов в минуту (было 30)
   message: 'Too many sync requests, please slow down.'
 });
 
@@ -76,4 +76,11 @@ export const authRateLimit = createRateLimiter({
   windowMs: 300000, // 5 минут
   maxRequests: 5, // 5 попыток входа в 5 минут
   message: 'Too many authentication attempts, please try again later.'
+});
+
+// Rate limiter для device-specific sync (очень мягкий)
+export const deviceSyncRateLimit = createRateLimiter({
+  windowMs: 60000, // 1 минута
+  maxRequests: 200, // 200 запросов в минуту для устройств
+  message: 'Device sync rate limit exceeded, please wait a moment.'
 });
