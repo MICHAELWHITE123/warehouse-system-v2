@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import { testConnection } from './config/database-postgresql';
 import { migrator } from './database/migrator';
 import apiRoutes from './routes';
+import { apiRateLimit } from './middleware/rateLimit';
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -28,11 +29,17 @@ app.use(cors({
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Device-ID']
 }));
 app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Rate limiting для всех API запросов
+if (process.env.RATE_LIMIT_ENABLED === 'true') {
+  app.use('/api', apiRateLimit);
+  console.log('🛡️ Rate limiting enabled for API endpoints');
+}
 
 // API маршруты
 app.use('/api', apiRoutes);
