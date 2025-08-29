@@ -61,7 +61,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           status: 'success',
-          message: 'Events endpoint is working',
+          message: 'Realtime events endpoint is working',
           timestamp: new Date().toISOString(),
           stream: stream || 'none',
           authenticated: !!apikey
