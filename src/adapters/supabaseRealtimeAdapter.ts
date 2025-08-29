@@ -1,5 +1,6 @@
-import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
+import { RealtimeChannel } from '@supabase/supabase-js';
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { supabase } from './supabaseAdapter'; // Используем единый экземпляр
 
 // Типы для real-time событий
 interface RealtimeEvent {
@@ -21,29 +22,6 @@ interface UseSupabaseRealtimeOptions {
   autoReconnect?: boolean;
 }
 
-// Создаем клиент Supabase с оптимизированными настройками для Realtime
-export function createOptimizedSupabaseClient() {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing Supabase environment variables');
-  }
-
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    realtime: {
-      params: {
-        eventsPerSecond: 10, // Ограничиваем количество событий
-        heartbeatIntervalMs: 30000, // Heartbeat каждые 30 секунд
-        reconnectAfterMs: (tries: number) => {
-          // Экспоненциальная задержка переподключения
-          return Math.min(tries * 1000, 10000);
-        }
-      }
-    }
-  });
-}
-
 // Основной хук для работы с Supabase Realtime
 export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
   const {
@@ -61,25 +39,10 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [lastEvent, setLastEvent] = useState<RealtimeEvent | null>(null);
   
-  const supabaseRef = useRef<SupabaseClient | null>(null);
   const channelsRef = useRef<RealtimeChannel[]>([]);
   const isConnectingRef = useRef(false);
   const isDisconnectingRef = useRef(false);
   const hasInitializedRef = useRef(false);
-
-  // Инициализация Supabase клиента
-  useEffect(() => {
-    if (hasInitializedRef.current) {
-      return; // Предотвращаем повторную инициализацию
-    }
-    
-    try {
-      supabaseRef.current = createOptimizedSupabaseClient();
-      hasInitializedRef.current = true;
-    } catch (error) {
-      setConnectionError(error instanceof Error ? error.message : 'Failed to initialize Supabase');
-    }
-  }, []);
 
   // Обработчик событий
   const handleRealtimeEvent = useCallback((payload: any) => {
@@ -120,7 +83,7 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
 
   // Подключение к таблицам
   const connect = useCallback(() => {
-    if (!supabaseRef.current || isConnectingRef.current || isDisconnectingRef.current || isConnected) {
+    if (isConnectingRef.current || isDisconnectingRef.current || isConnected) {
       return; // Предотвращаем повторные подключения
     }
 
@@ -130,13 +93,13 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
     try {
       // Отключаем существующие каналы
       channelsRef.current.forEach(channel => {
-        supabaseRef.current?.removeChannel(channel);
+        supabase.removeChannel(channel);
       });
       channelsRef.current = [];
 
       // Создаем каналы для каждой таблицы
       tables.forEach(table => {
-        const channel = supabaseRef.current!
+        const channel = supabase
           .channel(`public:${table}`)
           .on(
             'postgres_changes',
@@ -185,7 +148,7 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
     console.log('🔌 Disconnecting from Supabase Realtime');
     
     channelsRef.current.forEach(channel => {
-      supabaseRef.current?.removeChannel(channel);
+      supabase.removeChannel(channel);
     });
     channelsRef.current = [];
     
@@ -196,7 +159,8 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
 
   // Автоподключение при монтировании
   useEffect(() => {
-    if (supabaseRef.current && !isConnected && !isConnectingRef.current && !hasInitializedRef.current) {
+    if (!isConnected && !isConnectingRef.current && !hasInitializedRef.current) {
+      hasInitializedRef.current = true;
       connect();
     }
 
@@ -210,15 +174,11 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
 
   // Функция для уведомления других клиентов через изменение в БД
   const notifyChange = useCallback(async (table: string, action: 'INSERT' | 'UPDATE' | 'DELETE', data: any) => {
-    if (!supabaseRef.current) {
-      throw new Error('Supabase client not initialized');
-    }
-
     try {
       // Для Supabase Realtime уведомления происходят автоматически 
       // при изменении данных в таблице, но мы можем также использовать
       // специальную таблицу для кастомных уведомлений
-      const { error } = await supabaseRef.current
+      const { error } = await supabase
         .from('realtime_events') // Опциональная таблица для кастомных событий
         .insert({
           table_name: table,
@@ -246,7 +206,7 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
     connect,
     disconnect,
     notifyChange,
-    supabase: supabaseRef.current
+    supabase
   };
 }
 
@@ -269,5 +229,5 @@ export function useShipmentRealtime() {
   });
 }
 
-// Экспорт готового клиента для использования в других частях приложения
-export const supabaseClient = createOptimizedSupabaseClient();
+// Экспортируем единый экземпляр клиента
+export { supabase as supabaseClient };

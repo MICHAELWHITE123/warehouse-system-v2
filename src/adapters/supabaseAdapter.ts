@@ -7,7 +7,19 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Создаем единый экземпляр Supabase клиента для всего приложения
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  realtime: {
+    params: {
+      eventsPerSecond: 10, // Ограничиваем количество событий
+      heartbeatIntervalMs: 30000, // Heartbeat каждые 30 секунд
+      reconnectAfterMs: (tries: number) => {
+        // Экспоненциальная задержка переподключения
+        return Math.min(tries * 1000, 10000);
+      }
+    }
+  }
+});
 
 // Auth helpers
 export const auth = {

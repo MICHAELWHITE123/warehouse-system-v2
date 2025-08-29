@@ -262,5 +262,46 @@ return () => {
 
 - `src/hooks/useSync.ts` - добавлен Singleton паттерн
 - `src/database/syncAdapter.ts` - оптимизированы задержки и добавлена глобальная очистка
+- `src/adapters/supabaseAdapter.ts` - создан единый экземпляр Supabase клиента
+- `src/adapters/supabaseRealtimeAdapter.ts` - использует единый экземпляр клиента
+- `src/hooks/useEquipmentSupabaseSync.ts` - обновлен для использования единого клиента
+
+## 🆕 Дополнительные исправления
+
+### 7. Устранение "Multiple GoTrueClient instances"
+
+**Проблема:** В приложении создавалось несколько экземпляров Supabase клиента, что вызывало предупреждение:
+
+```
+Multiple GoTrueClient instances detected in the same browser context. 
+It is not an error, but this should be avoided as it may produce 
+undefined behavior when used concurrently under the same storage key.
+```
+
+**Причина:** Три разных файла создавали свои экземпляры:
+- `supabaseAdapter.ts` - основной клиент
+- `supabaseRealtimeAdapter.ts` - клиент для realtime  
+- `useEquipmentSupabaseSync.ts` - импорт отдельного клиента
+
+**Решение:** Создан единый экземпляр в `supabaseAdapter.ts`:
+
+```typescript
+// Создаем единый экземпляр Supabase клиента для всего приложения
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+      heartbeatIntervalMs: 30000,
+      reconnectAfterMs: (tries: number) => {
+        return Math.min(tries * 1000, 10000);
+      }
+    }
+  }
+});
+```
+
+Все остальные файлы теперь импортируют и используют этот единый экземпляр.
+
+**Результат:** ✅ Предупреждение "Multiple GoTrueClient instances" больше не появляется
 
 Теперь ваше приложение должно работать стабильно с Supabase Realtime! 🎉

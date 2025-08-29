@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSupabaseRealtime } from '../adapters/supabaseRealtimeAdapter';
-import { supabaseClient } from '../adapters/supabaseRealtimeAdapter';
+import { supabase } from '../adapters/supabaseAdapter'; // Используем единый экземпляр
 import type { Equipment } from '../components/EquipmentList';
 
 // Типы для Supabase схемы
@@ -72,7 +72,7 @@ export function useEquipmentSupabaseSync() {
       setLoading(true);
       setError(null);
 
-      const { data, error: supabaseError } = await supabaseClient
+      const { data, error: supabaseError } = await supabase
         .from('equipment')
         .select(`
           *,
@@ -103,8 +103,8 @@ export function useEquipmentSupabaseSync() {
     try {
       // Получаем ID категории и локации по именам
       const [categoriesResult, locationsResult] = await Promise.all([
-        supabaseClient.from('categories').select('id, name'),
-        supabaseClient.from('locations').select('id, name')
+        supabase.from('categories').select('id, name'),
+        supabase.from('locations').select('id, name')
       ]);
 
       const category = categoriesResult.data?.find(c => c.name === equipmentData.category);
@@ -124,7 +124,7 @@ export function useEquipmentSupabaseSync() {
         description: equipmentData.specifications || null
       };
 
-      const { data, error: supabaseError } = await supabaseClient
+      const { data, error: supabaseError } = await supabase
         .from('equipment')
         .insert(newEquipmentData)
         .select(`
@@ -157,8 +157,8 @@ export function useEquipmentSupabaseSync() {
     try {
       // Получаем ID категории и локации по именам
       const [categoriesResult, locationsResult] = await Promise.all([
-        supabaseClient.from('categories').select('id, name'),
-        supabaseClient.from('locations').select('id, name')
+        supabase.from('categories').select('id, name'),
+        supabase.from('locations').select('id, name')
       ]);
 
       const category = categoriesResult.data?.find(c => c.name === equipmentData.category);
@@ -178,7 +178,7 @@ export function useEquipmentSupabaseSync() {
         updated_at: new Date().toISOString()
       };
 
-      const { data, error: supabaseError } = await supabaseClient
+      const { data, error: supabaseError } = await supabase
         .from('equipment')
         .update(updateData)
         .eq('uuid', equipmentData.id)
@@ -209,7 +209,7 @@ export function useEquipmentSupabaseSync() {
   // Удаление оборудования
   const deleteEquipment = useCallback(async (equipmentId: string) => {
     try {
-      const { error: supabaseError } = await supabaseClient
+      const { error: supabaseError } = await supabase
         .from('equipment')
         .delete()
         .eq('uuid', equipmentId);
@@ -262,8 +262,8 @@ export function useEquipmentOptions() {
     const loadOptions = async () => {
       try {
         const [categoriesResult, locationsResult] = await Promise.all([
-          supabaseClient.from('categories').select('name').order('name'),
-          supabaseClient.from('locations').select('name').order('name')
+          supabase.from('categories').select('name').order('name'),
+          supabase.from('locations').select('name').order('name')
         ]);
 
         setCategories(categoriesResult.data?.map(c => c.name) || []);
