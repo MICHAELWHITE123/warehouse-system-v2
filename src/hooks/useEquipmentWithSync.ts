@@ -5,7 +5,6 @@ import {
 import type { 
   EquipmentWithRelations
 } from '../database/types';
-import { initDatabase } from '../database';
 import { useRealTimeSync } from './useRealTimeSync';
 
 // Хук для работы с оборудованием с real-time синхронизацией

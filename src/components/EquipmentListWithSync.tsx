@@ -122,19 +122,14 @@ export function EquipmentListWithSync({ onEdit, onView }: EquipmentListWithSyncP
     }
   };
 
-  const handleQRScan = (scannedId: string) => {
-    const foundEquipment = equipment.find(item => 
-      item.id === scannedId || 
-      item.serialNumber === scannedId ||
-      item.uuid === scannedId
-    );
-    
-    if (foundEquipment) {
-      onView(foundEquipment);
+  const handleQRScan = (scannedEquipment: Equipment) => {
+    // Если QR-код содержит данные оборудования, используем их напрямую
+    if (scannedEquipment && scannedEquipment.id) {
+      onView(scannedEquipment);
       setIsQRScannerOpen(false);
-      toast.success(`Найдено: ${foundEquipment.name}`);
+      toast.success(`Найдено: ${scannedEquipment.name}`);
     } else {
-      toast.error("Оборудование не найдено");
+      toast.error("Неверный формат QR-кода");
     }
   };
 
@@ -375,7 +370,7 @@ export function EquipmentListWithSync({ onEdit, onView }: EquipmentListWithSyncP
         <QRScanner
           isOpen={isQRScannerOpen}
           onClose={() => setIsQRScannerOpen(false)}
-          onScan={handleQRScan}
+          onScanSuccess={handleQRScan}
         />
       </CardContent>
     </Card>
