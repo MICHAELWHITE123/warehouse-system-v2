@@ -99,8 +99,19 @@
                 eventSource.close();
             }
             
-                  addLog('🔗 Подключение к ' + API_URL + '/functions/v1/events?stream=stream');
-      eventSource = new EventSource(API_URL + '/functions/v1/events?stream=stream');
+            // Для Supabase Edge Functions добавляем токен в URL
+            let eventSourceUrl = API_URL + '/functions/v1/events?stream=stream';
+            
+            // Если это Supabase, добавляем токен в URL
+            if (API_URL.includes('supabase.co')) {
+                const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhla29pYnd2YnNicGpjanFtamx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzMDE5NzEsImV4cCI6MjA3MTg3Nzk3MX0.q4InFPBY5l8zZKpryR0zOt9OID7eTA-2MmRf78QKi1k';
+                if (supabaseKey) {
+                    eventSourceUrl += '&apikey=' + supabaseKey;
+                }
+            }
+            
+            addLog('🔗 Подключение к ' + eventSourceUrl);
+            eventSource = new EventSource(eventSourceUrl);
             
             eventSource.onopen = function(event) {
                 addLog('✅ Соединение установлено');

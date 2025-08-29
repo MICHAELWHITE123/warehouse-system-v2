@@ -16,6 +16,27 @@ serve(async (req) => {
   }
 
   try {
+    // Проверяем аутентификацию
+    const authHeader = req.headers.get('authorization')
+    const apikeyHeader = req.headers.get('apikey')
+    
+    if (!authHeader && !apikeyHeader) {
+      return new Response(
+        JSON.stringify({
+          status: 'error',
+          message: 'Missing authentication headers',
+          timestamp: new Date().toISOString()
+        }),
+        {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+    }
+    
     if (req.method === 'POST') {
       // Handle sync operations
       const body = await req.json()
@@ -28,7 +49,8 @@ serve(async (req) => {
           deviceId: body.deviceId,
           lastSync: body.lastSync,
           timestamp: new Date().toISOString(),
-          result: 'synced'
+          result: 'synced',
+          authenticated: true
         }),
         {
           headers: {
@@ -53,7 +75,8 @@ serve(async (req) => {
           deviceId: deviceId || 'unknown',
           lastSync: lastSync || 0,
           timestamp: new Date().toISOString(),
-          data: [] // Пустой массив для тестирования
+          data: [], // Пустой массив для тестирования
+          authenticated: true
         }),
         {
           headers: {

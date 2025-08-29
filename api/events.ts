@@ -20,6 +20,25 @@ serve(async (req) => {
       // Real-time events stream
       const url = new URL(req.url)
       const stream = url.searchParams.get('stream')
+      const apikey = url.searchParams.get('apikey')
+      
+      // Проверяем аутентификацию
+      if (!apikey) {
+        return new Response(
+          JSON.stringify({
+            status: 'error',
+            message: 'Missing apikey parameter',
+            timestamp: new Date().toISOString()
+          }),
+          {
+            status: 401,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+      }
       
       if (stream === 'stream') {
         // Простой EventSource response
@@ -44,7 +63,8 @@ serve(async (req) => {
           status: 'success',
           message: 'Events endpoint is working',
           timestamp: new Date().toISOString(),
-          stream: stream || 'none'
+          stream: stream || 'none',
+          authenticated: !!apikey
         }),
         {
           headers: {

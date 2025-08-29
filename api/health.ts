@@ -16,6 +16,27 @@ serve(async (req) => {
   }
 
   try {
+    // Проверяем аутентификацию
+    const authHeader = req.headers.get('authorization')
+    const apikeyHeader = req.headers.get('apikey')
+    
+    if (!authHeader && !apikeyHeader) {
+      return new Response(
+        JSON.stringify({
+          status: 'error',
+          message: 'Missing authentication headers',
+          timestamp: new Date().toISOString()
+        }),
+        {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+    }
+    
     // Простой health check
     const healthData = {
       status: 'healthy',
@@ -23,6 +44,7 @@ serve(async (req) => {
       service: 'warehouse-sync-api',
       version: '1.0.0',
       cors: 'enabled',
+      authenticated: true,
       endpoints: {
         health: '/functions/v1/health',
         events: '/functions/v1/events',

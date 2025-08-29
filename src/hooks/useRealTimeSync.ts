@@ -44,9 +44,20 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
       eventSourceRef.current.close();
     }
 
-          try {
-        const eventSource = new EventSource(`${API_BASE_URL}/functions/v1/events?stream=stream`);
-        eventSourceRef.current = eventSource;
+    try {
+      // Для Supabase Edge Functions используем URL с токеном
+      let eventSourceUrl = `${API_BASE_URL}/functions/v1/events?stream=stream`;
+      
+      // Если это Supabase, добавляем токен в URL
+      if (API_BASE_URL.includes('supabase.co')) {
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (supabaseKey) {
+          eventSourceUrl += `&apikey=${supabaseKey}`;
+        }
+      }
+      
+      const eventSource = new EventSource(eventSourceUrl);
+      eventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
         console.log('🔗 Real-time connection established');
