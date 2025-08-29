@@ -7,6 +7,7 @@ import equipmentRoutes from './equipment';
 import stackRoutes from './stacks';
 import shipmentRoutes from './shipments';
 import statisticsRoutes from './statistics';
+import eventsRoutes from './events';
 import syncRoutes from './sync';
 import deviceRoutes from './devices';
 
@@ -19,7 +20,7 @@ router.get('/', (req, res) => {
     message: 'API is working',
     version: '2.0.0',
     features: ['auth', 'sync', 'devices', 'inventory'],
-    routes: ['/auth', '/users', '/categories', '/locations', '/equipment', '/stacks', '/shipments', '/statistics', '/sync', '/devices']
+    routes: ['/auth', '/users', '/categories', '/locations', '/equipment', '/stacks', '/shipments', '/statistics', '/events', '/sync', '/devices']
   });
 });
 
@@ -47,6 +48,7 @@ router.use('/equipment', equipmentRoutes);
 router.use('/stacks', stackRoutes);
 router.use('/shipments', shipmentRoutes);
 router.use('/statistics', statisticsRoutes);
+router.use('/events', eventsRoutes);
 router.use('/sync', syncRoutes);
 router.use('/devices', deviceRoutes);
 

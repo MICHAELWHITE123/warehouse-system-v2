@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест Real-Time Синхронизации</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px;
+        }
+        .status { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .log { 
+            background-color: #f8f9fa; 
+            border: 1px solid #dee2e6; 
+            padding: 15px; 
+            height: 300px; 
+            overflow-y: auto; 
+            font-family: monospace; 
+            font-size: 12px;
+        }
+        button { 
+            background-color: #007bff; 
+            color: white; 
+            border: none; 
+            padding: 10px 15px; 
+            margin: 5px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <h1>🚀 Тест Real-Time Синхронизации</h1>
+    
+    <div id="status" class="status disconnected">
+        ❌ Не подключено
+    </div>
+    
+    <div>
+        <button id="connectBtn">Подключиться</button>
+        <button id="disconnectBtn" disabled>Отключиться</button>
+        <button id="clearBtn">Очистить лог</button>
+    </div>
+    
+    <h3>Тестовые уведомления:</h3>
+    <div>
+        <button id="testEquipment">Тест Equipment Update</button>
+        <button id="testShipment">Тест Shipment Update</button>
+        <button id="testCategory">Тест Category Update</button>
+    </div>
+    
+    <h3>Лог событий:</h3>
+    <div id="log" class="log"></div>
+
+    <script>
+        const API_URL = 'http://localhost:3001';
+        let eventSource = null;
+        
+        const statusEl = document.getElementById('status');
+        const logEl = document.getElementById('log');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logLine = `[${timestamp}] ${message}\n`;
+            logEl.textContent += logLine;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+        
+        function updateStatus(connected, message = '') {
+            if (connected) {
+                statusEl.textContent = '✅ Подключено ' + message;
+                statusEl.className = 'status connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            } else {
+                statusEl.textContent = '❌ Не подключено ' + message;
+                statusEl.className = 'status disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+            }
+        }
+        
+        function connect() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            addLog('🔗 Подключение к ' + API_URL + '/api/events/stream');
+            eventSource = new EventSource(API_URL + '/api/events/stream');
+            
+            eventSource.onopen = function(event) {
+                addLog('✅ Соединение установлено');
+                updateStatus(true);
+            };
+            
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    addLog('📨 Получено: ' + JSON.stringify(data, null, 2));
+                } catch (e) {
+                    addLog('📨 Получено (raw): ' + event.data);
+                }
+            };
+            
+            eventSource.onerror = function(event) {
+                addLog('❌ Ошибка соединения: ' + event.type);
+                updateStatus(false, '(ошибка)');
+            };
+        }
+        
+        function disconnect() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                addLog('🔌 Соединение закрыто');
+                updateStatus(false);
+            }
+        }
+        
+        async function sendTestNotification(type, action = 'update') {
+            const testData = {
+                equipment: { id: '1', name: 'Test Equipment', status: 'available' },
+                shipment: { id: '1', number: 'SHIP-001', status: 'preparing' },
+                category: { id: '1', name: 'Test Category' }
+            };
+            
+            try {
+                addLog(`📤 Отправка тестового уведомления: ${type}/${action}`);
+                const response = await fetch(`${API_URL}/api/events/notify/${type}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: action,
+                        data: testData[type] || { test: true }
+                    })
+                });
+                
+                if (response.ok) {
+                    addLog(`✅ Уведомление отправлено: ${type}/${action}`);
+                } else {
+                    addLog(`❌ Ошибка отправки: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                addLog(`❌ Ошибка отправки: ${error.message}`);
+            }
+        }
+        
+        // Event listeners
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        clearBtn.addEventListener('click', () => logEl.textContent = '');
+        
+        document.getElementById('testEquipment').addEventListener('click', () => 
+            sendTestNotification('equipment', 'update'));
+        document.getElementById('testShipment').addEventListener('click', () => 
+            sendTestNotification('shipment', 'create'));
+        document.getElementById('testCategory').addEventListener('click', () => 
+            sendTestNotification('category', 'delete'));
+        
+        // Автоподключение при загрузке
+        addLog('🚀 Страница загружена. Нажмите "Подключиться" для начала теста.');
+        addLog('💡 Сначала убедитесь, что сервер запущен на http://localhost:3001');
+    </script>
+</body>
+</html>
