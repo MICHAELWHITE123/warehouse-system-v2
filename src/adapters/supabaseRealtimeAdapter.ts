@@ -110,6 +110,8 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
             },
             (payload) => {
               console.log(`📨 Realtime event for table ${table}:`, payload);
+              console.log(`🔍 Payload type:`, typeof payload);
+              console.log(`🔍 Payload keys:`, Object.keys(payload || {}));
               
               // Преобразуем payload в формат, ожидаемый обработчиками
               const event = {
@@ -120,7 +122,10 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
                 timestamp: new Date().toISOString()
               };
               
+              console.log(`🔍 Transformed event:`, event);
+              
               // Вызываем обработчик события
+              console.log(`🔍 Calling handleRealtimeEvent for table ${table}`);
               handleRealtimeEvent(event);
             }
           )
