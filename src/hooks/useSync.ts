@@ -1,11 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { syncAdapter, type SyncStatus } from '../database/syncAdapter';
 import { useAuth } from './useAuth';
+
+// Флаг для отслеживания инициализации
+let isInitialized = false;
 
 export const useSync = () => {
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
+  const initializationRef = useRef(false);
 
   // Обновление статуса синхронизации
   const updateStatus = useCallback(() => {
@@ -42,11 +46,21 @@ export const useSync = () => {
 
   // Запуск автоматической синхронизации
   const startAutoSync = useCallback((intervalMs: number = 30000) => {
+    // Предотвращаем повторный запуск
+    if (isInitialized) {
+      console.log('Auto sync already running, skipping...');
+      return;
+    }
     syncAdapter.startAutoSync(intervalMs);
   }, []);
 
   // Остановка автоматической синхронизации
   const stopAutoSync = useCallback(() => {
+    // Предотвращаем повторную остановку
+    if (!isInitialized) {
+      console.log('Auto sync not running, skipping...');
+      return;
+    }
     syncAdapter.stopAutoSync();
   }, []);
 
@@ -125,6 +139,14 @@ export const useSync = () => {
   }, [updateStatus]);
 
   useEffect(() => {
+    // Предотвращаем повторную инициализацию
+    if (initializationRef.current || isInitialized) {
+      return;
+    }
+
+    initializationRef.current = true;
+    isInitialized = true;
+
     // Устанавливаем пользователя в адаптер синхронизации
     if (user?.username) {
       syncAdapter.setUser(user.username);
@@ -147,9 +169,10 @@ export const useSync = () => {
 
     return () => {
       window.removeEventListener('sync-conflict', handleSyncEvent);
-      stopAutoSync();
+      // НЕ останавливаем автосинхронизацию при размонтировании компонента
+      // Это позволит другим компонентам продолжать использовать синхронизацию
     };
-  }, [user?.username, updateStatus, startAutoSync, stopAutoSync, forceSync]);
+  }, [user?.username, updateStatus, startAutoSync, forceSync]);
 
   // Обновляем статус каждые 5 секунд
   useEffect(() => {

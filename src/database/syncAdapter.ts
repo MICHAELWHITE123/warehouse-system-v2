@@ -46,7 +46,7 @@ class SyncAdapter {
   private syncInterval: NodeJS.Timeout | null = null;
   private conflicts: SyncConflict[] = [];
   private lastSyncAttempt: number = 0;
-  private syncRetryDelay: number = 30000; // 30 секунд между попытками
+  private syncRetryDelay: number = 5000; // 5 секунд между попытками (было 30 секунд)
   private isInitialized: boolean = false;
   private initializationTimeout: NodeJS.Timeout | null = null;
   private syncMode: 'server' | 'local' | 'hybrid' = 'hybrid';
@@ -1178,7 +1178,7 @@ class SyncAdapter {
     this.syncMode = 'local';
     this.isForcedLocalMode = true;
     this.lastSyncAttempt = Date.now();
-    this.syncRetryDelay = 300000; // 5 минут
+            this.syncRetryDelay = 60000; // 1 минута (было 5 минут)
     this.stopAutoSync();
     this.startAutoSync();
   }
@@ -1189,7 +1189,7 @@ class SyncAdapter {
     this.syncMode = 'hybrid';
     this.isForcedLocalMode = false;
     this.lastSyncAttempt = 0;
-    this.syncRetryDelay = 30000; // Возвращаем к 30 секундам
+            this.syncRetryDelay = 5000; // Возвращаем к 5 секундам (было 30 секунд)
     this.restartSync();
   }
   
@@ -1199,7 +1199,7 @@ class SyncAdapter {
     this.syncMode = 'hybrid';
     this.isForcedLocalMode = false;
     this.lastSyncAttempt = 0;
-    this.syncRetryDelay = 30000;
+    this.syncRetryDelay = 5000; // Возвращаем к 5 секундам (было 30 секунд)
     this.lastOperationAdd = 0;
     this.lastStatusUpdate = 0;
     
@@ -1921,5 +1921,17 @@ class SyncAdapter {
 
 // Создаем единственный экземпляр адаптера синхронизации
 export const syncAdapter = new SyncAdapter();
+
+// Глобальный метод для очистки при закрытии приложения
+export const cleanupSyncAdapter = () => {
+  console.log('Global cleanup of SyncAdapter...');
+  syncAdapter.cleanup();
+};
+
+// Добавляем обработчик для очистки при закрытии страницы
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', cleanupSyncAdapter);
+  window.addEventListener('pagehide', cleanupSyncAdapter);
+}
 
 export default SyncAdapter;
