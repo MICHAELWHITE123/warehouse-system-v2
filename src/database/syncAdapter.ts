@@ -1494,7 +1494,7 @@ class SyncAdapter {
             table: operation.table_name,
             operation: operation.operation_type,
             data: JSON.parse(operation.data),
-            timestamp: new Date(operation.timestamp).getTime(),
+            timestamp: new Date(operation.operation_timestamp).getTime(),
             deviceId: operation.source_device_id,
             userId: operation.user_id,
             hash: this.createDataHash(operation.data),

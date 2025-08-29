@@ -2,6 +2,7 @@
 -- ПОЛНАЯ НАСТРОЙКА БАЗЫ ДАННЫХ SUPABASE
 -- ====================================
 -- Этот файл содержит все необходимые миграции для развертывания системы WeareHouse
+-- ВСЕ ОГРАНИЧЕНИЯ СОЗДАЮТСЯ БЕЗОПАСНО С ПРОВЕРКОЙ СУЩЕСТВОВАНИЯ
 
 -- Таблица для отслеживания миграций
 CREATE TABLE IF NOT EXISTS migrations (
@@ -18,8 +19,8 @@ CREATE TABLE IF NOT EXISTS migrations (
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     uuid UUID UNIQUE NOT NULL DEFAULT gen_random_uuid(),
-    username VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(100) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     full_name VARCHAR(100),
     nickname VARCHAR(50) NOT NULL,
@@ -30,30 +31,59 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Уникальные ограничения для пользователей
-ALTER TABLE users ADD CONSTRAINT users_nickname_unique UNIQUE (nickname);
-ALTER TABLE users ADD CONSTRAINT users_login_unique UNIQUE (login);
+-- Добавляем уникальные ограничения для пользователей
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_username_unique') THEN
+        ALTER TABLE users ADD CONSTRAINT users_username_unique UNIQUE (username);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_email_unique') THEN
+        ALTER TABLE users ADD CONSTRAINT users_email_unique UNIQUE (email);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_nickname_unique') THEN
+        ALTER TABLE users ADD CONSTRAINT users_nickname_unique UNIQUE (nickname);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_login_unique') THEN
+        ALTER TABLE users ADD CONSTRAINT users_login_unique UNIQUE (login);
+    END IF;
+END $$;
 
 -- Таблица категорий оборудования
 CREATE TABLE IF NOT EXISTS categories (
     id SERIAL PRIMARY KEY,
     uuid UUID UNIQUE NOT NULL DEFAULT gen_random_uuid(),
-    name VARCHAR(100) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
     description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Добавляем уникальное ограничение для названия категории
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'categories_name_unique') THEN
+        ALTER TABLE categories ADD CONSTRAINT categories_name_unique UNIQUE (name);
+    END IF;
+END $$;
+
 -- Таблица местоположений
 CREATE TABLE IF NOT EXISTS locations (
     id SERIAL PRIMARY KEY,
     uuid UUID UNIQUE NOT NULL DEFAULT gen_random_uuid(),
-    name VARCHAR(100) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
     description TEXT,
     address TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Добавляем уникальное ограничение для названия местоположения
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'locations_name_unique') THEN
+        ALTER TABLE locations ADD CONSTRAINT locations_name_unique UNIQUE (name);
+    END IF;
+END $$;
 
 -- Таблица оборудования
 CREATE TABLE IF NOT EXISTS equipment (
@@ -61,7 +91,7 @@ CREATE TABLE IF NOT EXISTS equipment (
     uuid UUID UNIQUE NOT NULL DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-    serial_number VARCHAR(100) UNIQUE,
+    serial_number VARCHAR(100),
     status VARCHAR(20) NOT NULL CHECK (status IN ('available', 'in-use', 'maintenance')) DEFAULT 'available',
     location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
     purchase_date DATE,
@@ -73,6 +103,14 @@ CREATE TABLE IF NOT EXISTS equipment (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Добавляем уникальное ограничение для серийного номера
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'equipment_serial_number_unique') THEN
+        ALTER TABLE equipment ADD CONSTRAINT equipment_serial_number_unique UNIQUE (serial_number);
+    END IF;
+END $$;
 
 -- Таблица стеков оборудования
 CREATE TABLE IF NOT EXISTS equipment_stacks (
@@ -91,15 +129,22 @@ CREATE TABLE IF NOT EXISTS stack_equipment (
     id SERIAL PRIMARY KEY,
     stack_id INTEGER NOT NULL REFERENCES equipment_stacks(id) ON DELETE CASCADE,
     equipment_id INTEGER NOT NULL REFERENCES equipment(id) ON DELETE CASCADE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(stack_id, equipment_id)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Добавляем уникальное ограничение для связи стека и оборудования
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'stack_equipment_stack_equipment_unique') THEN
+        ALTER TABLE stack_equipment ADD CONSTRAINT stack_equipment_stack_equipment_unique UNIQUE(stack_id, equipment_id);
+    END IF;
+END $$;
 
 -- Таблица отгрузок
 CREATE TABLE IF NOT EXISTS shipments (
     id SERIAL PRIMARY KEY,
     uuid UUID UNIQUE NOT NULL DEFAULT gen_random_uuid(),
-    number VARCHAR(50) NOT NULL UNIQUE,
+    number VARCHAR(50) NOT NULL,
     date DATE NOT NULL,
     recipient VARCHAR(255) NOT NULL,
     recipient_address TEXT NOT NULL,
@@ -112,6 +157,14 @@ CREATE TABLE IF NOT EXISTS shipments (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     delivered_at TIMESTAMP
 );
+
+-- Добавляем уникальное ограничение для номера отгрузки
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'shipments_number_unique') THEN
+        ALTER TABLE shipments ADD CONSTRAINT shipments_number_unique UNIQUE (number);
+    END IF;
+END $$;
 
 -- Таблица оборудования в отгрузках
 CREATE TABLE IF NOT EXISTS shipment_equipment (
