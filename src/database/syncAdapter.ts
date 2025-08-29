@@ -186,9 +186,9 @@ class SyncAdapter {
         
         if (testUrl && testUrl.includes('supabase.co')) {
           try {
-            // Проверяем доступность Supabase Edge Functions
-            const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
-              method: 'GET',
+            // Проверяем доступность Supabase Edge Functions через sync endpoint
+            const testResponse = await fetch(testUrl, {
+              method: 'HEAD',
               headers: getAuthHeaders()
             });
             
@@ -321,25 +321,25 @@ class SyncAdapter {
       if (isApiAvailable()) {
         const testUrl = getApiUrl('sync');
         
-        if (testUrl && testUrl.includes('supabase.co')) {
-          try {
-            // Проверяем доступность Supabase Edge Functions
-            const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
-              method: 'GET',
-              headers: getAuthHeaders()
-            });
-            
-            if (!testResponse.ok && testResponse.status !== 404) {
-              console.log('Supabase not accessible after going online, staying in local mode');
-              this.syncMode = 'local';
-              return;
+                    if (testUrl && testUrl.includes('supabase.co')) {
+              try {
+                // Проверяем доступность Supabase Edge Functions через sync endpoint
+                const testResponse = await fetch(testUrl, {
+                  method: 'HEAD',
+                  headers: getAuthHeaders()
+                });
+                
+                if (!testResponse.ok && testResponse.status !== 404) {
+                  console.log('Supabase not accessible after going online, staying in local mode');
+                  this.syncMode = 'local';
+                  return;
+                }
+              } catch (testError) {
+                console.log('Supabase accessibility test failed after going online, staying in local mode:', testError);
+                this.syncMode = 'local';
+                return;
+              }
             }
-          } catch (testError) {
-            console.log('Supabase accessibility test failed after going online, staying in local mode:', testError);
-            this.syncMode = 'local';
-            return;
-          }
-        }
         
         // API доступен, переключаемся на гибридный режим и планируем синхронизацию
         this.syncMode = 'hybrid';
@@ -706,9 +706,9 @@ class SyncAdapter {
         
         if (testUrl && testUrl.includes('supabase.co')) {
           try {
-            // Проверяем доступность Supabase Edge Functions
-            const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
-              method: 'GET',
+            // Проверяем доступность Supabase Edge Functions через sync endpoint
+            const testResponse = await fetch(testUrl, {
+              method: 'HEAD',
               headers: getAuthHeaders()
             });
             
@@ -752,11 +752,11 @@ class SyncAdapter {
       // Дополнительная проверка доступности URL
       if (apiUrl.includes('supabase.co')) {
         try {
-          // Проверяем доступность Supabase Edge Functions
-          const testResponse = await fetch(apiUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
-            method: 'GET',
-            headers: getAuthHeaders()
-          });
+                      // Проверяем доступность Supabase Edge Functions через sync endpoint
+            const testResponse = await fetch(apiUrl, {
+              method: 'HEAD',
+              headers: getAuthHeaders()
+            });
           
           if (!testResponse.ok && testResponse.status !== 404) {
             console.log('Supabase URL not accessible, switching to local sync');
@@ -1083,9 +1083,9 @@ class SyncAdapter {
         const testUrl = getApiUrl('sync');
         
         if (testUrl && testUrl.includes('supabase.co')) {
-          // Проверяем доступность Supabase Edge Functions
-          const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
-            method: 'GET',
+          // Проверяем доступность Supabase Edge Functions через sync endpoint
+          const testResponse = await fetch(testUrl, {
+            method: 'HEAD',
             headers: getAuthHeaders()
           });
           
@@ -1237,11 +1237,11 @@ class SyncAdapter {
       if (isApiAvailable()) {
         const testUrl = getApiUrl('sync');
         
-                    if (testUrl && testUrl.includes('supabase.co')) {
+            if (testUrl && testUrl.includes('supabase.co')) {
               try {
-                // Проверяем доступность Supabase Edge Functions
-                const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
-                  method: 'GET',
+                // Проверяем доступность Supabase Edge Functions через sync endpoint
+                const testResponse = await fetch(testUrl, {
+                  method: 'HEAD',
                   headers: getAuthHeaders()
                 });
                 
@@ -1294,9 +1294,9 @@ class SyncAdapter {
               const testUrl = getApiUrl('sync');
               
               if (testUrl && testUrl.includes('supabase.co')) {
-                // Проверяем доступность Supabase Edge Functions
-                const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
-                  method: 'GET',
+                // Проверяем доступность Supabase Edge Functions через sync endpoint
+                const testResponse = await fetch(testUrl, {
+                  method: 'HEAD',
                   headers: getAuthHeaders()
                 });
                 
@@ -1343,9 +1343,9 @@ class SyncAdapter {
               const testUrl = getApiUrl('sync');
               
               if (testUrl && testUrl.includes('supabase.co')) {
-                // Проверяем доступность Supabase Edge Functions
-                const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
-                  method: 'GET',
+                // Проверяем доступность Supabase Edge Functions через sync endpoint
+                const testResponse = await fetch(testUrl, {
+                  method: 'HEAD',
                   headers: getAuthHeaders()
                 });
                 
@@ -1460,9 +1460,9 @@ class SyncAdapter {
               // Дополнительная проверка доступности URL
         if (apiUrl.includes('supabase.co')) {
           try {
-            // Проверяем доступность Supabase Edge Functions
-            const testResponse = await fetch(apiUrl.replace('/functions/v1/sync/operations', '/functions/v1/health'), {
-              method: 'GET',
+            // Проверяем доступность Supabase Edge Functions через sync endpoint
+            const testResponse = await fetch(apiUrl, {
+              method: 'HEAD',
               headers: getAuthHeaders()
             });
             
@@ -1700,9 +1700,9 @@ class SyncAdapter {
       // Дополнительная проверка доступности URL
       if (apiUrl.includes('supabase.co')) {
         try {
-          // Проверяем доступность Supabase Edge Functions
-          const testResponse = await fetch(apiUrl.replace('/functions/v1/sync/operations', '/functions/v1/health'), {
-            method: 'GET',
+          // Проверяем доступность Supabase Edge Functions через sync endpoint
+          const testResponse = await fetch(apiUrl, {
+            method: 'HEAD',
             headers: getAuthHeaders()
           });
           
@@ -1786,9 +1786,9 @@ class SyncAdapter {
             const testUrl = getApiUrl('sync');
             
             if (testUrl && testUrl.includes('supabase.co')) {
-              // Проверяем доступность Supabase Edge Functions
-              const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/health'), {
-                method: 'GET',
+              // Проверяем доступность Supabase Edge Functions через sync endpoint
+              const testResponse = await fetch(testUrl, {
+                method: 'HEAD',
                 headers: getAuthHeaders()
               });
               

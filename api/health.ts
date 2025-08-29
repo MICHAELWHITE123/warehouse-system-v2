@@ -9,7 +9,10 @@ const corsHeaders = {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { 
+      headers: corsHeaders,
+      status: 200
+    })
   }
 
   try {
@@ -18,7 +21,13 @@ serve(async (req) => {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       service: 'warehouse-sync-api',
-      version: '1.0.0'
+      version: '1.0.0',
+      cors: 'enabled',
+      endpoints: {
+        health: '/functions/v1/health',
+        events: '/functions/v1/events',
+        sync: '/functions/v1/sync'
+      }
     }
 
     return new Response(
@@ -27,7 +36,8 @@ serve(async (req) => {
         headers: { 
           ...corsHeaders,
           'Content-Type': 'application/json'
-        } 
+        },
+        status: 200
       }
     )
   } catch (error) {
@@ -42,7 +52,7 @@ serve(async (req) => {
         headers: { 
           ...corsHeaders,
           'Content-Type': 'application/json'
-        } 
+        }
       }
     )
   }
