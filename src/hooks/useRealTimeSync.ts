@@ -45,7 +45,7 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
     }
 
     try {
-      // Для Supabase Edge Functions используем URL с токеном
+      // Пробуем подключиться к Supabase Edge Function
       let eventSourceUrl = `${API_BASE_URL}/functions/v1/events?stream=stream`;
       
       // Если это Supabase, добавляем токен в URL
@@ -55,6 +55,8 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
           eventSourceUrl += `&apikey=${supabaseKey}`;
         }
       }
+      
+      console.log('🔗 Attempting to connect to:', eventSourceUrl);
       
       const eventSource = new EventSource(eventSourceUrl);
       eventSourceRef.current = eventSource;
@@ -109,6 +111,33 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
         console.error('❌ Real-time connection error:', error);
         setIsConnected(false);
         setConnectionError('Connection error');
+
+        // Если это Supabase и получаем 401, пробуем локальный API
+        if (API_BASE_URL.includes('supabase.co') && reconnectAttemptsRef.current === 0) {
+          console.log('🔄 Supabase Edge Function недоступен, пробуем локальный API...');
+          
+          // Закрываем текущее соединение
+          eventSource.close();
+          
+          // Пробуем локальный API
+          const localEventSourceUrl = 'http://localhost:3001/functions/v1/events?stream=stream';
+          console.log('🔗 Пробуем локальный API:', localEventSourceUrl);
+          
+          const localEventSource = new EventSource(localEventSourceUrl);
+          eventSourceRef.current = localEventSource;
+          
+          localEventSource.onopen = () => {
+            console.log('🔗 Локальное real-time соединение установлено');
+            setIsConnected(true);
+            setConnectionError(null);
+            reconnectAttemptsRef.current = 0;
+          };
+          
+          localEventSource.onmessage = eventSource.onmessage;
+          localEventSource.onerror = eventSource.onerror;
+          
+          return;
+        }
 
         if (autoReconnect && reconnectAttemptsRef.current < 5) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
