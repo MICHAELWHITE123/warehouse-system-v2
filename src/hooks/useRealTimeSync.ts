@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useSupabaseRealtime } from '../adapters/supabaseRealtimeAdapter';
 
 interface RealTimeEvent {
@@ -31,13 +31,12 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
 
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [lastUpdate, setLastUpdate] => useState<RealTimeEvent | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<RealTimeEvent | null>(null);
 
   // Используем Supabase Realtime адаптер
   const {
     isConnected: supabaseConnected,
     connectionError: supabaseError,
-    lastEvent: supabaseEvent,
     connect: supabaseConnect,
     disconnect: supabaseDisconnect
   } = useSupabaseRealtime({

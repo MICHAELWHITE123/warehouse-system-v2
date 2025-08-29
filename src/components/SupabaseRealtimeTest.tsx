@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { useSupabaseRealtime } from '../adapters/supabaseRealtimeAdapter';
 
 export function SupabaseRealtimeTest() {

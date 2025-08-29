@@ -10,7 +10,7 @@
 
 ### 1. Установка Supabase CLI
 ```bash
-npm install -g supabase
+git
 ```
 
 ### 2. Логин в Supabase
