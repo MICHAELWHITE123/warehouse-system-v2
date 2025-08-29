@@ -1202,6 +1202,9 @@ class SyncAdapter {
     this.lastOperationAdd = 0;
     this.lastStatusUpdate = 0;
     
+    // Принудительно сбрасываем все флаги критических ошибок
+    this.resetCriticalErrorFlag();
+    
     // Перезапускаем систему
     this.restartSync();
     
