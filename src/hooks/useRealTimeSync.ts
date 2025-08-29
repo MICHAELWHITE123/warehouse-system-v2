@@ -44,9 +44,9 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
       eventSourceRef.current.close();
     }
 
-    try {
-      const eventSource = new EventSource(`${API_BASE_URL}/api/events/stream`);
-      eventSourceRef.current = eventSource;
+          try {
+        const eventSource = new EventSource(`${API_BASE_URL}/functions/v1/events?stream=stream`);
+        eventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
         console.log('🔗 Real-time connection established');
@@ -137,7 +137,7 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
   // Функция для отправки уведомления об изменении
   const notifyUpdate = useCallback(async (type: string, action: 'create' | 'update' | 'delete', data: any) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/events/notify/${type}`, {
+      const response = await fetch(`${API_BASE_URL}/functions/v1/events/notify/${type}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

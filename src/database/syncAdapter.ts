@@ -186,7 +186,7 @@ class SyncAdapter {
         
         if (testUrl && testUrl.includes('supabase.co')) {
           try {
-            const testResponse = await fetch(testUrl.replace('/rest/v1/sync', '/rest/v1/'), {
+            const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/'), {
               method: 'HEAD',
               headers: getAuthHeaders()
             });
@@ -322,7 +322,7 @@ class SyncAdapter {
         
         if (testUrl && testUrl.includes('supabase.co')) {
           try {
-            const testResponse = await fetch(testUrl.replace('/rest/v1/sync', '/rest/v1/'), {
+            const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/'), {
               method: 'HEAD',
               headers: getAuthHeaders()
             });
@@ -704,7 +704,7 @@ class SyncAdapter {
         
         if (testUrl && testUrl.includes('supabase.co')) {
           try {
-            const testResponse = await fetch(testUrl.replace('/rest/v1/sync', '/rest/v1/'), {
+            const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/'), {
               method: 'HEAD',
               headers: getAuthHeaders()
             });
@@ -750,7 +750,7 @@ class SyncAdapter {
       if (apiUrl.includes('supabase.co')) {
         try {
           // Проверяем доступность Supabase URL
-          const testResponse = await fetch(apiUrl.replace('/rest/v1/sync', '/rest/v1/'), {
+          const testResponse = await fetch(apiUrl.replace('/functions/v1/sync', '/functions/v1/'), {
             method: 'HEAD',
             headers: getAuthHeaders()
           });
@@ -1080,7 +1080,7 @@ class SyncAdapter {
         const testUrl = getApiUrl('sync');
         
         if (testUrl && testUrl.includes('supabase.co')) {
-          const testResponse = await fetch(testUrl.replace('/rest/v1/sync', '/rest/v1/'), {
+          const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/'), {
             method: 'HEAD',
             headers: getAuthHeaders()
           });
@@ -1233,28 +1233,28 @@ class SyncAdapter {
       if (isApiAvailable()) {
         const testUrl = getApiUrl('sync');
         
-        if (testUrl && testUrl.includes('supabase.co')) {
-          try {
-            const testResponse = await fetch(testUrl.replace('/rest/v1/sync', '/rest/v1/'), {
-              method: 'HEAD',
-              headers: getAuthHeaders()
-            });
-            
-            if (!testResponse.ok && testResponse.status !== 404) {
-              console.log('Supabase not accessible, switching to local sync mode');
-              this.syncMode = 'local';
-              // Выполняем локальную синхронизацию сразу
-              await this.pullOperationsFromLocalStorage();
-              return;
+                    if (testUrl && testUrl.includes('supabase.co')) {
+              try {
+                const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/'), {
+                  method: 'HEAD',
+                  headers: getAuthHeaders()
+                });
+                
+                if (!testResponse.ok && testResponse.status !== 404) {
+                  console.log('Supabase not accessible, switching to local sync mode');
+                  this.syncMode = 'local';
+                  // Выполняем локальную синхронизацию сразу
+                  await this.pullOperationsFromLocalStorage();
+                  return;
+                }
+              } catch (testError) {
+                console.log('Supabase accessibility test failed, switching to local sync mode:', testError);
+                this.syncMode = 'local';
+                // Выполняем локальную синхронизацию сразу
+                await this.pullOperationsFromLocalStorage();
+                return;
+              }
             }
-          } catch (testError) {
-            console.log('Supabase accessibility test failed, switching to local sync mode:', testError);
-            this.syncMode = 'local';
-            // Выполняем локальную синхронизацию сразу
-            await this.pullOperationsFromLocalStorage();
-            return;
-          }
-        }
         
         // API доступен, планируем обычную синхронизацию
         this.scheduleInitialSync();
@@ -1289,7 +1289,7 @@ class SyncAdapter {
               const testUrl = getApiUrl('sync');
               
               if (testUrl && testUrl.includes('supabase.co')) {
-                const testResponse = await fetch(testUrl.replace('/rest/v1/sync', '/rest/v1/'), {
+                const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/'), {
                   method: 'HEAD',
                   headers: getAuthHeaders()
                 });
@@ -1328,40 +1328,40 @@ class SyncAdapter {
     try {
       console.log('Performing initial sync...');
       
-      // Проверяем доступность API перед попыткой серверной синхронизации
-      if (this.isOnline && this.syncMode !== 'local') {
-        try {
-          const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
-          
-          if (isApiAvailable()) {
-            const testUrl = getApiUrl('sync');
+              // Проверяем доступность API перед попыткой серверной синхронизации
+        if (this.isOnline && this.syncMode !== 'local') {
+          try {
+            const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
             
-            if (testUrl && testUrl.includes('supabase.co')) {
-              const testResponse = await fetch(testUrl.replace('/rest/v1/sync', '/rest/v1/'), {
-                method: 'HEAD',
-                headers: getAuthHeaders()
-              });
+            if (isApiAvailable()) {
+              const testUrl = getApiUrl('sync');
               
-              if (!testResponse.ok && testResponse.status !== 404) {
-                console.log('Supabase not accessible in performInitialSync, switching to local mode');
-                this.syncMode = 'local';
-                await this.pullOperationsFromLocalStorage();
-                return;
+              if (testUrl && testUrl.includes('supabase.co')) {
+                const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/'), {
+                  method: 'HEAD',
+                  headers: getAuthHeaders()
+                });
+                
+                if (!testResponse.ok && testResponse.status !== 404) {
+                  console.log('Supabase not accessible in performInitialSync, switching to local mode');
+                  this.syncMode = 'local';
+                  await this.pullOperationsFromLocalStorage();
+                  return;
+                }
               }
+              
+              await this.pullOperationsFromServer();
+            } else {
+              await this.pullOperationsFromLocalStorage();
             }
-            
-            await this.pullOperationsFromServer();
-          } else {
+          } catch (testError) {
+            console.log('API accessibility test failed in performInitialSync, switching to local mode:', testError);
+            this.syncMode = 'local';
             await this.pullOperationsFromLocalStorage();
           }
-        } catch (testError) {
-          console.log('API accessibility test failed in performInitialSync, switching to local mode:', testError);
-          this.syncMode = 'local';
+        } else {
           await this.pullOperationsFromLocalStorage();
         }
-      } else {
-        await this.pullOperationsFromLocalStorage();
-      }
     } catch (error) {
       console.error('Initial sync failed:', error);
       // При ошибке переключаемся на локальную синхронизацию
@@ -1453,7 +1453,7 @@ class SyncAdapter {
       // Дополнительная проверка доступности URL
       if (apiUrl.includes('supabase.co')) {
         try {
-          const testResponse = await fetch(apiUrl.replace('/rest/v1/sync/operations', '/rest/v1/'), {
+          const testResponse = await fetch(apiUrl.replace('/functions/v1/sync/operations', '/functions/v1/'), {
             method: 'HEAD',
             headers: getAuthHeaders()
           });
@@ -1692,7 +1692,7 @@ class SyncAdapter {
       // Дополнительная проверка доступности URL
       if (apiUrl.includes('supabase.co')) {
         try {
-          const testResponse = await fetch(apiUrl.replace('/rest/v1/sync/operations', '/rest/v1/'), {
+          const testResponse = await fetch(apiUrl.replace('/functions/v1/sync/operations', '/functions/v1/'), {
             method: 'HEAD',
             headers: getAuthHeaders()
           });
@@ -1777,7 +1777,7 @@ class SyncAdapter {
             const testUrl = getApiUrl('sync');
             
             if (testUrl && testUrl.includes('supabase.co')) {
-              const testResponse = await fetch(testUrl.replace('/rest/v1/sync', '/rest/v1/'), {
+              const testResponse = await fetch(testUrl.replace('/functions/v1/sync', '/functions/v1/'), {
                 method: 'HEAD',
                 headers: getAuthHeaders()
               });

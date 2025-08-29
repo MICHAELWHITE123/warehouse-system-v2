@@ -99,8 +99,8 @@
                 eventSource.close();
             }
             
-            addLog('🔗 Подключение к ' + API_URL + '/api/events/stream');
-            eventSource = new EventSource(API_URL + '/api/events/stream');
+                  addLog('🔗 Подключение к ' + API_URL + '/functions/v1/events?stream=stream');
+      eventSource = new EventSource(API_URL + '/functions/v1/events?stream=stream');
             
             eventSource.onopen = function(event) {
                 addLog('✅ Соединение установлено');
@@ -140,7 +140,7 @@
             
             try {
                 addLog(`📤 Отправка тестового уведомления: ${type}/${action}`);
-                const response = await fetch(`${API_URL}/api/events/notify/${type}`, {
+                const response = await fetch(`${API_URL}/functions/v1/events/notify/${type}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

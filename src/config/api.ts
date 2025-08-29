@@ -61,17 +61,17 @@ export const getApiUrl = (endpoint: string): string => {
     return '';
   }
   
-  // Если это Supabase URL, используем REST API
+  // Если это Supabase URL, используем Edge Functions API
   if (baseUrl.includes('supabase.co')) {
     const cleanBaseUrl = baseUrl.replace(/\/$/, ''); // Убираем trailing slash
-    return `${cleanBaseUrl}/rest/v1/${endpoint}`;
+    return `${cleanBaseUrl}/functions/v1/${endpoint}`;
   }
   
   // Если это Vercel API, используем прямые пути
   if (baseUrl.includes('/api')) {
     const cleanBaseUrl = baseUrl.replace(/\/$/, ''); // Убираем trailing slash
     const cleanEndpoint = endpoint.replace(/^\//, ''); // Убираем leading slash
-    return `${cleanBaseUrl}/${cleanEndpoint}`;
+    return `${cleanBaseUrl}/functions/v1/${cleanEndpoint}`;
   }
   
   const cleanBaseUrl = baseUrl.replace(/\/$/, ''); // Убираем trailing slash
