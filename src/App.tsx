@@ -100,6 +100,7 @@ export default function App() {
       console.log('🔄 Real-time equipment update received:', event);
       // Обновляем данные оборудования при получении realtime события
       if (loadEquipment) {
+        console.log('🔄 Refreshing equipment data...');
         loadEquipment();
       }
     },
@@ -107,6 +108,7 @@ export default function App() {
       console.log('🔄 Real-time shipment update received:', event);
       // Обновляем данные поставок при получении realtime события
       if (loadShipments) {
+        console.log('🔄 Refreshing shipment data...');
         loadShipments();
       }
     },
@@ -114,6 +116,7 @@ export default function App() {
       console.log('🔄 Real-time stack update received:', event);
       // Обновляем данные стеков при получении realtime события
       if (loadStacks) {
+        console.log('🔄 Refreshing stack data...');
         loadStacks();
       }
     },
@@ -121,6 +124,7 @@ export default function App() {
       console.log('🔄 Real-time category update received:', event);
       // Обновляем данные категорий при получении realtime события
       if (loadCategories) {
+        console.log('🔄 Refreshing category data...');
         loadCategories();
       }
     },
@@ -128,6 +132,7 @@ export default function App() {
       console.log('🔄 Real-time location update received:', event);
       // Обновляем данные локаций при получении realtime события
       if (loadLocations) {
+        console.log('🔄 Refreshing location data...');
         loadLocations();
       }
     },

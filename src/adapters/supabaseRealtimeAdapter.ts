@@ -108,7 +108,21 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
               schema: 'public',
               table: table
             },
-            handleRealtimeEvent
+            (payload) => {
+              console.log(`📨 Realtime event for table ${table}:`, payload);
+              
+              // Преобразуем payload в формат, ожидаемый обработчиками
+              const event = {
+                eventType: payload.eventType,
+                table: payload.table,
+                new: payload.new,
+                old: payload.old,
+                timestamp: new Date().toISOString()
+              };
+              
+              // Вызываем обработчик события
+              handleRealtimeEvent(event);
+            }
           )
           .subscribe((status) => {
             console.log(`📡 Channel ${table} status:`, status);
