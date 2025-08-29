@@ -65,11 +65,17 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
   const channelsRef = useRef<RealtimeChannel[]>([]);
   const isConnectingRef = useRef(false);
   const isDisconnectingRef = useRef(false);
+  const hasInitializedRef = useRef(false);
 
   // Инициализация Supabase клиента
   useEffect(() => {
+    if (hasInitializedRef.current) {
+      return; // Предотвращаем повторную инициализацию
+    }
+    
     try {
       supabaseRef.current = createOptimizedSupabaseClient();
+      hasInitializedRef.current = true;
     } catch (error) {
       setConnectionError(error instanceof Error ? error.message : 'Failed to initialize Supabase');
     }
@@ -112,25 +118,22 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
     onAnyChange?.(event);
   }, [onEquipmentChange, onShipmentChange, onCategoryChange, onLocationChange, onStackChange, onAnyChange]);
 
-
-
   // Подключение к таблицам
   const connect = useCallback(() => {
-    if (!supabaseRef.current || isConnectingRef.current || isDisconnectingRef.current) {
-      return;
+    if (!supabaseRef.current || isConnectingRef.current || isDisconnectingRef.current || isConnected) {
+      return; // Предотвращаем повторные подключения
     }
 
     isConnectingRef.current = true;
-
-    // Отключаем существующие каналы
-    channelsRef.current.forEach(channel => {
-      supabaseRef.current?.removeChannel(channel);
-    });
-    channelsRef.current = [];
-
     console.log('🔗 Connecting to Supabase Realtime for tables:', tables);
 
     try {
+      // Отключаем существующие каналы
+      channelsRef.current.forEach(channel => {
+        supabaseRef.current?.removeChannel(channel);
+      });
+      channelsRef.current = [];
+
       // Создаем каналы для каждой таблицы
       tables.forEach(table => {
         const channel = supabaseRef.current!
@@ -170,10 +173,15 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
       setConnectionError(error instanceof Error ? error.message : 'Connection failed');
       isConnectingRef.current = false;
     }
-  }, [tables, handleRealtimeEvent, autoReconnect]);
+  }, [tables, handleRealtimeEvent, autoReconnect, isConnected]);
 
   // Отключение
   const disconnect = useCallback(() => {
+    if (isDisconnectingRef.current || !isConnected) {
+      return; // Предотвращаем повторные отключения
+    }
+
+    isDisconnectingRef.current = true;
     console.log('🔌 Disconnecting from Supabase Realtime');
     
     channelsRef.current.forEach(channel => {
@@ -183,19 +191,22 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
     
     setIsConnected(false);
     setConnectionError(null);
-  }, []);
+    isDisconnectingRef.current = false;
+  }, [isConnected]);
 
   // Автоподключение при монтировании
   useEffect(() => {
-    if (supabaseRef.current) {
+    if (supabaseRef.current && !isConnected && !isConnectingRef.current && !hasInitializedRef.current) {
       connect();
     }
 
     // Отключение при размонтировании
     return () => {
-      disconnect();
+      if (isConnected) {
+        disconnect();
+      }
     };
-  }, [connect, disconnect]);
+  }, []); // Пустой массив зависимостей - выполняется только при монтировании
 
   // Функция для уведомления других клиентов через изменение в БД
   const notifyChange = useCallback(async (table: string, action: 'INSERT' | 'UPDATE' | 'DELETE', data: any) => {

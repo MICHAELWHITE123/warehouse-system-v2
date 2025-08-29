@@ -104,11 +104,15 @@ export function useRealTimeSync(options: UseRealTimeSyncOptions = {}) {
     autoReconnect
   });
 
-  // Синхронизируем состояние
+  // Синхронизируем состояние только при изменении
   useEffect(() => {
-    setIsConnected(supabaseConnected);
-    setConnectionError(supabaseError);
-  }, [supabaseConnected, supabaseError]);
+    if (isConnected !== supabaseConnected) {
+      setIsConnected(supabaseConnected);
+    }
+    if (connectionError !== supabaseError) {
+      setConnectionError(supabaseError);
+    }
+  }, [supabaseConnected, supabaseError, isConnected, connectionError]);
 
   // Функция для отправки уведомления об изменении
   const notifyUpdate = useCallback(async (type: string, action: 'create' | 'update' | 'delete', data: any) => {
