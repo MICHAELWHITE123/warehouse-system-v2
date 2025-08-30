@@ -1255,9 +1255,9 @@ class SyncAdapter {
   // Выполнить начальную синхронизацию
   private async performInitialSync(): Promise<void> {
     try {
-      console.log('Performing initial sync...');
+      // Убираем дублирующий лог, так как он уже есть в инициализации
       
-              // Проверяем доступность API перед попыткой серверной синхронизации
+      // Проверяем доступность API перед попыткой серверной синхронизации
         if (this.isOnline && this.syncMode !== 'local') {
           try {
             const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
