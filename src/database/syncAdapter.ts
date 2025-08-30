@@ -1366,7 +1366,7 @@ class SyncAdapter {
         return;
       }
       
-      const apiUrl = getApiUrl(`sync/operations?deviceId=${this.deviceId}&lastSync=${this.lastSync}`);
+      const apiUrl = getApiUrl(`sync?deviceId=${this.deviceId}&lastSync=${this.lastSync}`);
       
       if (!apiUrl) {
         console.log('API URL is empty, using local sync only');
@@ -1614,7 +1614,7 @@ class SyncAdapter {
         return;
       }
       
-      const apiUrl = getApiUrl(`sync/operations/${operationId}/acknowledge`);
+      const apiUrl = getApiUrl(`sync/${operationId}/acknowledge`);
       
       if (!apiUrl) {
         return;
