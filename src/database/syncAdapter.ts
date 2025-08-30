@@ -58,16 +58,6 @@ class SyncAdapter {
   private lastStatusUpdate: number = 0;
   private statusUpdateThrottle: number = 1000; // 1 секунда между обновлениями статуса
 
-  // Хранилище для обработчиков событий
-  private eventListeners: {
-    storage: (event: StorageEvent) => void;
-    syncQueueChange: (event: StorageEvent) => void;
-    syncStatusChange: (event: StorageEvent) => void;
-    online: () => void;
-    offline: () => void;
-    visibilityChange: () => void;
-  } | null = null;
-
   constructor() {
     try {
       if (this.isInitialized) {
@@ -86,7 +76,7 @@ class SyncAdapter {
           throw new Error('Database initialization failed');
         }
       
-              try {
+                      try {
           this.deviceId = this.generateDeviceId();
         } catch (error) {
           try {
@@ -97,17 +87,7 @@ class SyncAdapter {
           this.deviceId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         }
       
-              try {
-          this.setupEventListeners();
-        } catch (error) {
-          try {
-            console.error('Failed to setup event listeners:', error);
-          } catch (consoleError) {
-            // Игнорируем ошибки console.error
-          }
-        }
-      
-              try {
+        try {
           this.loadSyncQueue();
         } catch (error) {
           try {
@@ -273,95 +253,6 @@ class SyncAdapter {
     }
     
     return deviceId;
-  }
-
-  private setupEventListeners(): void {
-    // Слушаем изменения в сети
-    window.addEventListener('online', () => {
-      this.isOnline = true;
-      this.syncMode = 'hybrid';
-      
-      // При восстановлении соединения проверяем доступность API
-      this.checkApiAccessibilityOnOnline();
-    });
-
-    window.addEventListener('offline', () => {
-      this.isOnline = false;
-      this.syncMode = 'local';
-    });
-
-    // Слушаем изменения в localStorage для других вкладок
-    window.addEventListener('storage', (event) => {
-      if (event.key === 'warehouse-sync-queue') {
-        console.log('Storage change detected for sync queue');
-        this.loadSyncQueue();
-      } else if (event.key === 'warehouse-sync-queue-updated') {
-        console.log('Storage change detected for sync queue update');
-        // Запускаем синхронизацию при изменении в других вкладках
-        if (this.isOnline && this.syncMode === 'local') {
-          setTimeout(() => {
-            this.performLocalSync([...this.syncQueue.filter(op => op.status === 'pending')]);
-          }, 1000);
-        }
-      }
-    });
-    
-    // Слушаем события видимости страницы
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && this.isOnline) {
-        console.log('Page became visible, checking for updates...');
-        // При возвращении на страницу проверяем обновления
-        setTimeout(() => {
-          if (this.syncMode === 'local') {
-            console.log('In local mode, performing local sync only');
-            this.performLocalSync([...this.syncQueue.filter(op => op.status === 'pending')]);
-          } else {
-            this.forceSync();
-          }
-        }, 2000);
-      }
-    });
-  }
-  
-  // Проверка доступности API при восстановлении соединения
-  private async checkApiAccessibilityOnOnline(): Promise<void> {
-    try {
-      const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
-      
-      if (isApiAvailable()) {
-        const testUrl = getApiUrl('sync');
-        
-                    if (testUrl && testUrl.includes('supabase.co')) {
-              try {
-                // Проверяем доступность Supabase Edge Functions через sync endpoint
-                const testResponse = await fetch(testUrl, {
-                  method: 'HEAD',
-                  headers: getAuthHeaders()
-                });
-                
-                if (!testResponse.ok && testResponse.status !== 404) {
-                  console.log('Supabase not accessible after going online, staying in local mode');
-                  this.syncMode = 'local';
-                  return;
-                }
-              } catch (testError) {
-                console.log('Supabase accessibility test failed after going online, staying in local mode:', testError);
-                this.syncMode = 'local';
-                return;
-              }
-            }
-        
-        // API доступен, переключаемся на гибридный режим и планируем синхронизацию
-        this.syncMode = 'hybrid';
-        this.scheduleSync();
-      } else {
-        // API недоступен, остаемся в локальном режиме
-        this.syncMode = 'local';
-      }
-    } catch (error) {
-      console.log('API accessibility check failed after going online, staying in local mode:', error);
-      this.syncMode = 'local';
-    }
   }
 
   private loadSyncQueue(): void {

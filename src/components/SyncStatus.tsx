@@ -6,16 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { 
   RefreshCw, 
   AlertTriangle, 
-  CheckCircle, 
   WifiOff,
   Server,
   HardDrive,
   Activity,
   Info,
   Settings,
-  Clock,
-  Database,
-  Smartphone
+  Database
 } from 'lucide-react';
 
 export const SyncStatus: React.FC = () => {
@@ -43,7 +40,7 @@ export const SyncStatus: React.FC = () => {
     return null;
   }
 
-  const { isOnline, isSyncing, pendingOperations, conflicts, syncMode, deviceId } = syncStatus;
+  const { isOnline, isSyncing, pendingOperations, conflicts, syncMode } = syncStatus;
 
   // Получаем иконку для режима синхронизации
   const getSyncModeIcon = (mode: string) => {
