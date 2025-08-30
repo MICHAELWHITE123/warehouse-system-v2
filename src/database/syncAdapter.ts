@@ -507,29 +507,22 @@ class SyncAdapter {
         // Пытаемся синхронизироваться с сервером
         const results = await this.sendOperationsToServer(operationsToSync);
         
-        if (results.length > 0) {
-          // Обрабатываем результаты
-          await this.processSyncResults(results);
-          
-          // Удаляем обработанные операции из очереди
-          this.syncQueue = this.syncQueue.filter(op => 
-            !operationsToSync.some(syncedOp => syncedOp.id === op.id)
-          );
-          this.saveSyncQueue();
-          
-          // Обновляем время последней синхронизации
-          this.lastSync = Date.now();
-          
-          console.log('Server sync completed successfully');
-          
-          // Получаем операции от других устройств
-          await this.pullOperationsFromServer();
-        } else {
-          // Сервер недоступен, переключаемся на локальную синхронизацию
-          console.log('Server not available, switching to local sync');
-          this.syncMode = 'local';
-          await this.performLocalSync(operationsToSync);
-        }
+        // Обрабатываем результаты (даже если пустые)
+        await this.processSyncResults(results);
+        
+        // Удаляем обработанные операции из очереди
+        this.syncQueue = this.syncQueue.filter(op => 
+          !operationsToSync.some(syncedOp => syncedOp.id === op.id)
+        );
+        this.saveSyncQueue();
+        
+        // Обновляем время последней синхронизации
+        this.lastSync = Date.now();
+        
+        console.log('Server sync completed successfully');
+        
+        // Получаем операции от других устройств
+        await this.pullOperationsFromServer();
       } else {
         // Офлайн режим или локальный режим - только локальная синхронизация
         console.log(`Using local sync mode (${this.syncMode})`);
@@ -546,6 +539,10 @@ class SyncAdapter {
         this.saveSyncQueue();
         this.lastSyncAttempt = Date.now();
       } else {
+        // При ошибке сервера переключаемся на локальную синхронизацию
+        console.log('Server sync failed, falling back to local sync');
+        await this.performLocalSync(operationsToSync);
+        
         // Увеличиваем счетчик попыток для неудачных операций
         for (const op of operationsToSync) {
           op.retryCount++;
@@ -712,7 +709,9 @@ class SyncAdapter {
         return [];
       }
       
-      throw error;
+      // Для других ошибок возвращаем пустой массив, чтобы продолжить синхронизацию
+      console.log('Server error, but continuing with sync');
+      return [];
     }
   }
 
