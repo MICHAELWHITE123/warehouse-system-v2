@@ -45,6 +45,14 @@ serve(async (req) => {
     // Создаем клиент Supabase с правами администратора
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // HEAD запрос для проверки доступности
+    if (req.method === 'HEAD') {
+      return new Response('ok', { 
+        headers: corsHeaders,
+        status: 200
+      })
+    }
+
     if (req.method === 'POST') {
       // Отправка операций (PUSH)
       const body: SyncRequest = await req.json()
