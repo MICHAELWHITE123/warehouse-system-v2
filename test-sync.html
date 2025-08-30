@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест синхронизации - WeareHouse</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 4px solid;
+        }
+        .status.online { background-color: #d4edda; border-color: #28a745; }
+        .status.offline { background-color: #f8d7da; border-color: #dc3545; }
+        .status.syncing { background-color: #d1ecf1; border-color: #17a2b8; }
+        .form-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #dee2e6;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .tab.active {
+            border-bottom-color: #007bff;
+            color: #007bff;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .device-info {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .sync-queue {
+            background-color: #fff3cd;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            border: 1px solid #ffeaa7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Тест синхронизации WeareHouse</h1>
+        
+        <!-- Статус подключения -->
+        <div class="status" id="connectionStatus">
+            <strong>Статус:</strong> <span id="statusText">Проверка...</span>
+        </div>
+        
+        <!-- Вкладки -->
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('sync')">Синхронизация</div>
+            <div class="tab" onclick="showTab('test')">Тестирование</div>
+            <div class="tab" onclick="showTab('logs')">Логи</div>
+        </div>
+        
+        <!-- Вкладка синхронизации -->
+        <div id="sync" class="tab-content active">
+            <h2>📊 Статус синхронизации</h2>
+            
+            <div class="device-info">
+                <h3>Информация об устройстве</h3>
+                <p><strong>ID устройства:</strong> <span id="deviceId">Загрузка...</span></p>
+                <p><strong>Режим синхронизации:</strong> <span id="syncMode">Загрузка...</span></p>
+                <p><strong>Статус сети:</strong> <span id="networkStatus">Загрузка...</span></p>
+                <p><strong>Последняя синхронизация:</strong> <span id="lastSync">Загрузка...</span></p>
+            </div>
+            
+            <div class="sync-queue">
+                <h3>Очередь синхронизации</h3>
+                <p><strong>Ожидающие операции:</strong> <span id="pendingOps">0</span></p>
+                <p><strong>Успешные операции:</strong> <span id="syncedOps">0</span></p>
+                <p><strong>Неудачные операции:</strong> <span id="failedOps">0</span></p>
+            </div>
+            
+            <div class="form-group">
+                <button onclick="forceSync()" id="syncBtn">🔄 Принудительная синхронизация</button>
+                <button onclick="restartSync()">🔄 Перезапустить</button>
+                <button onclick="clearQueue()">🗑️ Очистить очередь</button>
+            </div>
+            
+            <div class="form-group">
+                <h3>Управление режимами</h3>
+                <button onclick="setLocalMode()">💾 Локальный режим</button>
+                <button onclick="setHybridMode()">🔄 Гибридный режим</button>
+                <button onclick="setServerMode()">🌐 Серверный режим</button>
+            </div>
+        </div>
+        
+        <!-- Вкладка тестирования -->
+        <div id="test" class="tab-content">
+            <h2>🧪 Тестирование синхронизации</h2>
+            
+            <div class="form-group">
+                <label for="testData">Тестовые данные:</label>
+                <textarea id="testData" rows="3" placeholder="Введите тестовые данные для синхронизации..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <button onclick="addTestOperation()">➕ Добавить операцию</button>
+                <button onclick="simulateConflict()">⚠️ Симулировать конфликт</button>
+                <button onclick="testLocalStorage()">💾 Тест localStorage</button>
+            </div>
+            
+            <div class="form-group">
+                <h3>Результаты тестирования</h3>
+                <div id="testResults" class="log"></div>
+            </div>
+        </div>
+        
+        <!-- Вкладка логов -->
+        <div id="logs" class="tab-content">
+            <h2>📝 Логи синхронизации</h2>
+            
+            <div class="form-group">
+                <button onclick="clearLogs()">🗑️ Очистить логи</button>
+                <button onclick="exportLogs()">📥 Экспорт логов</button>
+            </div>
+            
+            <div id="logsContainer" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        // Глобальные переменные
+        let deviceId = 'test_device_' + Date.now();
+        let syncMode = 'hybrid';
+        let isOnline = navigator.onLine;
+        let lastSync = Date.now();
+        let syncQueue = [];
+        let logs = [];
+        
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSync();
+            updateUI();
+            startLogging();
+            
+            // Слушаем изменения сети
+            window.addEventListener('online', () => {
+                isOnline = true;
+                updateUI();
+                log('🌐 Соединение восстановлено');
+            });
+            
+            window.addEventListener('offline', () => {
+                isOnline = false;
+                updateUI();
+                log('🌐 Соединение потеряно');
+            });
+            
+            // Слушаем изменения в localStorage
+            window.addEventListener('storage', (event) => {
+                if (event.key && event.key.startsWith('warehouse-sync-')) {
+                    log('🔄 Обнаружено изменение в localStorage: ' + event.key);
+                    handleStorageChange(event);
+                }
+            });
+        });
+        
+        // Инициализация синхронизации
+        function initializeSync() {
+            // Загружаем существующие данные
+            loadFromLocalStorage();
+            
+            // Генерируем уникальный ID устройства
+            const existingId = localStorage.getItem('warehouse-device-id');
+            if (existingId) {
+                deviceId = existingId;
+            } else {
+                localStorage.setItem('warehouse-device-id', deviceId);
+            }
+            
+            log('🚀 Синхронизация инициализирована для устройства: ' + deviceId);
+        }
+        
+        // Обновление UI
+        function updateUI() {
+            // Статус подключения
+            const statusEl = document.getElementById('connectionStatus');
+            const statusTextEl = document.getElementById('statusText');
+            
+            if (isOnline) {
+                statusEl.className = 'status online';
+                statusTextEl.textContent = 'Онлайн';
+            } else {
+                statusEl.className = 'status offline';
+                statusTextEl.textContent = 'Офлайн';
+            }
+            
+            // Информация об устройстве
+            document.getElementById('deviceId').textContent = deviceId;
+            document.getElementById('syncMode').textContent = syncMode;
+            document.getElementById('networkStatus').textContent = isOnline ? 'Онлайн' : 'Офлайн';
+            document.getElementById('lastSync').textContent = new Date(lastSync).toLocaleString();
+            
+            // Очередь синхронизации
+            const pending = syncQueue.filter(op => op.status === 'pending').length;
+            const synced = syncQueue.filter(op => op.status === 'synced').length;
+            const failed = syncQueue.filter(op => op.status === 'failed').length;
+            
+            document.getElementById('pendingOps').textContent = pending;
+            document.getElementById('syncedOps').textContent = synced;
+            document.getElementById('failedOps').textContent = failed;
+            
+            // Обновляем кнопку синхронизации
+            const syncBtn = document.getElementById('syncBtn');
+            syncBtn.disabled = pending === 0;
+        }
+        
+        // Логирование
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            logs.push(logEntry);
+            
+            // Обновляем UI логов
+            const logsContainer = document.getElementById('logsContainer');
+            if (logsContainer) {
+                logsContainer.innerHTML = logs.map(log => `<div>${log}</div>`).join('');
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            }
+            
+            // Выводим в консоль
+            console.log(logEntry);
+        }
+        
+        // Запуск логирования
+        function startLogging() {
+            setInterval(() => {
+                if (syncQueue.length > 0) {
+                    const pending = syncQueue.filter(op => op.status === 'pending').length;
+                    if (pending > 0) {
+                        log(`📊 В очереди ${pending} операций`);
+                    }
+                }
+            }, 10000); // Каждые 10 секунд
+        }
+        
+        // Загрузка из localStorage
+        function loadFromLocalStorage() {
+            try {
+                const stored = localStorage.getItem('warehouse-sync-queue');
+                if (stored) {
+                    syncQueue = JSON.parse(stored);
+                    log(`📥 Загружено ${syncQueue.length} операций из localStorage`);
+                }
+            } catch (error) {
+                log('❌ Ошибка загрузки из localStorage: ' + error.message);
+                syncQueue = [];
+            }
+        }
+        
+        // Сохранение в localStorage
+        function saveToLocalStorage() {
+            try {
+                localStorage.setItem('warehouse-sync-queue', JSON.stringify(syncQueue));
+                localStorage.setItem('warehouse-sync-updated', Date.now().toString());
+                log('💾 Данные сохранены в localStorage');
+            } catch (error) {
+                log('❌ Ошибка сохранения в localStorage: ' + error.message);
+            }
+        }
+        
+        // Обработка изменений в localStorage
+        function handleStorageChange(event) {
+            try {
+                if (event.newValue) {
+                    const newData = JSON.parse(event.newValue);
+                    if (Array.isArray(newData)) {
+                        // Добавляем новые операции
+                        newData.forEach(op => {
+                            if (op.deviceId !== deviceId && !syncQueue.find(existing => existing.id === op.id)) {
+                                syncQueue.push(op);
+                                log(`📥 Получена новая операция от устройства ${op.deviceId}`);
+                            }
+                        });
+                        
+                        saveToLocalStorage();
+                        updateUI();
+                    }
+                }
+            } catch (error) {
+                log('❌ Ошибка обработки изменения localStorage: ' + error.message);
+            }
+        }
+        
+        // Принудительная синхронизация
+        function forceSync() {
+            log('🔄 Запуск принудительной синхронизации...');
+            
+            const pendingOps = syncQueue.filter(op => op.status === 'pending');
+            if (pendingOps.length === 0) {
+                log('ℹ️ Нет операций для синхронизации');
+                return;
+            }
+            
+            // Имитируем синхронизацию
+            pendingOps.forEach(op => {
+                op.status = 'synced';
+                op.syncedAt = Date.now();
+            });
+            
+            lastSync = Date.now();
+            saveToLocalStorage();
+            updateUI();
+            
+            log(`✅ Синхронизировано ${pendingOps.length} операций`);
+        }
+        
+        // Перезапуск синхронизации
+        function restartSync() {
+            log('🔄 Перезапуск системы синхронизации...');
+            
+            // Сбрасываем статус
+            syncQueue.forEach(op => {
+                if (op.status === 'failed') {
+                    op.status = 'pending';
+                    op.retryCount = 0;
+                }
+            });
+            
+            lastSync = Date.now();
+            saveToLocalStorage();
+            updateUI();
+            
+            log('✅ Синхронизация перезапущена');
+        }
+        
+        // Очистка очереди
+        function clearQueue() {
+            log('🗑️ Очистка очереди синхронизации...');
+            
+            syncQueue = [];
+            saveToLocalStorage();
+            updateUI();
+            
+            log('✅ Очередь очищена');
+        }
+        
+        // Установка режимов
+        function setLocalMode() {
+            syncMode = 'local';
+            log('💾 Переключение в локальный режим');
+            updateUI();
+        }
+        
+        function setHybridMode() {
+            syncMode = 'hybrid';
+            log('🔄 Переключение в гибридный режим');
+            updateUI();
+        }
+        
+        function setServerMode() {
+            syncMode = 'server';
+            log('🌐 Переключение в серверный режим');
+            updateUI();
+        }
+        
+        // Тестирование
+        function addTestOperation() {
+            const testData = document.getElementById('testData').value || 'Тестовые данные ' + Date.now();
+            
+            const operation = {
+                id: 'op_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                table: 'test_table',
+                operation: 'create',
+                data: { content: testData, timestamp: Date.now() },
+                timestamp: Date.now(),
+                deviceId: deviceId,
+                status: 'pending',
+                retryCount: 0
+            };
+            
+            syncQueue.push(operation);
+            saveToLocalStorage();
+            updateUI();
+            
+            log(`➕ Добавлена тестовая операция: ${operation.id}`);
+            
+            // Показываем результат
+            const results = document.getElementById('testResults');
+            results.innerHTML += `<div>[${new Date().toLocaleTimeString()}] Добавлена операция: ${operation.id}</div>`;
+        }
+        
+        function simulateConflict() {
+            log('⚠️ Симуляция конфликта синхронизации...');
+            
+            // Создаем конфликтующие операции
+            const conflictOp1 = {
+                id: 'conflict_1_' + Date.now(),
+                table: 'test_table',
+                operation: 'update',
+                data: { id: 'test_id', content: 'Версия 1', timestamp: Date.now() },
+                timestamp: Date.now(),
+                deviceId: deviceId,
+                status: 'pending',
+                retryCount: 0
+            };
+            
+            const conflictOp2 = {
+                id: 'conflict_2_' + Date.now(),
+                table: 'test_table',
+                operation: 'update',
+                data: { id: 'test_id', content: 'Версия 2', timestamp: Date.now() + 1000 },
+                timestamp: Date.now() + 1000,
+                deviceId: 'other_device',
+                status: 'pending',
+                retryCount: 0
+            };
+            
+            syncQueue.push(conflictOp1, conflictOp2);
+            saveToLocalStorage();
+            updateUI();
+            
+            log('⚠️ Создан конфликт между операциями');
+            
+            // Показываем результат
+            const results = document.getElementById('testResults');
+            results.innerHTML += `<div>[${new Date().toLocaleTimeString()}] Создан конфликт: ${conflictOp1.id} vs ${conflictOp2.id}</div>`;
+        }
+        
+        function testLocalStorage() {
+            log('💾 Тестирование localStorage...');
+            
+            try {
+                // Тест записи
+                const testData = { test: 'data', timestamp: Date.now() };
+                localStorage.setItem('warehouse-test', JSON.stringify(testData));
+                
+                // Тест чтения
+                const readData = JSON.parse(localStorage.getItem('warehouse-test'));
+                
+                if (readData.test === testData.test) {
+                    log('✅ localStorage работает корректно');
+                } else {
+                    log('❌ localStorage работает некорректно');
+                }
+                
+                // Очистка тестовых данных
+                localStorage.removeItem('warehouse-test');
+                
+            } catch (error) {
+                log('❌ Ошибка тестирования localStorage: ' + error.message);
+            }
+        }
+        
+        // Управление вкладками
+        function showTab(tabName) {
+            // Скрываем все вкладки
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Показываем выбранную вкладку
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+        
+        // Очистка логов
+        function clearLogs() {
+            logs = [];
+            document.getElementById('logsContainer').innerHTML = '';
+            log('🗑️ Логи очищены');
+        }
+        
+        // Экспорт логов
+        function exportLogs() {
+            const logText = logs.join('\n');
+            const blob = new Blob([logText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sync-logs-' + new Date().toISOString().slice(0, 19) + '.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            log('📥 Логи экспортированы');
+        }
+        
+        // Автоматическое обновление каждые 5 секунд
+        setInterval(updateUI, 5000);
+    </script>
+</body>
+</html>

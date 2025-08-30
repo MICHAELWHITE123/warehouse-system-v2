@@ -58,6 +58,16 @@ class SyncAdapter {
   private lastStatusUpdate: number = 0;
   private statusUpdateThrottle: number = 1000; // 1 секунда между обновлениями статуса
 
+  // Хранилище для обработчиков событий
+  private eventListeners: {
+    storage: (event: StorageEvent) => void;
+    syncQueueChange: (event: StorageEvent) => void;
+    syncStatusChange: (event: StorageEvent) => void;
+    online: () => void;
+    offline: () => void;
+    visibilityChange: () => void;
+  } | null = null;
+
   constructor() {
     try {
       if (this.isInitialized) {

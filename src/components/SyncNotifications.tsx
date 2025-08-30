@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSync } from '../hooks/useSync';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -10,7 +10,10 @@ import {
   WifiOff,
   Server,
   HardDrive,
-  Activity
+  Activity,
+  Info,
+  X,
+  Settings
 } from 'lucide-react';
 
 export const SyncNotifications: React.FC = () => {
@@ -19,15 +22,29 @@ export const SyncNotifications: React.FC = () => {
     forceSync, 
     clearSyncQueue, 
     autoResolveConflicts, 
-    restartSync 
+    restartSync,
+    forceLocalMode,
+    tryHybridMode,
+    forceServerMode
   } = useSync();
   const [showNotifications, setShowNotifications] = useState(true);
+  const [showDetails, setShowDetails] = useState(false);
+
+  // Автоматически скрываем уведомления через 10 секунд если нет проблем
+  useEffect(() => {
+    if (syncStatus && !syncStatus.conflicts.length && !syncStatus.pendingOperations.length) {
+      const timer = setTimeout(() => {
+        setShowNotifications(false);
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [syncStatus]);
 
   if (!syncStatus || !showNotifications) {
     return null;
   }
 
-  const { isOnline, isSyncing, pendingOperations, conflicts, syncMode } = syncStatus;
+  const { isOnline, isSyncing, pendingOperations, conflicts, syncMode, deviceId } = syncStatus;
 
   // Определяем тип уведомления
   const getNotificationType = () => {
@@ -68,6 +85,20 @@ export const SyncNotifications: React.FC = () => {
     }
   };
 
+  // Получаем описание режима синхронизации
+  const getSyncModeDescription = (mode: string) => {
+    switch (mode) {
+      case 'server':
+        return 'Серверная синхронизация - данные синхронизируются с сервером в реальном времени';
+      case 'local':
+        return 'Локальная синхронизация - данные синхронизируются только между вкладками браузера';
+      case 'hybrid':
+        return 'Гибридная синхронизация - комбинация серверной и локальной синхронизации';
+      default:
+        return 'Неизвестный режим синхронизации';
+    }
+  };
+
   // Рендерим уведомление в зависимости от типа
   const renderNotification = () => {
     switch (notificationType) {
@@ -84,9 +115,17 @@ export const SyncNotifications: React.FC = () => {
                 <Button
                   size="sm"
                   variant="outline"
+                  onClick={() => setShowDetails(!showDetails)}
+                >
+                  <Info className="w-4 h-4 mr-1" />
+                  Детали
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   onClick={() => setShowNotifications(false)}
                 >
-                  Скрыть
+                  <X className="w-4 h-4" />
                 </Button>
               </div>
             </AlertDescription>
@@ -112,6 +151,14 @@ export const SyncNotifications: React.FC = () => {
                 <Button
                   size="sm"
                   variant="outline"
+                  onClick={() => setShowDetails(!showDetails)}
+                >
+                  <Info className="w-4 h-4 mr-1" />
+                  Детали
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   onClick={forceSync}
                   disabled={isSyncing}
                 >
@@ -123,7 +170,7 @@ export const SyncNotifications: React.FC = () => {
                   variant="ghost"
                   onClick={() => setShowNotifications(false)}
                 >
-                  Скрыть
+                  <X className="w-4 h-4" />
                 </Button>
               </div>
             </AlertDescription>
@@ -152,6 +199,14 @@ export const SyncNotifications: React.FC = () => {
                 <Button
                   size="sm"
                   variant="outline"
+                  onClick={() => setShowDetails(!showDetails)}
+                >
+                  <Info className="w-4 h-4 mr-1" />
+                  Детали
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   onClick={forceSync}
                   disabled={isSyncing}
                 >
@@ -163,7 +218,7 @@ export const SyncNotifications: React.FC = () => {
                   variant="ghost"
                   onClick={() => setShowNotifications(false)}
                 >
-                  Скрыть
+                  <X className="w-4 h-4" />
                 </Button>
               </div>
             </AlertDescription>
@@ -188,10 +243,18 @@ export const SyncNotifications: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
+                  variant="outline"
+                  onClick={() => setShowDetails(!showDetails)}
+                >
+                  <Info className="w-4 h-4 mr-1" />
+                  Детали
+                </Button>
+                <Button
+                  size="sm"
                   variant="ghost"
                   onClick={() => setShowNotifications(false)}
                 >
-                  Скрыть
+                  <X className="w-4 h-4" />
                 </Button>
               </div>
             </AlertDescription>
@@ -216,10 +279,18 @@ export const SyncNotifications: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
+                  variant="outline"
+                  onClick={() => setShowDetails(!showDetails)}
+                >
+                  <Info className="w-4 h-4 mr-1" />
+                  Детали
+                </Button>
+                <Button
+                  size="sm"
                   variant="ghost"
                   onClick={() => setShowNotifications(false)}
                 >
-                  Скрыть
+                  <X className="w-4 h-4" />
                 </Button>
               </div>
             </AlertDescription>
@@ -234,6 +305,92 @@ export const SyncNotifications: React.FC = () => {
   return (
     <div className="w-full space-y-2">
       {renderNotification()}
+      
+      {/* Детальная информация */}
+      {showDetails && (
+        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-medium text-gray-900">Детали синхронизации</h4>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowDetails(false)}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <p><strong>Режим:</strong> {syncMode}</p>
+              <p><strong>Статус сети:</strong> {isOnline ? 'Онлайн' : 'Офлайн'}</p>
+              <p><strong>ID устройства:</strong> {deviceId}</p>
+              <p><strong>Статус:</strong> {isSyncing ? 'Синхронизация...' : 'Готово'}</p>
+            </div>
+            <div>
+              <p><strong>Ожидающие операции:</strong> {pendingOperations.length}</p>
+              <p><strong>Конфликты:</strong> {conflicts.length}</p>
+              <p><strong>Описание режима:</strong></p>
+              <p className="text-gray-600 text-xs mt-1">{getSyncModeDescription(syncMode)}</p>
+            </div>
+          </div>
+          
+          {/* Действия для управления синхронизацией */}
+          <div className="mt-4 pt-3 border-t border-gray-200">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={forceSync}
+                disabled={isSyncing}
+              >
+                <RefreshCw className={`w-4 h-4 mr-1 ${isSyncing ? 'animate-spin' : ''}`} />
+                Принудительная синхронизация
+              </Button>
+              
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={restartSync}
+              >
+                <Settings className="w-4 h-4 mr-1" />
+                Перезапустить
+              </Button>
+              
+              {syncMode === 'local' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={tryHybridMode}
+                >
+                  <Activity className="w-4 h-4 mr-1" />
+                  Попробовать гибридный режим
+                </Button>
+              )}
+              
+              {syncMode === 'hybrid' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={forceServerMode}
+                >
+                  <Server className="w-4 h-4 mr-1" />
+                  Принудительно серверный режим
+                </Button>
+              )}
+              
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={forceLocalMode}
+              >
+                <HardDrive className="w-4 h-4 mr-1" />
+                Принудительно локальный режим
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Дополнительные действия для конфликтов */}
       {notificationType === 'conflict' && (
