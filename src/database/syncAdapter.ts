@@ -132,17 +132,24 @@ class SyncAdapter {
       // Инициализация через небольшую задержку
       this.initializationTimeout = setTimeout(async () => {
         try {
-          this.isInitialized = true;
-          await this.performInitialSync();
-        } catch (error) {
-          try {
-            console.error('Initial sync failed:', error);
-          } catch (consoleError) {
-            // Игнорируем ошибки console.error
+          // Проверяем, не была ли уже выполнена инициализация
+          if (this.isInitialized) {
+            console.log('🔄 Sync already initialized, skipping...');
+            return;
           }
+          
+          this.isInitialized = true;
+          console.log('🔄 Performing initial sync...');
+          
+          // Выполняем начальную синхронизацию только один раз
+          await this.performInitialSync();
+          
+        } catch (error) {
+          console.error('❌ Initial sync failed:', error);
+          // При ошибке переключаемся на локальный режим
           this.syncMode = 'local';
         }
-      }, 1000);
+      }, 2000); // Увеличиваем задержку до 2 секунд
       
       // Запускаем автоматическую очистку каждые 6 часов
       setInterval(() => {
@@ -1066,10 +1073,23 @@ class SyncAdapter {
   
   // Перезапустить синхронизацию
   restartSync(): void {
-    console.log('Restarting sync...');
+    console.log('🔄 Restarting sync...');
+    
+    // Останавливаем текущую синхронизацию
     this.stopAutoSync();
-    this.resetAllFlags();
-    this.startAutoSync();
+    
+    // Сбрасываем флаги с задержкой
+    setTimeout(() => {
+      this.lastSyncAttempt = 0;
+      this.syncRetryDelay = 5000;
+      this.lastOperationAdd = 0;
+      this.lastStatusUpdate = 0;
+      
+      console.log(`✅ Sync restarted in ${this.syncMode} mode`);
+      
+      // Запускаем синхронизацию с задержкой
+      this.startAutoSync();
+    }, 1000);
   }
   
   // Принудительно переключиться в локальный режим
@@ -1643,42 +1663,53 @@ class SyncAdapter {
 
   // Запустить автоматическую синхронизацию
   startAutoSync(intervalMs: number = 30000): void {
+    // Проверяем, не запущена ли уже синхронизация
     if (this.syncInterval) {
-      clearInterval(this.syncInterval);
+      console.log('⚠️ Auto sync already running, skipping...');
+      return;
     }
 
+    console.log(`🚀 Starting auto sync with interval: ${intervalMs}ms`);
+
     this.syncInterval = setInterval(async () => {
-      // Периодическая очистка (каждые 10 циклов синхронизации)
-      const syncCount = Math.floor(Date.now() / intervalMs);
-      if (syncCount % 10 === 0) {
-        try {
+      try {
+        // Периодическая очистка (каждые 10 циклов синхронизации)
+        const syncCount = Math.floor(Date.now() / intervalMs);
+        if (syncCount % 10 === 0) {
           this.cleanupOldOperations();
           this.cleanupLocalStorage();
-        } catch (error) {
-          console.error('Periodic cleanup failed:', error);
         }
-      }
-      
-      // Если в локальном режиме, работаем только с localStorage
-      if (this.syncMode === 'local') {
-        if (this.syncQueue.filter(op => op.status === 'pending').length > 0) {
-          await this.performLocalSync([...this.syncQueue.filter(op => op.status === 'pending')]);
+        
+        // Если в локальном режиме, работаем только с localStorage
+        if (this.syncMode === 'local') {
+          const pendingOps = this.syncQueue.filter(op => op.status === 'pending');
+          if (pendingOps.length > 0) {
+            console.log(`🔄 Local sync: processing ${pendingOps.length} pending operations`);
+            await this.performLocalSync([...pendingOps]);
+          }
+          return;
         }
-        return;
-      }
-      
-      if (this.isOnline && this.syncQueue.filter(op => op.status === 'pending').length > 0) {
+        
+        // Проверяем, есть ли операции для синхронизации
+        const pendingOps = this.syncQueue.filter(op => op.status === 'pending');
+        if (pendingOps.length === 0) {
+          return; // Нет операций для синхронизации
+        }
+        
+        // Проверяем время последней попытки
         const now = Date.now();
         if (now - this.lastSyncAttempt < this.syncRetryDelay) {
-          return;
+          return; // Слишком рано для повторной попытки
         }
         
         this.lastSyncAttempt = now;
         
+        // Проверяем доступность API
         const { isApiAvailable } = await import('../config/api');
         if (!isApiAvailable()) {
+          console.log('⚠️ API not available, switching to local mode');
           this.syncMode = 'local';
-          await this.performLocalSync([...this.syncQueue]);
+          await this.performLocalSync([...pendingOps]);
           return;
         }
         
@@ -1689,30 +1720,37 @@ class SyncAdapter {
             const testUrl = getApiUrl('sync');
             
             if (testUrl && testUrl.includes('supabase.co')) {
-              // Проверяем доступность Supabase Edge Functions через sync endpoint
               const testResponse = await fetch(testUrl, {
                 method: 'HEAD',
                 headers: getAuthHeaders()
               });
               
               if (!testResponse.ok && testResponse.status !== 404) {
-                console.log('Supabase not accessible in auto sync, switching to local mode');
+                console.log('⚠️ Supabase not accessible, switching to local mode');
                 this.syncMode = 'local';
-                await this.performLocalSync([...this.syncQueue]);
+                await this.performLocalSync([...pendingOps]);
                 return;
               }
             }
           } catch (testError) {
-            console.log('Supabase accessibility test failed in auto sync, switching to local mode:', testError);
+            console.log('⚠️ Supabase accessibility test failed, switching to local mode:', testError);
             this.syncMode = 'local';
-            await this.performLocalSync([...this.syncQueue]);
+            await this.performLocalSync([...pendingOps]);
             return;
           }
         }
         
+        // Выполняем синхронизацию
+        console.log(`🔄 Auto sync: processing ${pendingOps.length} operations`);
         await this.performSync();
+        
+      } catch (error) {
+        console.error('❌ Auto sync error:', error);
+        // При ошибке не перезапускаем, просто логируем
       }
     }, intervalMs);
+    
+    console.log('✅ Auto sync started successfully');
   }
 
   // Остановить автоматическую синхронизацию
