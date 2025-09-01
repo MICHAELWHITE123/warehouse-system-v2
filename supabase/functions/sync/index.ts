@@ -77,6 +77,8 @@ serve(async (req) => {
       const savedOperations = []
       for (const operation of operations) {
         try {
+          console.log(`📤 Saving operation: ${operation.operation} on ${operation.table}`, operation.data)
+          
           const { data, error } = await supabase
             .from('sync_operations')
             .insert({
@@ -88,7 +90,7 @@ serve(async (req) => {
               source_device_id: deviceId,
               user_id: userId || null,
               operation_hash: operation.hash,
-              status: 'pending'
+              status: 'acknowledged'
             })
             .select()
             .single()
@@ -154,7 +156,7 @@ serve(async (req) => {
         .from('sync_operations')
         .select('*')
         .neq('source_device_id', deviceId)
-        .eq('status', 'pending')
+        .in('status', ['pending', 'acknowledged'])
 
       if (lastSync) {
         const lastSyncDate = new Date(parseInt(lastSync))
