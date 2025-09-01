@@ -900,8 +900,11 @@ class SyncAdapter {
   private async applyRemoteOperation(operation: SyncOperation): Promise<void> {
     try {
       // Проверяем, не применяли ли мы уже эту операцию
-      if (operation.timestamp <= this.lastSync) {
-        console.log(`Skipping already applied operation: ${operation.operation} on ${operation.table}`);
+      // Если lastSync = 0, это первая синхронизация, применяем все операции
+      if (this.lastSync > 0 && operation.timestamp <= this.lastSync) {
+        if (import.meta.env.DEV) {
+          console.log(`⏭️ Skipping already applied operation: ${operation.operation} on ${operation.table} (timestamp: ${operation.timestamp}, lastSync: ${this.lastSync})`);
+        }
         return;
       }
       
@@ -1471,9 +1474,11 @@ class SyncAdapter {
           // await this.acknowledgeOperation(operation.operation_id);
         }
         
-        this.lastSync = Date.now();
+        // Устанавливаем lastSync как время последней примененной операции
+        // Это предотвратит повторное применение тех же операций
         if (import.meta.env.DEV) {
           console.log('✅ Successfully applied operations from other devices');
+          console.log(`📅 Updated lastSync to: ${new Date(this.lastSync).toISOString()}`);
         }
       }
       
@@ -1517,7 +1522,8 @@ class SyncAdapter {
         for (const operation of sortedOperations) {
           try {
             // Проверяем, не применяли ли мы уже эту операцию
-            if (operation.timestamp <= this.lastSync) {
+            // Если lastSync = 0, это первая синхронизация, применяем все операции
+            if (this.lastSync > 0 && operation.timestamp <= this.lastSync) {
               skippedOperations++;
               continue;
             }
@@ -1856,6 +1862,22 @@ class SyncAdapter {
       console.log(`Cleaning up ${oldOperations.length} old operations`);
       this.syncQueue = this.syncQueue.filter(op => !oldOperations.includes(op));
       this.saveSyncQueue();
+    }
+  }
+  
+  // Сбросить синхронизацию (для отладки)
+  resetSync(): void {
+    if (import.meta.env.DEV) {
+      console.log('🔄 Resetting sync state...');
+    }
+    
+    this.lastSync = 0;
+    this.lastSyncAttempt = 0;
+    this.syncMode = 'hybrid';
+    this.isForcedLocalMode = false;
+    
+    if (import.meta.env.DEV) {
+      console.log('✅ Sync state reset completed');
     }
   }
   

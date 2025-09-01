@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface DiagnosticResult {
   name: string;
@@ -198,15 +199,33 @@ export function Diagnostics() {
                 Check system health and configuration
               </CardDescription>
             </div>
-            <Button 
-              onClick={runDiagnostics} 
-              disabled={isLoading}
-              variant="outline"
-              size="sm"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
+            <div className="flex space-x-2">
+              <Button 
+                onClick={runDiagnostics} 
+                disabled={isLoading}
+                variant="outline"
+                size="sm"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Button 
+                onClick={async () => {
+                  try {
+                    const { syncAdapter } = await import('../database/syncAdapter');
+                    syncAdapter.resetSync();
+                    toast.success('Sync state reset successfully');
+                    runDiagnostics();
+                  } catch (error) {
+                    toast.error('Failed to reset sync state');
+                  }
+                }}
+                variant="destructive"
+                size="sm"
+              >
+                Reset Sync
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
