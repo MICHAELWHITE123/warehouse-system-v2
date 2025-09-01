@@ -186,7 +186,7 @@ class SyncAdapter {
             // Проверяем доступность Supabase Edge Functions через sync endpoint
             const testResponse = await fetch(testUrl, {
               method: 'HEAD',
-              headers: getAuthHeaders()
+              headers: getAuthHeaders(this.deviceId)
             });
             
             if (!testResponse.ok && testResponse.status !== 404) {
@@ -618,7 +618,7 @@ class SyncAdapter {
             // Проверяем доступность Supabase Edge Functions через sync endpoint
             const testResponse = await fetch(testUrl, {
               method: 'HEAD',
-              headers: getAuthHeaders()
+              headers: getAuthHeaders(this.deviceId)
             });
             
             if (testResponse.ok || testResponse.status === 404) {
@@ -664,7 +664,7 @@ class SyncAdapter {
                       // Проверяем доступность Supabase Edge Functions через sync endpoint
             const testResponse = await fetch(apiUrl, {
               method: 'HEAD',
-              headers: getAuthHeaders()
+              headers: getAuthHeaders(this.deviceId)
             });
           
           if (!testResponse.ok && testResponse.status !== 404) {
@@ -679,7 +679,7 @@ class SyncAdapter {
       
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: getAuthHeaders(this.deviceId),
         body: JSON.stringify({
           operations,
           deviceId: this.deviceId,
@@ -1014,7 +1014,7 @@ class SyncAdapter {
           // Проверяем доступность Supabase Edge Functions через sync endpoint
           const testResponse = await fetch(testUrl, {
             method: 'HEAD',
-            headers: getAuthHeaders()
+            headers: getAuthHeaders(this.deviceId)
           });
           
           if (!testResponse.ok && testResponse.status !== 404) {
@@ -1185,7 +1185,7 @@ class SyncAdapter {
                 // Проверяем доступность Supabase Edge Functions через sync endpoint
                 const testResponse = await fetch(testUrl, {
                   method: 'HEAD',
-                  headers: getAuthHeaders()
+                  headers: getAuthHeaders(this.deviceId)
                 });
                 
                 if (!testResponse.ok && testResponse.status !== 404) {
@@ -1240,7 +1240,7 @@ class SyncAdapter {
                 // Проверяем доступность Supabase Edge Functions через sync endpoint
                 const testResponse = await fetch(testUrl, {
                   method: 'HEAD',
-                  headers: getAuthHeaders()
+                  headers: getAuthHeaders(this.deviceId)
                 });
                 
                 if (!testResponse.ok && testResponse.status !== 404) {
@@ -1289,7 +1289,7 @@ class SyncAdapter {
                 // Проверяем доступность Supabase Edge Functions через sync endpoint
                 const testResponse = await fetch(testUrl, {
                   method: 'HEAD',
-                  headers: getAuthHeaders()
+                  headers: getAuthHeaders(this.deviceId)
                 });
                 
                 if (!testResponse.ok && testResponse.status !== 404) {
@@ -1417,7 +1417,7 @@ class SyncAdapter {
           // Проверяем доступность Supabase Edge Functions через sync endpoint
           const testResponse = await fetch(apiUrl, {
             method: 'HEAD',
-            headers: getAuthHeaders()
+            headers: getAuthHeaders(this.deviceId)
           });
           
           if (!testResponse.ok && testResponse.status !== 404) {
@@ -1438,7 +1438,7 @@ class SyncAdapter {
       
       const response = await fetch(apiUrl, {
         method: 'GET',
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(this.deviceId)
       });
 
       if (!response.ok) {
@@ -1688,7 +1688,7 @@ class SyncAdapter {
           // Проверяем доступность Supabase Edge Functions через sync endpoint
           const testResponse = await fetch(apiUrl, {
             method: 'HEAD',
-            headers: getAuthHeaders()
+            headers: getAuthHeaders(this.deviceId)
           });
           
           if (!testResponse.ok && testResponse.status !== 404) {
@@ -1703,7 +1703,7 @@ class SyncAdapter {
       
       await fetch(apiUrl, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: getAuthHeaders(this.deviceId),
         body: JSON.stringify({
           deviceId: this.deviceId
         })
@@ -1785,7 +1785,7 @@ class SyncAdapter {
             if (testUrl && testUrl.includes('supabase.co')) {
               const testResponse = await fetch(testUrl, {
                 method: 'HEAD',
-                headers: getAuthHeaders()
+                headers: getAuthHeaders(this.deviceId)
               });
               
               if (!testResponse.ok && testResponse.status !== 404) {

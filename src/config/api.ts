@@ -95,7 +95,7 @@ export const isPostgresAvailable = (): boolean => {
 };
 
 // Функция для получения заголовков с авторизацией
-export const getAuthHeaders = (): Record<string, string> => {
+export const getAuthHeaders = (deviceId?: string): Record<string, string> => {
   const token = localStorage.getItem('auth-token');
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   
@@ -113,13 +113,15 @@ export const getAuthHeaders = (): Record<string, string> => {
   if (API_CONFIG.BASE_URL.includes('/api')) {
     return {
       ...API_CONFIG.DEFAULT_HEADERS,
-      ...(token && { 'Authorization': `Bearer ${token}` })
+      ...(token && { 'Authorization': `Bearer ${token}` }),
+      ...(deviceId && { 'X-Device-ID': deviceId })
     };
   }
   
   return {
     ...API_CONFIG.DEFAULT_HEADERS,
-    ...(token && { 'Authorization': `Bearer ${token}` })
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+    ...(deviceId && { 'X-Device-ID': deviceId })
   };
 };
 

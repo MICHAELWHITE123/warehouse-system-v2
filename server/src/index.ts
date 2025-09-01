@@ -25,6 +25,8 @@ app.use(cors({
     'http://localhost:4176',
     'https://warehouse-system-v2.vercel.app',
     'https://warehouse-system-v2.vercel.app/',
+    'https://warehouse-frontend-two.vercel.app',
+    'https://warehouse-frontend-two.vercel.app/',
     ...(process.env.CORS_ORIGIN ? [process.env.CORS_ORIGIN] : [])
   ],
   credentials: true,

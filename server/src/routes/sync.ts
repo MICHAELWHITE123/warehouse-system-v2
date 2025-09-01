@@ -19,6 +19,42 @@ if (process.env.SYNC_RATE_LIMIT_DISABLED !== 'true') {
 }
 
 // ========================================
+// TEST ENDPOINT (без аутентификации для отладки)
+// ========================================
+
+/**
+ * Test endpoint для проверки синхронизации без аутентификации
+ * Этот endpoint используется для отладки проблем с синхронизацией
+ */
+router.post('/test', logRequest, async (req, res) => {
+  try {
+    const { operations, deviceId } = req.body;
+    
+    console.log(`🧪 TEST SYNC: Received ${operations?.length || 0} operations from device ${deviceId || 'unknown'}`);
+    
+    // Просто возвращаем успешный ответ для тестирования
+    res.json({
+      success: true,
+      message: 'Test sync endpoint working',
+      received: {
+        operationsCount: operations?.length || 0,
+        deviceId: deviceId || 'unknown',
+        timestamp: new Date().toISOString()
+      },
+      conflicts: []
+    });
+    
+  } catch (error) {
+    console.error('Test sync error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Test sync failed',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// ========================================
 // LEGACY ENDPOINTS (DEVICE AUTHENTICATION)
 // ========================================
 
