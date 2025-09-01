@@ -56,31 +56,54 @@ export const API_CONFIG = {
 export const getApiUrl = (endpoint: string): string => {
   const baseUrl = API_CONFIG.BASE_URL;
   
-  // Если базовый URL пустой (production без backend), возвращаем пустую строку
-  if (!baseUrl) {
-    return '';
+  console.log(`🔧 getApiUrl called with endpoint: ${endpoint}`);
+  console.log(`🔧 API_CONFIG.BASE_URL: ${baseUrl}`);
+  console.log(`🔧 window.location.hostname: ${window.location.hostname}`);
+  
+  // Если базовый URL пустой или не указан, используем Vercel API
+  if (!baseUrl || baseUrl.trim() === '') {
+    // На Vercel используем относительные пути к API
+    if (window.location.hostname.includes('vercel.app')) {
+      const url = `/api/${endpoint}`;
+      console.log(`🔧 Using Vercel API: ${url}`);
+      return url;
+    }
+    // В development используем localhost
+    const url = `http://localhost:3001/${endpoint}`;
+    console.log(`🔧 Using localhost API: ${url}`);
+    return url;
   }
   
   // Если это Supabase URL, используем Edge Functions API
   if (baseUrl.includes('supabase.co')) {
     const cleanBaseUrl = baseUrl.replace(/\.supabase\.co.*$/, '.supabase.co'); // Убираем все после .supabase.co
-    return `${cleanBaseUrl}/functions/v1/${endpoint}`;
+    const url = `${cleanBaseUrl}/functions/v1/${endpoint}`;
+    console.log(`🔧 Using Supabase API: ${url}`);
+    return url;
   }
   
   // Если это Vercel API, используем прямые пути
   if (baseUrl.includes('/api')) {
     const cleanBaseUrl = baseUrl.replace(/\/$/, ''); // Убираем trailing slash
     const cleanEndpoint = endpoint.replace(/^\//, ''); // Убираем leading slash
-    return `${cleanBaseUrl}/functions/v1/${cleanEndpoint}`;
+    const url = `${cleanBaseUrl}/functions/v1/${cleanEndpoint}`;
+    console.log(`🔧 Using configured Vercel API: ${url}`);
+    return url;
   }
   
   const cleanBaseUrl = baseUrl.replace(/\/$/, ''); // Убираем trailing slash
   const cleanEndpoint = endpoint.replace(/^\//, ''); // Убираем leading slash
-  return `${cleanBaseUrl}/${cleanEndpoint}`;
+  const url = `${cleanBaseUrl}/${cleanEndpoint}`;
+  console.log(`🔧 Using fallback API: ${url}`);
+  return url;
 };
 
 // Функция для проверки доступности API
 export const isApiAvailable = (): boolean => {
+  // Если базовый URL не указан, но мы на Vercel, API доступен
+  if (!API_CONFIG.BASE_URL || API_CONFIG.BASE_URL.trim() === '') {
+    return window.location.hostname.includes('vercel.app');
+  }
   return !!API_CONFIG.BASE_URL;
 };
 
@@ -100,7 +123,7 @@ export const getAuthHeaders = (deviceId?: string): Record<string, string> => {
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   
   // Если используем Supabase, добавляем специальные заголовки
-  if (API_CONFIG.BASE_URL.includes('supabase.co')) {
+  if (API_CONFIG.BASE_URL && API_CONFIG.BASE_URL.includes('supabase.co')) {
     return {
       ...API_CONFIG.DEFAULT_HEADERS,
       'apikey': supabaseKey || '',
@@ -109,15 +132,7 @@ export const getAuthHeaders = (deviceId?: string): Record<string, string> => {
     };
   }
   
-  // Для Vercel API используем стандартные заголовки
-  if (API_CONFIG.BASE_URL.includes('/api')) {
-    return {
-      ...API_CONFIG.DEFAULT_HEADERS,
-      ...(token && { 'Authorization': `Bearer ${token}` }),
-      ...(deviceId && { 'X-Device-ID': deviceId })
-    };
-  }
-  
+  // Для Vercel API или когда базовый URL не указан, используем стандартные заголовки
   return {
     ...API_CONFIG.DEFAULT_HEADERS,
     ...(token && { 'Authorization': `Bearer ${token}` }),
