@@ -97,7 +97,7 @@ export default function App() {
   const notificationCount = stats.maintenanceEquipment;
 
   // Real-time синхронизация для автоматического обновления UI
-  const { isConnected: realtimeConnected, lastUpdate } = useRealTimeSync({
+  const { isConnected: realtimeConnected } = useRealTimeSync({
     onEquipmentUpdate: (event: RealTimeEvent) => {
       console.log('🔄 Real-time equipment update received:', event);
       // Обновляем данные оборудования при получении realtime события

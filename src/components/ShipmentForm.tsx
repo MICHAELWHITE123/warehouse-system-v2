@@ -162,14 +162,6 @@ export function ShipmentForm({
       });
     }
     
-    // Обновляем статус техники в локальном состоянии
-    // Это позволит UI обновиться в реальном времени
-    const updatedEquipment = equipment.map(eq => 
-      eq.id === equipmentId 
-        ? { ...eq, status: newStatus as Equipment['status'] }
-        : eq
-    );
-    
     // Показываем уведомление об изменении статуса
     toast.success(`Статус техники изменен на: ${newStatus === 'in-use' ? 'В работе' : newStatus}`);
   };
