@@ -1450,7 +1450,8 @@ class SyncAdapter {
             retryCount: 0
           });
           
-          await this.acknowledgeOperation(operation.operation_id);
+          // Временно отключаем подтверждение операций из-за проблем с триггером
+          // await this.acknowledgeOperation(operation.operation_id);
         }
         
         this.lastSync = Date.now();
@@ -1622,7 +1623,8 @@ class SyncAdapter {
     }
   }
 
-  // Подтверждение получения операции
+  // Подтверждение получения операции (временно отключено)
+  /*
   private async acknowledgeOperation(operationId: string): Promise<void> {
     try {
       const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
@@ -1677,6 +1679,7 @@ class SyncAdapter {
       }
     }
   }
+  */
 
   // Запустить автоматическую синхронизацию
   startAutoSync(intervalMs: number = 30000): void {

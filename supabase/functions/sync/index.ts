@@ -54,9 +54,96 @@ serve(async (req) => {
     }
 
     if (req.method === 'POST') {
-      // Отправка операций (PUSH)
-      const body: SyncRequest = await req.json()
-      const { operations, deviceId, userId } = body
+      // Проверяем, это подтверждение операции или отправка операций
+      const url = new URL(req.url)
+      const pathParts = url.pathname.split('/')
+      const isAcknowledge = pathParts[pathParts.length - 1] === 'acknowledge'
+      
+      if (isAcknowledge) {
+        // Подтверждение получения операции (ACK)
+        const operationId = pathParts[pathParts.length - 2]
+        
+        if (!operationId) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              message: 'Operation ID is required'
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          )
+        }
+
+        const body = await req.json()
+        const { deviceId } = body
+
+        if (!deviceId) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              message: 'deviceId is required'
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          )
+        }
+
+        // Помечаем операцию как подтвержденную
+        console.log(`📝 Acknowledging operation ${operationId} by device ${deviceId}`)
+        
+        // Обновляем только поля подтверждения, не трогая updated_at
+        // Сначала обновляем acknowledged_by
+        const { error: error1 } = await supabase
+          .from('sync_operations')
+          .update({
+            acknowledged_by: deviceId
+          })
+          .eq('operation_id', operationId)
+        
+        // Затем обновляем acknowledged_at
+        const { error: error2 } = await supabase
+          .from('sync_operations')
+          .update({
+            acknowledged_at: new Date().toISOString()
+          })
+          .eq('operation_id', operationId)
+        
+        const error = error1 || error2
+
+        if (error) {
+          console.error('Failed to acknowledge operation:', error)
+          console.error('Error details:', JSON.stringify(error, null, 2))
+          return new Response(
+            JSON.stringify({
+              success: false,
+              message: 'Failed to acknowledge operation',
+              error: error.message
+            }),
+            {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          )
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: 'Operation acknowledged'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
+          }
+        )
+      } else {
+        // Отправка операций (PUSH)
+        const body: SyncRequest = await req.json()
+        const { operations, deviceId, userId } = body
 
       if (!operations || !Array.isArray(operations) || !deviceId) {
         return new Response(
@@ -97,6 +184,7 @@ serve(async (req) => {
 
           if (error) {
             console.error(`Failed to save operation ${operation.id}:`, error)
+            console.error('Operation data:', operation)
             continue
           }
 
@@ -129,7 +217,7 @@ serve(async (req) => {
           status: 200
         }
       )
-
+      }
     } else if (req.method === 'GET') {
       // Получение операций (PULL)
       const url = new URL(req.url)
@@ -196,75 +284,7 @@ serve(async (req) => {
         }
       )
 
-    } else if (req.method === 'PUT') {
-      // Подтверждение получения операции (ACK)
-      const url = new URL(req.url)
-      const pathParts = url.pathname.split('/')
-      const operationId = pathParts[pathParts.length - 1]
 
-      if (!operationId || operationId === 'acknowledge') {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: 'Operation ID is required'
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        )
-      }
-
-      const body = await req.json()
-      const { deviceId } = body
-
-      if (!deviceId) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: 'deviceId is required'
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        )
-      }
-
-      // Помечаем операцию как подтвержденную
-      const { error } = await supabase
-        .from('sync_operations')
-        .update({
-          status: 'acknowledged',
-          acknowledged_by: deviceId,
-          acknowledged_at: new Date().toISOString()
-        })
-        .eq('operation_id', operationId)
-
-      if (error) {
-        console.error('Failed to acknowledge operation:', error)
-        return new Response(
-          JSON.stringify({
-            success: false,
-            message: 'Failed to acknowledge operation'
-          }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        )
-      }
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'Operation acknowledged'
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
-        }
-      )
 
     } else {
       return new Response(
