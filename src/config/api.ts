@@ -2,6 +2,12 @@
 export const API_CONFIG = {
   // Базовый URL API - автоматически определяется по окружению
   BASE_URL: (() => {
+    // ПРИНУДИТЕЛЬНОЕ ПЕРЕКЛЮЧЕНИЕ НА VERCEL API В PRODUCTION
+    if (window.location.hostname.includes('vercel.app')) {
+      console.log('🔧 Принудительно переключаюсь на Vercel API в production');
+      return ''; // Пустая строка заставит использовать Vercel API
+    }
+    
     // Если указан переменная окружения, используем её
     if (import.meta.env.VITE_API_URL) {
       return import.meta.env.VITE_API_URL;
@@ -59,6 +65,13 @@ export const getApiUrl = (endpoint: string): string => {
   console.log(`🔧 getApiUrl called with endpoint: ${endpoint}`);
   console.log(`🔧 API_CONFIG.BASE_URL: ${baseUrl}`);
   console.log(`🔧 window.location.hostname: ${window.location.hostname}`);
+  
+  // ПРИНУДИТЕЛЬНОЕ ПЕРЕКЛЮЧЕНИЕ НА VERCEL API В PRODUCTION
+  if (window.location.hostname.includes('vercel.app')) {
+    const url = `/api/${endpoint}`;
+    console.log(`🔧 ПРИНУДИТЕЛЬНО использую Vercel API: ${url}`);
+    return url;
+  }
   
   // Если базовый URL пустой или не указан, используем Vercel API
   if (!baseUrl || baseUrl.trim() === '') {
