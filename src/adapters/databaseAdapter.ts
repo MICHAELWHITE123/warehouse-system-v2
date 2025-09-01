@@ -72,8 +72,11 @@ export function adaptEquipmentToDB(
 
 // Преобразование стека из БД в интерфейс компонента
 export function adaptStackFromDB(dbStack: StackWithEquipment): EquipmentStack {
-  console.log('adaptStackFromDB input:', dbStack);
-  console.log('dbStack.tags:', dbStack.tags, 'type:', typeof dbStack.tags);
+  // Only log in development mode
+  if (import.meta.env.DEV) {
+    console.log('🔄 adaptStackFromDB input:', dbStack);
+    console.log('🏷️ dbStack.tags:', dbStack.tags, 'type:', typeof dbStack.tags);
+  }
   
   let tags: string[] = [];
   
@@ -84,13 +87,17 @@ export function adaptStackFromDB(dbStack: StackWithEquipment): EquipmentStack {
       if (Array.isArray(parsed)) {
         tags = parsed;
       } else {
-        console.warn('Tags for stack is not an array:', dbStack.uuid, parsed);
+        if (import.meta.env.DEV) {
+          console.warn('⚠️ Tags for stack is not an array:', dbStack.uuid, parsed);
+        }
         tags = [];
       }
     }
   } catch (error) {
-    console.warn('Failed to parse tags for stack:', dbStack.uuid, error);
-    console.warn('Raw tags value:', dbStack.tags);
+    if (import.meta.env.DEV) {
+      console.warn('⚠️ Failed to parse tags for stack:', dbStack.uuid, error);
+      console.warn('📝 Raw tags value:', dbStack.tags);
+    }
     tags = [];
   }
   
@@ -104,7 +111,9 @@ export function adaptStackFromDB(dbStack: StackWithEquipment): EquipmentStack {
     tags
   };
   
-  console.log('adaptStackFromDB result:', result);
+  if (import.meta.env.DEV) {
+    console.log('✅ adaptStackFromDB result:', result);
+  }
   return result;
 }
 
@@ -113,8 +122,11 @@ export function adaptStackToDB(
   stack: Omit<EquipmentStack, 'id'>,
   uuid?: string
 ): CreateEquipmentStack {
-  console.log('adaptStackToDB input:', stack);
-  console.log('stack.tags:', stack.tags);
+  // Only log in development mode
+  if (import.meta.env.DEV) {
+    console.log('🔄 adaptStackToDB input:', stack);
+    console.log('🏷️ stack.tags:', stack.tags);
+  }
   
   const result = {
     uuid: uuid || Date.now().toString(),
@@ -124,7 +136,9 @@ export function adaptStackToDB(
     tags: stack.tags && stack.tags.length > 0 ? JSON.stringify(stack.tags) : undefined
   };
   
-  console.log('adaptStackToDB result:', result);
+  if (import.meta.env.DEV) {
+    console.log('✅ adaptStackToDB result:', result);
+  }
   return result;
 }
 

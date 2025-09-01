@@ -154,9 +154,13 @@ export function ShipmentForm({
 
   // Обработчик изменения статуса техники
   const handleEquipmentStatusChange = (equipmentId: string, newStatus: string) => {
-    console.log('=== ShipmentForm: handleEquipmentStatusChange ===');
-    console.log('equipmentId:', equipmentId);
-    console.log('newStatus:', newStatus);
+    if (import.meta.env.DEV) {
+      console.log('🔧 Equipment status change:', {
+        equipmentId,
+        newStatus,
+        equipmentCount: equipment.length
+      });
+    }
     
     // Обновляем статус техники в локальном состоянии
     // Это позволит UI обновиться в реальном времени
@@ -165,9 +169,6 @@ export function ShipmentForm({
         ? { ...eq, status: newStatus as Equipment['status'] }
         : eq
     );
-    
-    console.log('Обновленное оборудование:', updatedEquipment);
-    console.log('===============================');
     
     // Показываем уведомление об изменении статуса
     toast.success(`Статус техники изменен на: ${newStatus === 'in-use' ? 'В работе' : newStatus}`);

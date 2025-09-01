@@ -88,7 +88,11 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
     }
 
     isConnectingRef.current = true;
-    console.log('🔗 Connecting to Supabase Realtime for tables:', tables);
+    
+    // Only log connection attempts in development mode
+    if (import.meta.env.DEV) {
+      console.log('🔗 Connecting to Supabase Realtime for tables:', tables);
+    }
 
     try {
       // Отключаем существующие каналы
@@ -109,9 +113,10 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
               table: table
             },
             (payload) => {
-              console.log(`📨 Realtime event for table ${table}:`, payload);
-              console.log(`🔍 Payload type:`, typeof payload);
-              console.log(`🔍 Payload keys:`, Object.keys(payload || {}));
+              // Only log events in development mode
+              if (import.meta.env.DEV) {
+                console.log(`📨 Realtime event for table ${table}:`, payload);
+              }
               
               // Преобразуем payload в формат, ожидаемый обработчиками
               const event = {
@@ -122,15 +127,15 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
                 timestamp: new Date().toISOString()
               };
               
-              console.log(`🔍 Transformed event:`, event);
-              
               // Вызываем обработчик события
-              console.log(`🔍 Calling handleRealtimeEvent for table ${table}`);
               handleRealtimeEvent(event);
             }
           )
           .subscribe((status) => {
-            console.log(`📡 Channel ${table} status:`, status);
+            // Only log status changes in development mode
+            if (import.meta.env.DEV) {
+              console.log(`📡 Channel ${table} status:`, status);
+            }
             
             if (status === 'SUBSCRIBED') {
               setIsConnected(true);
@@ -142,6 +147,10 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
               isConnectingRef.current = false;
               
               if (autoReconnect) {
+                // Log reconnection attempts only in development
+                if (import.meta.env.DEV) {
+                  console.log(`🔄 Reconnecting to ${table} in 5 seconds...`);
+                }
                 setTimeout(() => connect(), 5000);
               }
             }
@@ -164,7 +173,10 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
     }
 
     isDisconnectingRef.current = true;
-    console.log('🔌 Disconnecting from Supabase Realtime');
+    
+    if (import.meta.env.DEV) {
+      console.log('🔌 Disconnecting from Supabase Realtime');
+    }
     
     channelsRef.current.forEach(channel => {
       supabase.removeChannel(channel);
@@ -180,16 +192,15 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
   useEffect(() => {
     if (!isConnected && !isConnectingRef.current && !hasInitializedRef.current) {
       hasInitializedRef.current = true;
-      connect();
+      
+      // Add a small delay to avoid immediate connection attempts
+      const timer = setTimeout(() => {
+        connect();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
     }
-
-    // Отключение при размонтировании
-    return () => {
-      if (isConnected) {
-        disconnect();
-      }
-    };
-  }, []); // Пустой массив зависимостей - выполняется только при монтировании
+  }, [connect, isConnected]);
 
   // Функция для уведомления других клиентов через изменение в БД
   const notifyChange = useCallback(async (table: string, action: 'INSERT' | 'UPDATE' | 'DELETE', data: any) => {

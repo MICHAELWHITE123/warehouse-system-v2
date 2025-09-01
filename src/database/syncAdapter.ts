@@ -1368,17 +1368,24 @@ class SyncAdapter {
       
       const now = Date.now();
       if (now - this.lastSyncAttempt < this.syncRetryDelay) {
-        console.log('Skipping server sync - too soon after last attempt');
+        if (import.meta.env.DEV) {
+          console.log('⏭️ Skipping server sync - too soon after last attempt');
+        }
         return;
       }
       
       this.lastSyncAttempt = now;
-      console.log('Pulling operations from server...');
+      
+      if (import.meta.env.DEV) {
+        console.log('🔄 Pulling operations from server...');
+      }
       
       const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
       
       if (!isApiAvailable()) {
-        console.log('API not available, using local sync only');
+        if (import.meta.env.DEV) {
+          console.log('⚠️ API not available, using local sync only');
+        }
         await this.pullOperationsFromLocalStorage();
         return;
       }
@@ -1386,37 +1393,45 @@ class SyncAdapter {
       const apiUrl = getApiUrl(`sync?deviceId=${this.deviceId}&lastSync=${this.lastSync}`);
       
       if (!apiUrl) {
-        console.log('API URL is empty, using local sync only');
+        if (import.meta.env.DEV) {
+          console.log('⚠️ API URL is empty, using local sync only');
+        }
         await this.pullOperationsFromLocalStorage();
         return;
       }
       
       if (apiUrl.includes('localhost') && window.location.hostname.includes('vercel.app')) {
-        console.log('On Vercel, skipping server sync to localhost');
+        if (import.meta.env.DEV) {
+          console.log('🌐 On Vercel, skipping server sync to localhost');
+        }
         await this.pullOperationsFromLocalStorage();
         return;
       }
       
-              // Дополнительная проверка доступности URL
-        if (apiUrl.includes('supabase.co')) {
-          try {
-            // Проверяем доступность Supabase Edge Functions через sync endpoint
-            const testResponse = await fetch(apiUrl, {
-              method: 'HEAD',
-              headers: getAuthHeaders()
-            });
-            
-            if (!testResponse.ok && testResponse.status !== 404) {
-              console.log('Supabase URL not accessible, using local sync only');
-              await this.pullOperationsFromLocalStorage();
-              return;
+      // Дополнительная проверка доступности URL
+      if (apiUrl.includes('supabase.co')) {
+        try {
+          // Проверяем доступность Supabase Edge Functions через sync endpoint
+          const testResponse = await fetch(apiUrl, {
+            method: 'HEAD',
+            headers: getAuthHeaders()
+          });
+          
+          if (!testResponse.ok && testResponse.status !== 404) {
+            if (import.meta.env.DEV) {
+              console.log('⚠️ Supabase URL not accessible, using local sync only');
             }
-          } catch (testError) {
-            console.log('Supabase URL test failed, using local sync only:', testError);
             await this.pullOperationsFromLocalStorage();
             return;
           }
+        } catch (testError) {
+          if (import.meta.env.DEV) {
+            console.log('⚠️ Supabase URL test failed, using local sync only:', testError);
+          }
+          await this.pullOperationsFromLocalStorage();
+          return;
         }
+      }
       
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -1434,7 +1449,9 @@ class SyncAdapter {
       const result = await response.json();
       
       if (result.success && result.data && result.data.length > 0) {
-        console.log(`Received ${result.data.length} operations from other devices`);
+        if (import.meta.env.DEV) {
+          console.log(`📥 Received ${result.data.length} operations from other devices`);
+        }
         
         for (const operation of result.data) {
           await this.applyRemoteOperation({
@@ -1455,11 +1472,15 @@ class SyncAdapter {
         }
         
         this.lastSync = Date.now();
-        console.log('Successfully applied operations from other devices');
+        if (import.meta.env.DEV) {
+          console.log('✅ Successfully applied operations from other devices');
+        }
       }
       
     } catch (error) {
-      console.error('Failed to pull operations from server:', error);
+      if (import.meta.env.DEV) {
+        console.error('❌ Failed to pull operations from server:', error);
+      }
       
       // Если ошибка связана с недоступностью URL, переключаемся на локальную синхронизацию
       if (error instanceof Error && (
@@ -1467,7 +1488,9 @@ class SyncAdapter {
         error.message.includes('ERR_NAME_NOT_RESOLVED') ||
         error.message.includes('ERR_CONNECTION_REFUSED')
       )) {
-        console.log('Network error detected, switching to local sync');
+        if (import.meta.env.DEV) {
+          console.log('🌐 Network error detected, switching to local sync');
+        }
         this.syncMode = 'local';
         await this.pullOperationsFromLocalStorage();
         return;
@@ -1567,9 +1590,13 @@ class SyncAdapter {
       localStorage.setItem(storageKey, JSON.stringify(operations));
       localStorage.setItem('warehouse-sync-updated', Date.now().toString());
       
-      console.log(`Operation saved to localStorage: ${operation.operation} on ${operation.table}`);
+      if (import.meta.env.DEV) {
+        console.log(`💾 Operation saved to localStorage: ${operation.operation} on ${operation.table}`);
+      }
     } catch (error) {
-      console.error('Failed to save operation to localStorage:', error);
+      if (import.meta.env.DEV) {
+        console.error('❌ Failed to save operation to localStorage:', error);
+      }
     }
   }
 
@@ -1580,7 +1607,9 @@ class SyncAdapter {
       const now = Date.now();
       const maxAge = 24 * 60 * 60 * 1000; // 24 часа
       
-      console.log('Scanning localStorage for operations...');
+      if (import.meta.env.DEV) {
+        console.log('🔍 Scanning localStorage for operations...');
+      }
       
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -1597,14 +1626,18 @@ class SyncAdapter {
               
               if (validOperations.length < operations.length) {
                 const oldOperationsCount = operations.length - validOperations.length;
-                console.log(`Cleaning up ${oldOperationsCount} old operations from ${key}`);
+                if (import.meta.env.DEV) {
+                  console.log(`🧹 Cleaning up ${oldOperationsCount} old operations from ${key}`);
+                }
                 localStorage.setItem(key, JSON.stringify(validOperations));
               }
               
               allOperations.push(...validOperations);
             }
           } catch (e) {
-            console.warn('Failed to parse localStorage operation:', e);
+            if (import.meta.env.DEV) {
+              console.warn('⚠️ Failed to parse localStorage operation:', e);
+            }
             localStorage.removeItem(key);
           }
         }
@@ -1615,10 +1648,14 @@ class SyncAdapter {
         index === self.findIndex(o => o.hash === op.hash)
       );
       
-      console.log('Total operations found:', uniqueOperations.length);
+      if (import.meta.env.DEV) {
+        console.log('📊 Total operations found:', uniqueOperations.length);
+      }
       return uniqueOperations;
     } catch (error) {
-      console.error('Error getting operations from localStorage:', error);
+      if (import.meta.env.DEV) {
+        console.error('❌ Error getting operations from localStorage:', error);
+      }
       return [];
     }
   }

@@ -77,18 +77,19 @@ export default function App() {
   const categories: string[] = adaptCategoriesFromDB(dbCategories);
   const locations: string[] = adaptLocationsFromDB(dbLocations);
   
-  console.log('=== App.tsx Debug ===');
-  console.log('dbStacks from database:', dbStacks);
+  // Debug logging only in development mode
+  if (import.meta.env.DEV) {
+    console.log('📊 Data loaded:', {
+      equipment: equipment.length,
+      categories: categories.length,
+      locations: locations.length,
+      stacks: dbStacks.length,
+      shipments: dbShipments.length
+    });
+  }
   
   const stacks: EquipmentStack[] = dbStacks.map(adaptStackFromDB);
-  
-  console.log('stacks after adaptation:', stacks);
-  console.log('dbShipments from database:', dbShipments);
-  
   const shipments: ExtendedShipment[] = dbShipments.map(adaptShipmentFromDB);
-  
-  console.log('shipments after adaptation:', shipments);
-  console.log('=====================');
 
   // Используем статистику из БД или рассчитываем локально как fallback
   const stats = dbStats || calculateStats(equipment, stacks, shipments);
@@ -146,11 +147,10 @@ export default function App() {
 
   // Логируем статус realtime подключения для отладки
   useEffect(() => {
-    console.log('🔄 Realtime connection status:', realtimeConnected);
-    if (lastUpdate) {
-      console.log('🔄 Last realtime update:', lastUpdate);
+    if (import.meta.env.DEV) {
+      console.log('🔄 Realtime connection status:', realtimeConnected ? '✅ Connected' : '❌ Disconnected');
     }
-  }, [realtimeConnected, lastUpdate]);
+  }, [realtimeConnected]);
 
   // Обработчики для оборудования
   const handleAddEquipment = async (newEquipment: Omit<Equipment, 'id'>) => {
@@ -320,12 +320,15 @@ export default function App() {
   // Обработчики для отгрузок
   const handleAddShipment = async (newShipment: Omit<ExtendedShipment, 'id'>) => {
     try {
-      console.log('=== handleAddShipment Debug ===');
-      console.log('newShipment from form:', newShipment);
-      console.log('newShipment.equipment:', newShipment.equipment);
-      console.log('newShipment.stacks:', newShipment.stacks);
-      console.log('newShipment.rental:', newShipment.rental);
-      console.log('newShipment.checklist:', newShipment.checklist);
+      // Debug logging only in development mode
+      if (import.meta.env.DEV) {
+        console.log('📦 Creating shipment:', {
+          number: newShipment.number,
+          recipient: newShipment.recipient,
+          equipmentCount: newShipment.equipment?.length || 0,
+          stacksCount: newShipment.stacks?.length || 0
+        });
+      }
       
       // Создаем данные для БД, включая связанные записи
       const fullShipmentData = {
@@ -345,17 +348,16 @@ export default function App() {
         checklist: newShipment.checklist
       };
       
-      console.log('fullShipmentData for DB:', fullShipmentData);
-      
       // Используем новый метод для создания отгрузки со всеми связанными данными
       await createShipmentWithDetails(fullShipmentData);
       
       setIsShipmentFormVisible(false);
       toast.success("Отгрузка успешно создана");
-      console.log('===============================');
     } catch (error) {
       toast.error("Ошибка при создании отгрузки");
-      console.error(error);
+      if (import.meta.env.DEV) {
+        console.error('❌ Failed to create shipment:', error);
+      }
     }
   };
 

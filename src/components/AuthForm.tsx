@@ -58,14 +58,15 @@ export function AuthForm({ onLogin }: AuthFormProps) {
     setError("");
     setIsLoading(true);
 
-    // Отладочная информация
-    console.log("=== AuthForm Debug ===");
-    console.log("Username entered:", username);
-    console.log("Password entered:", password);
-    console.log("Available users:", Object.keys(productionUsers));
-    console.log("User found:", productionUsers[username]);
-    console.log("Password match:", productionUsers[username]?.password === password);
-    console.log("=====================");
+    // Debug logging only in development mode
+    if (import.meta.env.DEV) {
+      console.log("🔐 AuthForm submission:", {
+        username,
+        hasPassword: !!password,
+        availableUsers: Object.keys(productionUsers).length,
+        userFound: !!productionUsers[username]
+      });
+    }
 
     // Симуляция загрузки
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -73,11 +74,13 @@ export function AuthForm({ onLogin }: AuthFormProps) {
     const user = productionUsers[username];
     
     if (user && user.password === password) {
-      console.log("Authentication successful, calling onLogin with:", {
-        username: username,
-        role: user.role,
-        displayName: user.displayName
-      });
+      if (import.meta.env.DEV) {
+        console.log("✅ Authentication successful:", {
+          username: username,
+          role: user.role,
+          displayName: user.displayName
+        });
+      }
       
       onLogin({
         username: username,
@@ -85,7 +88,9 @@ export function AuthForm({ onLogin }: AuthFormProps) {
         displayName: user.displayName
       });
     } else {
-      console.log("Authentication failed");
+      if (import.meta.env.DEV) {
+        console.log("❌ Authentication failed");
+      }
       if (!productionUsers[username]) {
         setError(`Пользователь "${username}" не найден`);
       } else {

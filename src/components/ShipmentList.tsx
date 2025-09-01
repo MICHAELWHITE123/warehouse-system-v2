@@ -261,12 +261,16 @@ export function ShipmentList({ shipments, onEdit, onCreate, onDelete }: Shipment
   const handleViewShipment = (shipment: Shipment) => {
     if (!shipment) return;
     
-    console.log('=== handleViewShipment Debug ===');
-    console.log('clicking on shipment:', shipment);
-    console.log('shipment.equipment:', shipment.equipment);
-    console.log('shipment.stacks:', shipment.stacks);
-    console.log('shipment.rental:', shipment.rental);
-    console.log('================================');
+    if (import.meta.env.DEV) {
+      console.log('📋 Viewing shipment:', {
+        id: shipment.id,
+        number: shipment.number,
+        recipient: shipment.recipient,
+        equipmentCount: shipment.equipment?.length || 0,
+        stacksCount: shipment.stacks?.length || 0
+      });
+    }
+    
     setSelectedShipment(shipment);
     setIsViewDialogOpen(true);
   };

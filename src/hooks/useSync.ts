@@ -48,7 +48,9 @@ export const useSync = () => {
   const startAutoSync = useCallback((intervalMs: number = 30000) => {
     // Предотвращаем повторный запуск
     if (isInitialized) {
-      console.log('Auto sync already running, skipping...');
+      if (import.meta.env.DEV) {
+        console.log('⏭️ Auto sync already running, skipping...');
+      }
       return;
     }
     syncAdapter.startAutoSync(intervalMs);
@@ -58,7 +60,9 @@ export const useSync = () => {
   const stopAutoSync = useCallback(() => {
     // Предотвращаем повторную остановку
     if (!isInitialized) {
-      console.log('Auto sync not running, skipping...');
+      if (import.meta.env.DEV) {
+        console.log('⏭️ Auto sync not running, skipping...');
+      }
       return;
     }
     syncAdapter.stopAutoSync();
