@@ -39,9 +39,9 @@ export function EquipmentList({ equipment, onEdit, onView, onDelete }: Equipment
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
 
 
-  // Получаем уникальные значения для фильтров
-  const categories = Array.from(new Set(equipment.map(item => item.category)));
-  const locations = Array.from(new Set(equipment.map(item => item.location)));
+  // Получаем уникальные значения для фильтров, исключая пустые строки
+  const categories = Array.from(new Set(equipment.map(item => item.category))).filter(cat => cat && cat.trim() !== '');
+  const locations = Array.from(new Set(equipment.map(item => item.location))).filter(loc => loc && loc.trim() !== '');
 
   // Фильтрация оборудования
   const filteredEquipment = equipment.filter(item => {
@@ -148,7 +148,9 @@ export function EquipmentList({ equipment, onEdit, onView, onDelete }: Equipment
             <SelectContent>
               <SelectItem value="all">Все категории</SelectItem>
               {categories.map(category => (
-                <SelectItem key={category} value={category}>{category}</SelectItem>
+                category && category.trim() !== '' && (
+                  <SelectItem key={category} value={category}>{category}</SelectItem>
+                )
               ))}
             </SelectContent>
           </Select>
@@ -172,7 +174,9 @@ export function EquipmentList({ equipment, onEdit, onView, onDelete }: Equipment
             <SelectContent>
               <SelectItem value="all">Все места</SelectItem>
               {locations.map(location => (
-                <SelectItem key={location} value={location}>{location}</SelectItem>
+                location && location.trim() !== '' && (
+                  <SelectItem key={location} value={location}>{location}</SelectItem>
+                )
               ))}
             </SelectContent>
           </Select>

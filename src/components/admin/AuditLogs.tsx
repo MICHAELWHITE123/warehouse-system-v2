@@ -290,7 +290,9 @@ export function AuditLogs() {
               <SelectContent>
                 <SelectItem value="all">Все действия</SelectItem>
                 {uniqueActions.map(action => (
-                  <SelectItem key={action} value={action}>{action}</SelectItem>
+                  action && action.trim() !== '' && (
+                    <SelectItem key={action} value={action}>{action}</SelectItem>
+                  )
                 ))}
               </SelectContent>
             </Select>
@@ -314,7 +316,9 @@ export function AuditLogs() {
               <SelectContent>
                 <SelectItem value="all">Все пользователи</SelectItem>
                 {uniqueUsers.map(user => (
-                  <SelectItem key={user} value={user}>{user}</SelectItem>
+                  user && user.trim() !== '' && (
+                    <SelectItem key={user} value={user}>{user}</SelectItem>
+                  )
                 ))}
               </SelectContent>
             </Select>

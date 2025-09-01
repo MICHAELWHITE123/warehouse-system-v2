@@ -204,9 +204,11 @@ export function EquipmentForm({
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map(category => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
+                        category && category.trim() !== '' && (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        )
                       ))}
                     </SelectContent>
                   </Select>
@@ -260,9 +262,11 @@ export function EquipmentForm({
                     </SelectTrigger>
                     <SelectContent>
                       {locations.map(location => (
-                        <SelectItem key={location} value={location}>
-                          {location}
-                        </SelectItem>
+                        location && location.trim() !== '' && (
+                          <SelectItem key={location} value={location}>
+                            {location}
+                          </SelectItem>
+                        )
                       ))}
                     </SelectContent>
                   </Select>

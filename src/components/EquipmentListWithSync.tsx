@@ -51,9 +51,9 @@ export function EquipmentListWithSync({ onEdit, onView }: EquipmentListWithSyncP
   // Преобразуем данные из БД в формат компонента
   const equipment: Equipment[] = dbEquipment.map(adaptEquipmentFromDB);
 
-  // Получаем уникальные значения для фильтров
-  const categories = Array.from(new Set(equipment.map(item => item.category)));
-  const locations = Array.from(new Set(equipment.map(item => item.location)));
+  // Получаем уникальные значения для фильтров, исключая пустые строки
+  const categories = Array.from(new Set(equipment.map(item => item.category))).filter(cat => cat && cat.trim() !== '');
+  const locations = Array.from(new Set(equipment.map(item => item.location))).filter(loc => loc && loc.trim() !== '');
 
   // Фильтрация оборудования
   const filteredEquipment = equipment.filter(item => {
@@ -219,9 +219,11 @@ export function EquipmentListWithSync({ onEdit, onView }: EquipmentListWithSyncP
               <SelectContent>
                 <SelectItem value="all">Все категории</SelectItem>
                 {categories.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
+                  category && category.trim() !== '' && (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  )
                 ))}
               </SelectContent>
             </Select>
@@ -245,9 +247,11 @@ export function EquipmentListWithSync({ onEdit, onView }: EquipmentListWithSyncP
               <SelectContent>
                 <SelectItem value="all">Все местоположения</SelectItem>
                 {locations.map((location) => (
-                  <SelectItem key={location} value={location}>
-                    {location}
-                  </SelectItem>
+                  location && location.trim() !== '' && (
+                    <SelectItem key={location} value={location}>
+                      {location}
+                    </SelectItem>
+                  )
                 ))}
               </SelectContent>
             </Select>
