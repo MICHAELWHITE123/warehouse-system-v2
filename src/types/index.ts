@@ -43,7 +43,8 @@ export type ActiveView =
   | "edit-stack"
   | "edit-shipment"
   | "view-equipment"
-  | "admin";
+  | "admin"
+  | "diagnostics";
 
 // Интерфейс для подсчета по категориям/местоположениям
 export interface CountMap {

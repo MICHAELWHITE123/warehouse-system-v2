@@ -14,6 +14,7 @@ import { AuthForm } from "./components/AuthForm";
 import { AdminPanel } from "./components/AdminPanel";
 import { SyncNotifications } from "./components/SyncNotifications";
 import { SyncStatus } from "./components/SyncStatus";
+import { Diagnostics } from "./components/Diagnostics";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
 
@@ -559,6 +560,8 @@ export default function App() {
         return <LocationManagement />;
       case "admin":
         return user ? <AdminPanel user={user} /> : null;
+      case "diagnostics":
+        return <Diagnostics />;
       default:
         return <Dashboard stats={stats} onEquipmentSelect={handleDashboardEquipmentSelect} />;
     }

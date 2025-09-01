@@ -13,7 +13,8 @@ import {
   FolderOpen,
   Menu,
   X,
-  Shield
+  Shield,
+  Activity
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -105,6 +106,12 @@ export function Navigation({
       label: "Админ-панель",
       icon: Shield,
       description: "Панель администратора системы"
+    },
+    {
+      id: "diagnostics",
+      label: "Диагностика",
+      icon: Activity,
+      description: "Проверка состояния системы"
     }
   ];
 
