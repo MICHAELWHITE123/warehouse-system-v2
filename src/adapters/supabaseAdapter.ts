@@ -23,34 +23,62 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 // Auth helpers
 export const auth = {
-  signUp: async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
+  // OAuth аутентификация
+  signInWithGoogle: async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`
+      }
     });
     return { data, error };
   },
 
-  signIn: async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+  signInWithGitHub: async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'github',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`
+      }
     });
     return { data, error };
   },
 
+  // Выход из системы
   signOut: async () => {
     const { error } = await supabase.auth.signOut();
     return { error };
   },
 
+  // Получение текущего пользователя
   getCurrentUser: async () => {
     const { data: { user }, error } = await supabase.auth.getUser();
     return { user, error };
   },
 
+  // Получение текущей сессии
+  getCurrentSession: async () => {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    return { session, error };
+  },
+
+  // Слушатель изменений состояния аутентификации
   onAuthStateChange: (callback: (event: string, session: any) => void) => {
     return supabase.auth.onAuthStateChange(callback);
+  },
+
+  // Обновление профиля пользователя
+  updateProfile: async (updates: any) => {
+    const { data, error } = await supabase.auth.updateUser(updates);
+    return { data, error };
+  },
+
+  // Сброс пароля (если понадобится в будущем)
+  resetPassword: async (email: string) => {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/reset-password`
+    });
+    return { data, error };
   }
 };
 

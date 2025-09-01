@@ -83,8 +83,8 @@ serve(async (req) => {
               operation_id: operation.id,
               table_name: operation.table,
               operation_type: operation.operation,
-              data: JSON.stringify(operation.data),
-              operation_timestamp: new Date(operation.timestamp).toISOString(),
+              data_after: operation.data,
+              created_at: new Date(operation.timestamp).toISOString(),
               source_device_id: deviceId,
               user_id: userId || null,
               operation_hash: operation.hash,
@@ -158,11 +158,11 @@ serve(async (req) => {
 
       if (lastSync) {
         const lastSyncDate = new Date(parseInt(lastSync))
-        query = query.gt('operation_timestamp', lastSyncDate.toISOString())
+        query = query.gt('created_at', lastSyncDate.toISOString())
       }
 
       const { data: operations, error } = await query
-        .order('operation_timestamp', { ascending: true })
+        .order('created_at', { ascending: true })
         .limit(100)
 
       if (error) {

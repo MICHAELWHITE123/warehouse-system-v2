@@ -1423,11 +1423,11 @@ class SyncAdapter {
             id: operation.operation_id,
             table: operation.table_name,
             operation: operation.operation_type,
-            data: JSON.parse(operation.data),
-            timestamp: new Date(operation.operation_timestamp).getTime(),
+            data: operation.data_after,
+            timestamp: new Date(operation.created_at).getTime(),
             deviceId: operation.source_device_id,
             userId: operation.user_id,
-            hash: this.createDataHash(operation.data),
+            hash: this.createDataHash(operation.data_after),
             status: 'synced',
             retryCount: 0
           });
