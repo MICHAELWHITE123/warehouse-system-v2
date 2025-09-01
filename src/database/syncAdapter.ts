@@ -508,7 +508,11 @@ class SyncAdapter {
         const results = await this.sendOperationsToServer(operationsToSync);
         
         // Обрабатываем результаты (даже если пустые)
-        await this.processSyncResults(results);
+        if (results !== null && results !== undefined) {
+          await this.processSyncResults(results);
+        } else {
+          console.log('No results to process from server sync');
+        }
         
         // Удаляем обработанные операции из очереди
         this.syncQueue = this.syncQueue.filter(op => 
@@ -695,7 +699,15 @@ class SyncAdapter {
         }
       }
 
-      return await response.json();
+      const result = await response.json();
+      
+      // Edge Function возвращает объект, а не массив
+      if (result.success) {
+        // Возвращаем массив результатов для совместимости
+        return result.conflicts || [];
+      } else {
+        throw new Error(result.message || 'Sync failed');
+      }
     } catch (error) {
       console.error('Failed to send operations to server:', error);
       
@@ -717,6 +729,12 @@ class SyncAdapter {
 
   // Обработать результаты синхронизации
   private async processSyncResults(results: any[]): Promise<void> {
+    // Убеждаемся, что results - это массив
+    if (!Array.isArray(results)) {
+      console.log('processSyncResults: results is not an array, skipping processing');
+      return;
+    }
+    
     for (const result of results) {
       if (result.conflict) {
         await this.handleConflict(result);
