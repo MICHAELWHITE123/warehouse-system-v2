@@ -507,23 +507,26 @@ class SyncAdapter {
         // Пытаемся синхронизироваться с сервером
         const results = await this.sendOperationsToServer(operationsToSync);
         
-        // Обрабатываем результаты (даже если пустые)
+        // Проверяем, действительно ли синхронизация прошла успешно
         if (results !== null && results !== undefined) {
           await this.processSyncResults(results);
+          
+          // Удаляем операции из очереди только если они действительно синхронизированы
+          this.syncQueue = this.syncQueue.filter(op => 
+            !operationsToSync.some(syncedOp => syncedOp.id === op.id)
+          );
+          this.saveSyncQueue();
+          
+          // Обновляем время последней синхронизации
+          this.lastSync = Date.now();
+          
+          console.log('Server sync completed successfully - operations removed from queue');
         } else {
-          console.log('No results to process from server sync');
+          console.log('Server sync failed - no results returned, keeping operations in queue');
+          // Не удаляем операции из очереди, если сервер не вернул результатов
+          // Переключаемся на локальную синхронизацию
+          await this.performLocalSync(operationsToSync);
         }
-        
-        // Удаляем обработанные операции из очереди
-        this.syncQueue = this.syncQueue.filter(op => 
-          !operationsToSync.some(syncedOp => syncedOp.id === op.id)
-        );
-        this.saveSyncQueue();
-        
-        // Обновляем время последней синхронизации
-        this.lastSync = Date.now();
-        
-        console.log('Server sync completed successfully');
         
         // Получаем операции от других устройств
         await this.pullOperationsFromServer();
@@ -637,7 +640,7 @@ class SyncAdapter {
   }
 
   // Отправить операции на сервер
-  private async sendOperationsToServer(operations: SyncOperation[]): Promise<any[]> {
+  private async sendOperationsToServer(operations: SyncOperation[]): Promise<any[] | null> {
     const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
     
     if (!isApiAvailable()) {
@@ -677,6 +680,10 @@ class SyncAdapter {
         }
       }
       
+      console.log(`🌐 Sending ${operations.length} operations to server at: ${apiUrl}`);
+      console.log(`📤 Request headers:`, getAuthHeaders(this.deviceId));
+      console.log(`📦 Request body:`, { operations: operations.length, deviceId: this.deviceId, lastSync: this.lastSync });
+      
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: getAuthHeaders(this.deviceId),
@@ -686,6 +693,9 @@ class SyncAdapter {
           lastSync: this.lastSync
         })
       });
+
+      console.log(`📥 Response status: ${response.status} ${response.statusText}`);
+      console.log(`📥 Response headers:`, Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -700,46 +710,60 @@ class SyncAdapter {
       }
 
       const result = await response.json();
+      console.log(`📥 Response body:`, result);
       
       // Edge Function возвращает объект, а не массив
       if (result.success) {
+        console.log(`✅ Server sync successful, returning ${result.conflicts?.length || 0} conflicts`);
         // Возвращаем массив результатов для совместимости
         return result.conflicts || [];
       } else {
+        console.log(`❌ Server sync failed: ${result.message || 'Unknown error'}`);
         throw new Error(result.message || 'Sync failed');
       }
     } catch (error) {
       console.error('Failed to send operations to server:', error);
       
-      // Если ошибка связана с недоступностью URL, возвращаем пустой массив
+      // Если ошибка связана с недоступностью URL, возвращаем null
       if (error instanceof Error && (
         error.message.includes('Failed to fetch') ||
         error.message.includes('ERR_NAME_NOT_RESOLVED') ||
         error.message.includes('ERR_CONNECTION_REFUSED')
       )) {
-        console.log('Network error detected, switching to local sync');
-        return [];
+        console.log('Network error detected, server sync failed');
+        return null;
       }
       
-      // Для других ошибок возвращаем пустой массив, чтобы продолжить синхронизацию
-      console.log('Server error, but continuing with sync');
-      return [];
+      // Для других ошибок возвращаем null, чтобы показать что синхронизация не удалась
+      console.log('Server error, sync failed');
+      return null;
     }
   }
 
   // Обработать результаты синхронизации
   private async processSyncResults(results: any[]): Promise<void> {
+    console.log(`🔄 Processing ${results.length} sync results:`, results);
+    
     // Убеждаемся, что results - это массив
     if (!Array.isArray(results)) {
       console.log('processSyncResults: results is not an array, skipping processing');
       return;
     }
     
+    if (results.length === 0) {
+      console.log('✅ No conflicts or results to process - all operations synced successfully');
+      return;
+    }
+    
     for (const result of results) {
+      console.log(`📋 Processing result:`, result);
       if (result.conflict) {
+        console.log(`⚠️ Handling conflict for operation:`, result);
         await this.handleConflict(result);
       } else if (result.success) {
-        console.log(`Operation ${result.operationId} synced successfully`);
+        console.log(`✅ Operation ${result.operationId} synced successfully`);
+      } else {
+        console.log(`❓ Unknown result type:`, result);
       }
     }
   }

@@ -18,6 +18,45 @@ if (process.env.SYNC_RATE_LIMIT_DISABLED !== 'true') {
   console.log('⚠️ Rate limiting disabled for sync endpoints');
 }
 
+/**
+ * Ping endpoint для проверки доступности API без аутентификации
+ * Этот endpoint используется для проверки, что API работает
+ */
+router.get('/ping', (req, res) => {
+  console.log('🏓 PING: API sync endpoint is accessible');
+  res.json({
+    success: true,
+    message: 'Sync API is working',
+    timestamp: new Date().toISOString(),
+    endpoint: '/api/sync/ping',
+    method: 'GET'
+  });
+});
+
+/**
+ * Status endpoint для проверки статуса синхронизации
+ * Этот endpoint используется для мониторинга состояния API
+ */
+router.get('/status', (req, res) => {
+  console.log('📊 STATUS: Checking sync API status');
+  res.json({
+    success: true,
+    message: 'Sync API status check',
+    timestamp: new Date().toISOString(),
+    status: 'healthy',
+    endpoints: {
+      ping: '/api/sync/ping',
+      test: '/api/sync/test',
+      legacy: '/api/sync',
+      operations: '/api/sync/operations'
+    },
+    authentication: {
+      device: 'X-Device-ID header required',
+      jwt: 'Authorization header optional'
+    }
+  });
+});
+
 // ========================================
 // TEST ENDPOINT (без аутентификации для отладки)
 // ========================================

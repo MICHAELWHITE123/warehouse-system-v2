@@ -99,6 +99,8 @@
         <button onclick="clearQueue()">🗑️ Очистить очередь</button>
         <button onclick="resetSync()">🔄 Сбросить синхронизацию</button>
         <button onclick="testApiEndpoint()">🌐 Тест API endpoint</button>
+        <button onclick="testPingEndpoint()">🏓 Тест Ping endpoint</button>
+        <button onclick="testStatusEndpoint()">📊 Тест Status endpoint</button>
         
         <hr>
         
@@ -288,6 +290,42 @@
                 }
             } catch (error) {
                 log('❌ Ошибка тестирования API endpoint:', error);
+            }
+        };
+        
+        // Тест Ping endpoint
+        window.testPingEndpoint = async function() {
+            try {
+                log('🏓 Тестирование Ping endpoint...');
+                
+                const response = await fetch('/api/sync/ping');
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    log('✅ Ping endpoint работает:', result);
+                } else {
+                    log('❌ Ping endpoint вернул ошибку:', response.status, response.statusText);
+                }
+            } catch (error) {
+                log('❌ Ошибка тестирования Ping endpoint:', error);
+            }
+        };
+        
+        // Тест Status endpoint
+        window.testStatusEndpoint = async function() {
+            try {
+                log('📊 Тестирование Status endpoint...');
+                
+                const response = await fetch('/api/sync/status');
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    log('✅ Status endpoint работает:', result);
+                } else {
+                    log('❌ Status endpoint вернул ошибку:', response.status, response.statusText);
+                }
+            } catch (error) {
+                log('❌ Ошибка тестирования Status endpoint:', error);
             }
         };
         
