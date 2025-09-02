@@ -1,4 +1,5 @@
 // API маршрут для синхронизации данных
+// Версия 1.1 - принудительное развертывание
 export default async function handler(req, res) {
   // Поддерживаем только POST запросы
   if (req.method !== 'POST') {
