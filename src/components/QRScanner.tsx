@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { QrScanner } from "@yudiel/react-qr-scanner";
+import { Scanner } from "@yudiel/react-qr-scanner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -236,17 +236,23 @@ export function QRScanner({
           {isScanning && !scannedData && !error && (
             <div className="relative">
               <div className="aspect-square rounded-lg overflow-hidden border">
-                <QrScanner
-                  onDecode={handleScan}
-                  onError={handleError}
-                  containerStyle={{
-                    width: "100%",
-                    height: "100%"
+                <Scanner
+                  onScan={(detectedCodes) => {
+                    if (detectedCodes.length > 0) {
+                      handleScan(detectedCodes[0].rawValue);
+                    }
                   }}
-                  videoStyle={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover"
+                  onError={handleError}
+                  styles={{
+                    container: {
+                      width: "100%",
+                      height: "100%"
+                    },
+                    video: {
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover"
+                    }
                   }}
                 />
               </div>
