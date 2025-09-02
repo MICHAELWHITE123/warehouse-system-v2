@@ -49,18 +49,11 @@
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_APP_NAME=Система учета техники на складе
-VITE_API_URL=https://your-vercel-app.vercel.app/api
 ```
 
-#### Backend переменные:
+#### Backend переменные (не нужны для этого проекта):
 ```
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-SUPABASE_DB_URL=your_supabase_database_url
-NODE_ENV=production
-CORS_ORIGIN=https://your-vercel-app.vercel.app
-JWT_SECRET=your_jwt_secret_key_here
+# Этот проект использует только Supabase, backend переменные не требуются
 ```
 
 ## Шаг 3: Деплой
@@ -72,8 +65,8 @@ JWT_SECRET=your_jwt_secret_key_here
 
 ### 3.2 Проверка работоспособности
 1. Откройте деплой URL
-2. Проверьте API: `https://your-app.vercel.app/api/health`
-3. Убедитесь, что подключение к Supabase работает
+2. Убедитесь, что подключение к Supabase работает
+3. Проверьте регистрацию/вход пользователей
 
 ## Шаг 4: Настройка домена (опционально)
 
@@ -84,8 +77,7 @@ JWT_SECRET=your_jwt_secret_key_here
 
 ### 4.2 Обновление переменных окружения
 После настройки домена обновите:
-- `VITE_API_URL`
-- `CORS_ORIGIN`
+- `CORS_ORIGIN` в Supabase (если используете кастомный домен)
 
 ## Шаг 5: Мониторинг и поддержка
 
@@ -102,12 +94,11 @@ JWT_SECRET=your_jwt_secret_key_here
 ```
 Production URLs:
 - Frontend: https://your-app.vercel.app
-- API: https://your-app.vercel.app/api
 - Database: Supabase (managed)
 
 Environment:
-- Frontend: Vercel Edge Functions
-- Backend: Vercel Serverless Functions
+- Frontend: Vercel Static Site
+- Backend: Supabase (Auth, Database, Storage)
 - Database: Supabase PostgreSQL
 ```
 
@@ -131,15 +122,12 @@ Environment:
 ```bash
 # Установка зависимостей
 npm install
-cd server && npm install
 
 # Запуск в режиме разработки
 npm run dev
-cd server && npm run dev
 
 # Сборка для продакшена
 npm run build
-cd server && npm run build
 ```
 
 ## Безопасность

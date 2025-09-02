@@ -40,16 +40,11 @@
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_APP_NAME=Система учета техники на складе
-VITE_API_URL=https://your-app-name.vercel.app/api
 ```
 
-### Backend переменные:
+### Backend переменные (не нужны):
 ```
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-NODE_ENV=production
-CORS_ORIGIN=https://your-app-name.vercel.app
+# Этот проект использует только Supabase, backend переменные не требуются
 ```
 
 ## 📁 Структура проекта
@@ -57,13 +52,11 @@ CORS_ORIGIN=https://your-app-name.vercel.app
 ```
 WeareHouse/
 ├── src/                    # Frontend (React + Vite)
-├── server/                 # Backend (Express + TypeScript)
-│   └── src/
-│       └── index.ts        # Простой API сервер
 ├── dist/                   # Собранный фронтенд
 ├── vercel.json            # Конфигурация Vercel
 ├── package.json           # Зависимости фронтенда
-└── server/package.json    # Зависимости сервера
+└── supabase/              # Supabase миграции
+    └── migrations/
 ```
 
 ## 🎯 Что работает
@@ -77,9 +70,7 @@ WeareHouse/
 - ✅ Адаптивный дизайн
 
 ### Backend
-- ✅ Express сервер
-- ✅ Health check endpoint
-- ✅ CORS настроен
+- ✅ Supabase (Auth, Database, Storage)
 - ✅ Готов для расширения API
 
 ### База данных
@@ -98,7 +89,6 @@ WeareHouse/
 
 - **Vercel**: Логи, метрики, производительность
 - **Supabase**: База данных, аутентификация, логи
-- **Health check**: `/api/health` endpoint
 
 ## 🆘 Поддержка
 
