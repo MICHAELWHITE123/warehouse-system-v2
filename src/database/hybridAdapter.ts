@@ -25,12 +25,12 @@ class HybridDatabaseAdapter {
   // private postgresAdapter?: any; // Будет добавлен позже
   private config: HybridDatabaseConfig;
   private isInitialized: boolean = false;
-  private fallbackToLocal: boolean = true;
+  private fallbackToLocal: boolean = false; // Отключаем fallback к локальному хранилищу
   private localStorage: Map<string, any> = new Map();
 
   constructor(config: HybridDatabaseConfig) {
     this.config = config;
-    this.fallbackToLocal = config.fallbackToLocal ?? true;
+    this.fallbackToLocal = false; // Принудительно отключаем локальное хранилище
   }
 
   // Инициализация адаптера
@@ -59,16 +59,17 @@ class HybridDatabaseAdapter {
         }
       }
 
+      // Проверяем, что хотя бы один адаптер БД инициализирован
+      if (!this.redisAdapter && !isPostgresAvailable()) {
+        throw new Error('No database adapters available. Cannot initialize without database connection.');
+      }
+
       this.isInitialized = true;
       console.log('Hybrid Database Adapter initialized successfully');
     } catch (error) {
       console.error('Failed to initialize Hybrid Database Adapter:', error);
-      if (this.fallbackToLocal) {
-        console.log('Falling back to local storage');
-        this.isInitialized = true;
-      } else {
-        throw error;
-      }
+      // Не используем fallback к локальному хранилищу
+      throw new Error('Database initialization failed. No fallback to local storage allowed.');
     }
   }
 
@@ -99,7 +100,7 @@ class HybridDatabaseAdapter {
         } else if (this.redisAdapter) {
           return await this.setInRedis(key, value, expiration);
         } else {
-          return await this.setInLocal(key, value);
+          throw new Error('No database adapters available. Cannot use local storage.');
         }
       }
 
@@ -118,20 +119,15 @@ class HybridDatabaseAdapter {
             throw new Error('Table name required for Postgres storage');
           }
         case 'local':
-          return await this.setInLocal(key, value);
+          throw new Error('Local storage is disabled. Use database storage only.');
         default:
           throw new Error(`Unknown storage type: ${storage}`);
       }
     } catch (error) {
       console.error(`Failed to set key ${key}:`, error);
       
-      // Fallback к локальному хранилищу
-      if (this.fallbackToLocal) {
-        console.log(`Falling back to local storage for key ${key}`);
-        return await this.setInLocal(key, value);
-      }
-      
-      throw error;
+      // Не используем fallback к локальному хранилищу
+      throw new Error(`Database operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -162,12 +158,12 @@ class HybridDatabaseAdapter {
             const result = await this.getFromRedis(key);
             if (result.success) return result;
           } catch (error) {
-            console.log(`Redis get failed for ${key}, trying local...`);
+            console.log(`Redis get failed for ${key}, no local fallback available.`);
           }
         }
 
-        // Последняя попытка - локальное хранилище
-        return await this.getFromLocal(key);
+        // Нет доступных хранилищ
+        throw new Error('No database adapters available. Cannot use local storage.');
       }
 
       // Ручной выбор хранилища
@@ -185,20 +181,15 @@ class HybridDatabaseAdapter {
             throw new Error('Table name required for Postgres storage');
           }
         case 'local':
-          return await this.getFromLocal(key);
+          throw new Error('Local storage is disabled. Use database storage only.');
         default:
           throw new Error(`Unknown storage type: ${storage}`);
       }
     } catch (error) {
       console.error(`Failed to get key ${key}:`, error);
       
-      // Fallback к локальному хранилищу
-      if (this.fallbackToLocal) {
-        console.log(`Falling back to local storage for key ${key}`);
-        return await this.getFromLocal(key);
-      }
-      
-      throw error;
+      // Не используем fallback к локальному хранилищу
+      throw new Error(`Database operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -233,8 +224,10 @@ class HybridDatabaseAdapter {
           }
         }
 
-        // Всегда удаляем из локального хранилища
-        results.push(await this.deleteFromLocal(key));
+        // Не удаляем из локального хранилища
+        if (results.length === 0) {
+          throw new Error('No database adapters available. Cannot use local storage.');
+        }
 
         // Возвращаем успешный результат если хотя бы одна операция удалась
         const hasSuccess = results.some(r => r.success);
@@ -260,19 +253,15 @@ class HybridDatabaseAdapter {
             throw new Error('Table name required for Postgres storage');
           }
         case 'local':
-          return await this.deleteFromLocal(key);
+          throw new Error('Local storage is disabled. Use database storage only.');
         default:
           throw new Error(`Unknown storage type: ${storage}`);
       }
     } catch (error) {
       console.error(`Failed to delete key ${key}:`, error);
       
-      if (this.fallbackToLocal) {
-        console.log(`Falling back to local delete for key ${key}`);
-        return await this.deleteFromLocal(key);
-      }
-      
-      throw error;
+      // Не используем fallback к локальному хранилищу
+      throw new Error(`Database operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -419,7 +408,7 @@ class HybridDatabaseAdapter {
     const stats = {
       redis: { available: false, keys: 0 },
       postgres: { available: false, tables: 0 },
-      local: { keys: this.localStorage.size },
+      local: { keys: 0 }, // Локальное хранилище отключено
       total: 0
     };
 
@@ -439,7 +428,7 @@ class HybridDatabaseAdapter {
       // TODO: Добавить получение статистики Postgres
     }
 
-    stats.total = (stats.redis.keys || 0) + (stats.postgres.tables || 0) + stats.local.keys;
+    stats.total = (stats.redis.keys || 0) + (stats.postgres.tables || 0);
 
     return stats;
   }
@@ -462,22 +451,8 @@ class HybridDatabaseAdapter {
       console.log('Postgres clear not implemented yet');
     }
 
-    // Очищаем локальное хранилище
-    this.localStorage.clear();
-    
-    // Очищаем localStorage
-    try {
-      const keys = Object.keys(localStorage);
-      keys.forEach(key => {
-        if (key.startsWith('hybrid-db-')) {
-          localStorage.removeItem(key);
-        }
-      });
-    } catch (error) {
-      console.warn('Failed to clear localStorage:', error);
-    }
-
-    console.log('All storage cleared successfully');
+    // Не очищаем локальное хранилище - оно отключено
+    console.log('Database storage cleared successfully');
   }
 
   // Закрытие соединений

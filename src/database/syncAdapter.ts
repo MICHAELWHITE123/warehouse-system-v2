@@ -49,8 +49,8 @@ class SyncAdapter {
   private syncRetryDelay: number = 5000; // 5 секунд между попытками (было 30 секунд)
   private isInitialized: boolean = false;
   private initializationTimeout: NodeJS.Timeout | null = null;
-  private syncMode: 'server' | 'local' | 'hybrid' = 'hybrid';
-  private isForcedLocalMode: boolean = false;
+  private syncMode: 'server' | 'local' | 'hybrid' = 'server'; // Принудительно используем только серверную синхронизацию
+  private isForcedLocalMode: boolean = true; // Принудительно отключаем локальный режим
   
   // Throttling для предотвращения спама
   private lastOperationAdd: number = 0;
@@ -146,8 +146,8 @@ class SyncAdapter {
           
         } catch (error) {
           console.error('❌ Initial sync failed:', error);
-          // При ошибке переключаемся на локальный режим
-          this.syncMode = 'local';
+          // При ошибке не переключаемся на локальный режим - только серверная синхронизация
+          throw new Error('Server sync failed. Local sync is disabled.');
         }
       }, 2000); // Увеличиваем задержку до 2 секунд
       
@@ -168,16 +168,16 @@ class SyncAdapter {
         // Игнорируем ошибки console.error
       }
       
-      // При ошибке инициализации переключаемся на локальный режим
-      this.syncMode = 'local';
+      // При ошибке инициализации не переключаемся на локальный режим
+      throw new Error('SyncAdapter initialization failed. Local sync is disabled.');
     }
   }
   
   // Проверка доступности API при инициализации
   private async checkApiAccessibilityOnInit(): Promise<void> {
-    // Отключаем API синхронизацию - используем только Supabase
-    this.syncMode = 'local';
-    console.log('API sync disabled, using local sync mode with Supabase');
+    // Принудительно используем только серверную синхронизацию
+    this.syncMode = 'server';
+    console.log('Forcing server-only sync mode - local sync disabled');
   }
 
   private generateDeviceId(): string {
@@ -456,7 +456,7 @@ class SyncAdapter {
     const operationsToSync = [...this.syncQueue];
 
     try {
-      if (this.isOnline && this.syncMode !== 'local') {
+      if (this.isOnline && this.syncMode === 'server') {
         // Пытаемся синхронизироваться с сервером
         const results = await this.sendOperationsToServer(operationsToSync);
         
@@ -477,16 +477,12 @@ class SyncAdapter {
         } else {
           console.log('Server sync failed - no results returned, keeping operations in queue');
           // Не удаляем операции из очереди, если сервер не вернул результатов
-          // Переключаемся на локальную синхронизацию
-          await this.performLocalSync(operationsToSync);
+          throw new Error('Server sync failed. Local sync is disabled.');
         }
-        
-        // API синхронизация отключена - используем только локальную
-        // await this.pullOperationsFromServer();
       } else {
-        // Офлайн режим или локальный режим - только локальная синхронизация
-        console.log(`Using local sync mode (${this.syncMode})`);
-        await this.performLocalSync(operationsToSync);
+        // Офлайн режим - локальная синхронизация отключена
+        console.log('Offline mode - local sync is disabled');
+        throw new Error('Cannot sync offline. Local sync is disabled.');
       }
       
     } catch (error) {
@@ -499,9 +495,8 @@ class SyncAdapter {
         this.saveSyncQueue();
         this.lastSyncAttempt = Date.now();
       } else {
-        // При ошибке сервера переключаемся на локальную синхронизацию
-        console.log('Server sync failed, falling back to local sync');
-        await this.performLocalSync(operationsToSync);
+        // При ошибке сервера не переключаемся на локальную синхронизацию
+        console.log('Server sync failed, local sync is disabled');
         
         // Увеличиваем счетчик попыток для неудачных операций
         for (const op of operationsToSync) {
@@ -512,6 +507,8 @@ class SyncAdapter {
           }
         }
         this.saveSyncQueue();
+        
+        throw new Error('Server sync failed. Local sync is disabled.');
       }
     } finally {
       this.isSyncing = false;
@@ -557,39 +554,8 @@ class SyncAdapter {
   
   // Проверка возможности переключения на гибридный режим
   private async checkApiAccessibilityForModeSwitch(): Promise<void> {
-    // Не пытаемся переключиться обратно, если режим был принудительно установлен
-    if (this.isForcedLocalMode) {
-      console.log('Local mode was forced, skipping API accessibility check');
-      return;
-    }
-    
-    try {
-      const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
-      
-      if (isApiAvailable()) {
-        const testUrl = getApiUrl('sync');
-        
-        if (testUrl && testUrl.includes('supabase.co')) {
-          try {
-            // Проверяем доступность Supabase Edge Functions через sync endpoint
-            const testResponse = await fetch(testUrl, {
-              method: 'HEAD',
-              headers: getAuthHeaders(this.deviceId)
-            });
-            
-            if (testResponse.ok || testResponse.status === 404) {
-              console.log('API became accessible, switching to hybrid mode');
-              this.syncMode = 'hybrid';
-            }
-          } catch (testError) {
-            // API все еще недоступен, остаемся в локальном режиме
-            console.log('API still not accessible, staying in local mode');
-          }
-        }
-      }
-    } catch (error) {
-      console.log('API accessibility check for mode switch failed:', error);
-    }
+    // Локальный режим отключен - всегда используем серверную синхронизацию
+    console.log('Local mode is disabled, staying in server mode');
   }
 
   // Отправить операции на сервер
@@ -951,14 +917,9 @@ class SyncAdapter {
   async forceSync(): Promise<void> {
     const now = Date.now();
     
-    // Если уже в локальном режиме, не пытаемся подключиться к серверу
+    // Локальный режим отключен - только серверная синхронизация
     if (this.syncMode === 'local') {
-      console.log('In local mode, performing local sync only');
-      const pendingOperations = this.syncQueue.filter(op => op.status === 'pending');
-      if (pendingOperations.length > 0) {
-        await this.performLocalSync(pendingOperations);
-      }
-      return;
+      throw new Error('Local sync mode is disabled. Only server sync is available.');
     }
     
     // Проверяем, не слишком ли рано для повторной попытки
@@ -973,12 +934,7 @@ class SyncAdapter {
     // Проверяем доступность API
     const { isApiAvailable } = await import('../config/api');
     if (!isApiAvailable()) {
-      console.log('API not available, using local sync only for forceSync');
-      const pendingOperations = this.syncQueue.filter(op => op.status === 'pending');
-      if (pendingOperations.length > 0) {
-        await this.performLocalSync(pendingOperations);
-      }
-      return;
+      throw new Error('API not available. Local sync is disabled.');
     }
     
     // Дополнительная проверка доступности Supabase
@@ -995,23 +951,11 @@ class SyncAdapter {
           });
           
           if (!testResponse.ok && testResponse.status !== 404) {
-            console.log('Supabase not accessible, switching to local sync mode');
-            this.syncMode = 'local';
-            const pendingOperations = this.syncQueue.filter(op => op.status === 'pending');
-            if (pendingOperations.length > 0) {
-              await this.performLocalSync(pendingOperations);
-            }
-            return;
+            throw new Error('Supabase not accessible. Local sync is disabled.');
           }
         }
              } catch (testError) {
-         console.log('Supabase accessibility test failed, but continuing with hybrid mode:', testError);
-         // Не переключаемся в локальный режим принудительно, продолжаем работать в гибридном
-         const pendingOperations = this.syncQueue.filter(op => op.status === 'pending');
-         if (pendingOperations.length > 0) {
-           await this.performLocalSync(pendingOperations);
-         }
-         return;
+         throw new Error('Supabase accessibility test failed. Local sync is disabled.');
        }
     }
     
@@ -1062,10 +1006,9 @@ class SyncAdapter {
     this.lastSyncAttempt = 0;
     this.lastOperationAdd = 0;
     this.lastStatusUpdate = 0;
-    // Разрешаем возврат в гибридный режим, если не было принудительного переключения
-    if (!this.isForcedLocalMode) {
-      this.syncMode = 'hybrid';
-    }
+    // Всегда используем серверный режим
+    this.syncMode = 'server';
+    this.isForcedLocalMode = true;
     console.log('All flags and timeouts reset, mode:', this.syncMode, 'forced:', this.isForcedLocalMode);
   }
   
@@ -1092,32 +1035,26 @@ class SyncAdapter {
   
   // Принудительно переключиться в локальный режим
   forceLocalMode(): void {
-    console.log('Forcing local mode permanently...');
-    this.syncMode = 'local';
-    this.isForcedLocalMode = true;
-    this.lastSyncAttempt = Date.now();
-            this.syncRetryDelay = 60000; // 1 минута (было 5 минут)
-    this.stopAutoSync();
-    this.startAutoSync();
+    throw new Error('Local mode is disabled. Only server sync is available.');
   }
   
   // Попытаться вернуться в гибридный режим
   tryHybridMode(): void {
-    console.log('Attempting to switch back to hybrid mode...');
-    this.syncMode = 'hybrid';
-    this.isForcedLocalMode = false;
+    console.log('Switching to server-only mode...');
+    this.syncMode = 'server';
+    this.isForcedLocalMode = true;
     this.lastSyncAttempt = 0;
-            this.syncRetryDelay = 5000; // Возвращаем к 5 секундам (было 30 секунд)
+    this.syncRetryDelay = 5000;
     this.restartSync();
   }
   
   // Принудительно сбросить все блокировки и попробовать подключиться к серверу
   forceServerMode(): void {
     console.log('Forcing server connection attempt...');
-    this.syncMode = 'hybrid';
-    this.isForcedLocalMode = false;
+    this.syncMode = 'server';
+    this.isForcedLocalMode = true;
     this.lastSyncAttempt = 0;
-    this.syncRetryDelay = 5000; // Возвращаем к 5 секундам (было 30 секунд)
+    this.syncRetryDelay = 5000;
     this.lastOperationAdd = 0;
     this.lastStatusUpdate = 0;
     
@@ -1158,41 +1095,30 @@ class SyncAdapter {
       if (isApiAvailable()) {
         const testUrl = getApiUrl('sync');
         
-            if (testUrl && testUrl.includes('supabase.co')) {
-              try {
-                // Проверяем доступность Supabase Edge Functions через sync endpoint
-                const testResponse = await fetch(testUrl, {
-                  method: 'HEAD',
-                  headers: getAuthHeaders(this.deviceId)
-                });
-                
-                if (!testResponse.ok && testResponse.status !== 404) {
-                  console.log('Supabase not accessible, switching to local sync mode');
-                  this.syncMode = 'local';
-                  // Выполняем локальную синхронизацию сразу
-                  await this.pullOperationsFromLocalStorage();
-                  return;
-                }
-              } catch (testError) {
-                console.log('Supabase accessibility test failed, switching to local sync mode:', testError);
-                this.syncMode = 'local';
-                // Выполняем локальную синхронизацию сразу
-                await this.pullOperationsFromLocalStorage();
-                return;
-              }
+        if (testUrl && testUrl.includes('supabase.co')) {
+          try {
+            // Проверяем доступность Supabase Edge Functions через sync endpoint
+            const testResponse = await fetch(testUrl, {
+              method: 'HEAD',
+              headers: getAuthHeaders(this.deviceId)
+            });
+            
+            if (!testResponse.ok && testResponse.status !== 404) {
+              throw new Error('Supabase not accessible. Local sync is disabled.');
             }
+          } catch (testError) {
+            throw new Error('Supabase accessibility test failed. Local sync is disabled.');
+          }
+        }
         
         // API доступен, планируем обычную синхронизацию
         this.scheduleInitialSync();
       } else {
-        // API недоступен, переключаемся на локальный режим
-        this.syncMode = 'local';
-        await this.pullOperationsFromLocalStorage();
+        // API недоступен - локальная синхронизация отключена
+        throw new Error('API not available. Local sync is disabled.');
       }
     } catch (error) {
-      console.log('API accessibility check failed, switching to local sync mode:', error);
-      this.syncMode = 'local';
-      await this.pullOperationsFromLocalStorage();
+      throw new Error('API accessibility check failed. Local sync is disabled.');
     }
   }
 
@@ -1207,7 +1133,7 @@ class SyncAdapter {
         console.log('Performing initial sync for new user...');
         
         // Проверяем доступность API перед попыткой серверной синхронизации
-        if (this.isOnline && this.syncMode !== 'local') {
+        if (this.isOnline && this.syncMode === 'server') {
           try {
             const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
             
@@ -1222,30 +1148,23 @@ class SyncAdapter {
                 });
                 
                 if (!testResponse.ok && testResponse.status !== 404) {
-                  console.log('Supabase not accessible in initial sync, switching to local mode');
-                  this.syncMode = 'local';
-                  await this.pullOperationsFromLocalStorage();
-                  return;
+                  throw new Error('Supabase not accessible in initial sync. Local sync is disabled.');
                 }
               }
               
               await this.pullOperationsFromServer();
             } else {
-              await this.pullOperationsFromLocalStorage();
+              throw new Error('API not available. Local sync is disabled.');
             }
           } catch (testError) {
-            console.log('API accessibility test failed in initial sync, switching to local mode:', testError);
-            this.syncMode = 'local';
-            await this.pullOperationsFromLocalStorage();
+            throw new Error('API accessibility test failed in initial sync. Local sync is disabled.');
           }
         } else {
-          await this.pullOperationsFromLocalStorage();
+          throw new Error('Offline mode. Local sync is disabled.');
         }
       } catch (error) {
         console.error('Initial sync failed:', error);
-        // При ошибке переключаемся на локальную синхронизацию
-        this.syncMode = 'local';
-        await this.pullOperationsFromLocalStorage();
+        throw new Error('Initial sync failed. Local sync is disabled.');
       }
     }, 2000);
   }
@@ -1256,7 +1175,7 @@ class SyncAdapter {
       // Убираем дублирующий лог, так как он уже есть в инициализации
       
       // Проверяем доступность API перед попыткой серверной синхронизации
-        if (this.isOnline && this.syncMode !== 'local') {
+        if (this.isOnline && this.syncMode === 'server') {
           try {
             const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
             
@@ -1271,30 +1190,23 @@ class SyncAdapter {
                 });
                 
                 if (!testResponse.ok && testResponse.status !== 404) {
-                  console.log('Supabase not accessible in performInitialSync, switching to local mode');
-                  this.syncMode = 'local';
-                  await this.pullOperationsFromLocalStorage();
-                  return;
+                  throw new Error('Supabase not accessible in performInitialSync. Local sync is disabled.');
                 }
               }
               
               await this.pullOperationsFromServer();
             } else {
-              await this.pullOperationsFromLocalStorage();
+              throw new Error('API not available. Local sync is disabled.');
             }
           } catch (testError) {
-            console.log('API accessibility test failed in performInitialSync, switching to local mode:', testError);
-            this.syncMode = 'local';
-            await this.pullOperationsFromLocalStorage();
+            throw new Error('API accessibility test failed in performInitialSync. Local sync is disabled.');
           }
         } else {
-          await this.pullOperationsFromLocalStorage();
+          throw new Error('Offline mode. Local sync is disabled.');
         }
     } catch (error) {
       console.error('Initial sync failed:', error);
-      // При ошибке переключаемся на локальную синхронизацию
-      this.syncMode = 'local';
-      await this.pullOperationsFromLocalStorage();
+      throw new Error('Initial sync failed. Local sync is disabled.');
     }
   }
 
@@ -1581,13 +1493,9 @@ class SyncAdapter {
           this.cleanupLocalStorage();
         }
         
-        // Если в локальном режиме, работаем только с localStorage
+        // Локальный режим отключен
         if (this.syncMode === 'local') {
-          const pendingOps = this.syncQueue.filter(op => op.status === 'pending');
-          if (pendingOps.length > 0) {
-            console.log(`🔄 Local sync: processing ${pendingOps.length} pending operations`);
-            await this.performLocalSync([...pendingOps]);
-          }
+          console.log('🔄 Local sync is disabled, skipping auto sync');
           return;
         }
         
@@ -1608,9 +1516,7 @@ class SyncAdapter {
         // Проверяем доступность API
         const { isApiAvailable } = await import('../config/api');
         if (!isApiAvailable()) {
-          console.log('⚠️ API not available, switching to local mode');
-          this.syncMode = 'local';
-          await this.performLocalSync([...pendingOps]);
+          console.log('⚠️ API not available, local sync is disabled');
           return;
         }
         
@@ -1627,16 +1533,12 @@ class SyncAdapter {
               });
               
               if (!testResponse.ok && testResponse.status !== 404) {
-                console.log('⚠️ Supabase not accessible, switching to local mode');
-                this.syncMode = 'local';
-                await this.performLocalSync([...pendingOps]);
+                console.log('⚠️ Supabase not accessible, local sync is disabled');
                 return;
               }
             }
           } catch (testError) {
-            console.log('⚠️ Supabase accessibility test failed, switching to local mode:', testError);
-            this.syncMode = 'local';
-            await this.performLocalSync([...pendingOps]);
+            console.log('⚠️ Supabase accessibility test failed, local sync is disabled:', testError);
             return;
           }
         }
@@ -1685,7 +1587,7 @@ class SyncAdapter {
     this.lastSyncAttempt = 0;
     this.lastOperationAdd = 0;
     this.lastStatusUpdate = 0;
-    this.syncMode = 'local';
+    this.syncMode = 'server';
     console.log('SyncAdapter cleanup completed');
   }
   
@@ -1711,8 +1613,8 @@ class SyncAdapter {
     
     this.lastSync = 0;
     this.lastSyncAttempt = 0;
-    this.syncMode = 'hybrid';
-    this.isForcedLocalMode = false;
+    this.syncMode = 'server';
+    this.isForcedLocalMode = true;
     
     if (import.meta.env.DEV) {
       console.log('✅ Sync state reset completed');
