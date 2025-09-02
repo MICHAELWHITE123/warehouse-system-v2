@@ -30,7 +30,7 @@ class HybridDatabaseAdapter {
 
   constructor(config: HybridDatabaseConfig) {
     this.config = config;
-    this.fallbackToLocal = false; // Принудительно отключаем локальное хранилище
+    this.fallbackToLocal = config.fallbackToLocal ?? true; // Разрешаем fallback к локальному хранилищу по умолчанию
   }
 
   // Инициализация адаптера
@@ -59,17 +59,27 @@ class HybridDatabaseAdapter {
         }
       }
 
-      // Проверяем, что хотя бы один адаптер БД инициализирован
-      if (!this.redisAdapter && !isPostgresAvailable()) {
+      // Проверяем, что хотя бы один адаптер БД инициализирован или разрешен fallback
+      if (!this.redisAdapter && !isPostgresAvailable() && !this.fallbackToLocal) {
         throw new Error('No database adapters available. Cannot initialize without database connection.');
+      }
+
+      // Если нет внешних баз данных, но разрешен fallback, используем локальное хранилище
+      if (!this.redisAdapter && !isPostgresAvailable() && this.fallbackToLocal) {
+        console.log('No external databases available, using local storage fallback');
       }
 
       this.isInitialized = true;
       console.log('Hybrid Database Adapter initialized successfully');
     } catch (error) {
       console.error('Failed to initialize Hybrid Database Adapter:', error);
-      // Не используем fallback к локальному хранилищу
-      throw new Error('Database initialization failed. No fallback to local storage allowed.');
+      // Разрешаем fallback к локальному хранилищу
+      if (this.fallbackToLocal) {
+        console.log('Using local storage fallback due to initialization error');
+        this.isInitialized = true;
+      } else {
+        throw new Error('Database initialization failed. No fallback to local storage allowed.');
+      }
     }
   }
 
@@ -119,7 +129,8 @@ class HybridDatabaseAdapter {
             throw new Error('Table name required for Postgres storage');
           }
         case 'local':
-          throw new Error('Local storage is disabled. Use database storage only.');
+          // Используем локальное хранилище как fallback
+          return await this.setInLocal(key, value);
         default:
           throw new Error(`Unknown storage type: ${storage}`);
       }

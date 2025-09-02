@@ -49,8 +49,8 @@ class SyncAdapter {
   private syncRetryDelay: number = 5000; // 5 секунд между попытками (было 30 секунд)
   private isInitialized: boolean = false;
   private initializationTimeout: NodeJS.Timeout | null = null;
-  private syncMode: 'server' | 'local' | 'hybrid' = 'server'; // Принудительно используем только серверную синхронизацию
-  private isForcedLocalMode: boolean = true; // Принудительно отключаем локальный режим
+  private syncMode: 'server' | 'local' | 'hybrid' = 'hybrid'; // Используем гибридную синхронизацию
+  private isForcedLocalMode: boolean = false; // Разрешаем локальный режим как fallback
   
   // Throttling для предотвращения спама
   private lastOperationAdd: number = 0;
@@ -73,7 +73,8 @@ class SyncAdapter {
           } catch (consoleError) {
             // Игнорируем ошибки console.error
           }
-          throw new Error('Database initialization failed');
+          // Не выбрасываем ошибку, а используем fallback
+          console.warn('Database initialization failed, using fallback mode');
         }
       
                       try {

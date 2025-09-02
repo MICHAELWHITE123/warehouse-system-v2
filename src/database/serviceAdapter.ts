@@ -17,22 +17,22 @@ class ServiceDatabaseAdapter implements ServiceDatabase {
   private isInitialized: boolean = false;
 
   constructor() {
-    // Инициализируем гибридный адаптер с конфигурацией только для БД
+    // Инициализируем гибридный адаптер с разрешением fallback к локальному хранилищу
     this.hybridAdapter = new HybridDatabaseAdapter({
-      fallbackToLocal: false,
-      redis: {
+      fallbackToLocal: true, // Разрешаем fallback к локальному хранилищу
+      redis: import.meta.env.VITE_VERCEL_KV_URL ? {
         url: import.meta.env.VITE_VERCEL_KV_URL,
         restApiUrl: import.meta.env.VITE_VERCEL_KV_REST_API_URL,
         restApiToken: import.meta.env.VITE_VERCEL_KV_REST_API_TOKEN,
         restApiReadOnlyToken: import.meta.env.VITE_VERCEL_KV_REST_API_READ_ONLY_TOKEN
-      } as any, // Временно используем any для обхода ошибки типов
-      postgres: {
+      } as any : undefined,
+      postgres: import.meta.env.VITE_POSTGRES_URL ? {
         url: import.meta.env.VITE_POSTGRES_URL,
         host: import.meta.env.VITE_POSTGRES_HOST,
         database: import.meta.env.VITE_POSTGRES_DATABASE,
         username: import.meta.env.VITE_POSTGRES_USERNAME,
         password: import.meta.env.VITE_POSTGRES_PASSWORD
-      }
+      } : undefined
     });
   }
 
