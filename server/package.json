@@ -9,6 +9,7 @@
     "dev": "nodemon src/index.ts",
     "dev:ts": "ts-node src/index.ts",
     "prod": "npm run build && npm start",
+    "vercel-build": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

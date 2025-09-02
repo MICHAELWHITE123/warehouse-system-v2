@@ -1,38 +1,63 @@
-import { Pool, PoolConfig } from 'pg';
-import dotenv from 'dotenv';
+import { Pool } from 'pg';
+import { testSupabaseConnection } from './supabase';
 
-dotenv.config();
+let pool: Pool | null = null;
 
-const poolConfig: PoolConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'warehouse_db',
-  user: process.env.DB_USER || 'warehouse_user',
-  password: process.env.DB_PASSWORD || '',
-  max: 20, // максимальное количество подключений в пуле
-  idleTimeoutMillis: 30000, // время ожидания перед закрытием неактивного подключения
-  connectionTimeoutMillis: 2000, // время ожидания подключения
+// Создаем пул подключений к PostgreSQL
+const createPool = () => {
+  if (process.env.NODE_ENV === 'production') {
+    // В продакшене используем Supabase
+    return new Pool({
+      connectionString: process.env.SUPABASE_DB_URL,
+      ssl: {
+        rejectUnauthorized: false
+      }
+    });
+  } else {
+    // В разработке используем локальную базу
+    return new Pool({
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432'),
+      database: process.env.DB_NAME || 'warehouse_db',
+      user: process.env.DB_USER || 'warehouse_user',
+      password: process.env.DB_PASSWORD || '',
+    });
+  }
 };
 
-export const pool = new Pool(poolConfig);
+// Получаем пул подключений
+export const getPool = () => {
+  if (!pool) {
+    pool = createPool();
+  }
+  return pool;
+};
 
-// Обработка ошибок подключения
-pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
-});
-
-// Тестирование подключения
+// Тестируем подключение к базе данных
 export const testConnection = async (): Promise<boolean> => {
   try {
-    const client = await pool.connect();
-    await client.query('SELECT NOW()');
-    client.release();
-    console.log('✅ Database connection successful');
-    return true;
+    if (process.env.NODE_ENV === 'production') {
+      // В продакшене тестируем Supabase
+      return await testSupabaseConnection();
+    } else {
+      // В разработке тестируем PostgreSQL
+      const client = await getPool().connect();
+      await client.query('SELECT NOW()');
+      client.release();
+      console.log('✅ Database connection successful');
+      return true;
+    }
   } catch (error) {
     console.error('❌ Database connection failed:', error);
     return false;
+  }
+};
+
+// Закрываем пул подключений
+export const closePool = async () => {
+  if (pool) {
+    await pool.end();
+    pool = null;
   }
 };
 
@@ -40,7 +65,7 @@ export const testConnection = async (): Promise<boolean> => {
 export const query = async (text: string, params?: any[]): Promise<any> => {
   const start = Date.now();
   try {
-    const res = await pool.query(text, params);
+    const res = await getPool().query(text, params);
     const duration = Date.now() - start;
     console.log('Query executed', { text, duration, rows: res.rowCount });
     return res;
@@ -67,7 +92,7 @@ export const queryMany = async (text: string, params?: any[]): Promise<any[]> =>
 export const withTransaction = async <T>(
   callback: (client: any) => Promise<T>
 ): Promise<T> => {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     await client.query('BEGIN');
     const result = await callback(client);
@@ -80,5 +105,3 @@ export const withTransaction = async <T>(
     client.release();
   }
 };
-
-export default pool;

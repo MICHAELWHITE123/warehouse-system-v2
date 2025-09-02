@@ -99,32 +99,15 @@ async function startServer() {
     });
     
   } catch (error) {
-    console.error('💥 Failed to start server:', error);
+    console.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 }
 
-// Обработка сигналов завершения
-process.on('SIGTERM', () => {
-  console.log('👋 SIGTERM received, shutting down gracefully');
-  process.exit(0);
-});
+// Запускаем сервер только если это не Vercel
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  startServer();
+}
 
-process.on('SIGINT', () => {
-  console.log('👋 SIGINT received, shutting down gracefully');
-  process.exit(0);
-});
-
-// Обработка необработанных ошибок
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
-
-process.on('uncaughtException', (error) => {
-  console.error('💥 Uncaught Exception:', error);
-  process.exit(1);
-});
-
-// Запускаем сервер
-startServer();
+// Экспортируем для Vercel
+export default app;
