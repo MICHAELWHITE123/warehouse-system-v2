@@ -25,13 +25,14 @@ export const SyncStatus: React.FC<SyncStatusProps> = ({ className }) => {
   const [lastError, setLastError] = useState<string | null>(null);
 
   useEffect(() => {
-    const handleStatusUpdate = () => {
+    const handleStatusUpdate = (event: Event) => {
       setStatus(syncAdapter.getSyncStatus());
     };
 
-    const handleError = (event: CustomEvent) => {
-      if (event.detail?.error) {
-        setLastError(event.detail.error);
+    const handleError = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail?.error) {
+        setLastError(customEvent.detail.error);
       }
     };
 

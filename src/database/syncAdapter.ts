@@ -494,6 +494,12 @@ class SyncAdapter {
     } catch (error) {
       console.error('Sync failed:', error);
       
+      // Отправляем событие об ошибке
+      const errorEvent = new CustomEvent('sync-error', {
+        detail: { error: error instanceof Error ? error.message : 'Unknown error' }
+      });
+      window.dispatchEvent(errorEvent);
+      
       // Обрабатываем ошибки
       if (error instanceof Error && error.message.includes('401')) {
         console.log('Authentication error, clearing sync queue');
@@ -663,23 +669,29 @@ class SyncAdapter {
         console.log(`❌ Server sync failed: ${result.message || 'Unknown error'}`);
         throw new Error(result.message || 'Sync failed');
       }
-    } catch (error) {
-      console.error('Failed to send operations to server:', error);
-      
-      // Если ошибка связана с недоступностью URL, возвращаем null
-      if (error instanceof Error && (
-        error.message.includes('Failed to fetch') ||
-        error.message.includes('ERR_NAME_NOT_RESOLVED') ||
-        error.message.includes('ERR_CONNECTION_REFUSED')
-      )) {
-        console.log('Network error detected, server sync failed');
+          } catch (error) {
+        console.error('Failed to send operations to server:', error);
+        
+        // Отправляем событие об ошибке
+        const errorEvent = new CustomEvent('sync-error', {
+          detail: { error: error instanceof Error ? error.message : 'Unknown error' }
+        });
+        window.dispatchEvent(errorEvent);
+        
+        // Если ошибка связана с недоступностью URL, возвращаем null
+        if (error instanceof Error && (
+          error.message.includes('Failed to fetch') ||
+          error.message.includes('ERR_NAME_NOT_RESOLVED') ||
+          error.message.includes('ERR_CONNECTION_REFUSED')
+        )) {
+          console.log('Network error detected, server sync failed');
+          return null;
+        }
+        
+        // Для других ошибок возвращаем null, чтобы показать что синхронизация не удалась
+        console.log('Server error, sync failed');
         return null;
       }
-      
-      // Для других ошибок возвращаем null, чтобы показать что синхронизация не удалась
-      console.log('Server error, sync failed');
-      return null;
-    }
   }
 
   // Обработать результаты синхронизации
@@ -774,13 +786,7 @@ class SyncAdapter {
     window.dispatchEvent(event);
     
     // Также отправляем событие о статусе синхронизации
-    const statusEvent = new CustomEvent('sync-status-updated', {
-      detail: { 
-        status: this.getSyncStatus(),
-        conflictCount: this.conflicts.length
-      }
-    });
-    window.dispatchEvent(statusEvent);
+    this.notifyStatusUpdate();
   }
   
   // Уведомить об обновлении статуса
