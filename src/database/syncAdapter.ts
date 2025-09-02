@@ -13,6 +13,7 @@ export interface SyncOperation {
   status: 'pending' | 'synced' | 'failed' | 'conflict';
   retryCount: number;
   lastRetry?: number;
+  lastError?: string; // Последняя ошибка синхронизации
 }
 
 export interface SyncConflict {
@@ -118,9 +119,11 @@ class SyncAdapter {
         this.syncMode = 'local';
       }
       
-      // Запускаем автоматическую синхронизацию
+      // Запускаем автоматическую синхронизацию (временно отключено)
       try {
-        this.startAutoSync();
+        // Временно отключаем автосинхронизацию до развертывания API
+        console.log('Auto sync temporarily disabled until API deployment');
+        // this.startAutoSync();
       } catch (error) {
         try {
           console.error('Failed to start auto sync:', error);
@@ -505,6 +508,7 @@ class SyncAdapter {
         for (const op of operationsToSync) {
           op.retryCount++;
           op.lastRetry = Date.now();
+          op.lastError = error instanceof Error ? error.message : 'Unknown error';
           if (op.retryCount >= 3) {
             op.status = 'failed';
           }
@@ -524,7 +528,14 @@ class SyncAdapter {
         // Проверяем, не слишком ли много неудачных попыток
         const failedOperations = pendingOperations.filter(op => op.retryCount >= 3);
         if (failedOperations.length < pendingOperations.length) {
-          this.scheduleSync();
+          // Увеличиваем задержку при ошибках 404
+          const has404Error = pendingOperations.some(op => op.lastError && op.lastError.includes('404'));
+          if (has404Error) {
+            console.log('404 error detected, increasing sync delay to 30 seconds');
+            setTimeout(() => this.scheduleSync(), 30000);
+          } else {
+            this.scheduleSync();
+          }
         } else {
           console.log('Too many failed operations, stopping sync attempts');
         }
