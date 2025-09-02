@@ -478,12 +478,14 @@ class SyncAdapter {
         } else {
           console.log('Server sync failed - no results returned, keeping operations in queue');
           // Не удаляем операции из очереди, если сервер не вернул результатов
-          throw new Error('Server sync failed. Local sync is disabled.');
+          // Не выбрасываем ошибку, а просто логируем
+          console.warn('Server sync failed, but continuing without error');
         }
       } else {
         // Офлайн режим - локальная синхронизация отключена
         console.log('Offline mode - local sync is disabled');
-        throw new Error('Cannot sync offline. Local sync is disabled.');
+        // Не выбрасываем ошибку, а просто логируем
+        console.warn('Cannot sync offline, but continuing without error');
       }
       
     } catch (error) {
@@ -509,14 +511,23 @@ class SyncAdapter {
         }
         this.saveSyncQueue();
         
-        throw new Error('Server sync failed. Local sync is disabled.');
+        // Не выбрасываем ошибку, а просто логируем
+        console.warn('Server sync failed, but continuing without error');
       }
     } finally {
       this.isSyncing = false;
       
       // Если есть еще операции и не было критической ошибки, планируем следующую синхронизацию
-      if (this.syncQueue.filter(op => op.status === 'pending').length > 0 && this.lastSyncAttempt === 0) {
-        this.scheduleSync();
+      // Но только если не было слишком много неудачных попыток
+      const pendingOperations = this.syncQueue.filter(op => op.status === 'pending');
+      if (pendingOperations.length > 0 && this.lastSyncAttempt === 0) {
+        // Проверяем, не слишком ли много неудачных попыток
+        const failedOperations = pendingOperations.filter(op => op.retryCount >= 3);
+        if (failedOperations.length < pendingOperations.length) {
+          this.scheduleSync();
+        } else {
+          console.log('Too many failed operations, stopping sync attempts');
+        }
       }
     }
   }
