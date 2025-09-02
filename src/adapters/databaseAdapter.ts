@@ -2,7 +2,6 @@
 
 import type { Equipment } from '../components/EquipmentList';
 import type { EquipmentStack } from '../components/StackManagement';
-import type { Shipment } from '../components/ShipmentList';
 
 import type { 
   EquipmentWithRelations, 
@@ -18,6 +17,21 @@ import { ExtendedShipment } from '../types';
 
 // Преобразование оборудования из БД в интерфейс компонента
 export function adaptEquipmentFromDB(dbEquipment: EquipmentWithRelations): Equipment {
+  // Извлекаем текст спецификации из объекта или строки
+  let specifications: string | undefined;
+  if (dbEquipment.specifications) {
+    if (typeof dbEquipment.specifications === 'string') {
+      try {
+        const parsed = JSON.parse(dbEquipment.specifications);
+        specifications = parsed.text || dbEquipment.specifications;
+      } catch {
+        specifications = dbEquipment.specifications;
+      }
+    } else if (typeof dbEquipment.specifications === 'object') {
+      specifications = (dbEquipment.specifications as any).text || JSON.stringify(dbEquipment.specifications);
+    }
+  }
+
   return {
     id: dbEquipment.uuid,
     name: dbEquipment.name,
@@ -27,7 +41,8 @@ export function adaptEquipmentFromDB(dbEquipment: EquipmentWithRelations): Equip
     location: dbEquipment.location_name || '',
     purchaseDate: dbEquipment.purchase_date || '',
     lastMaintenance: dbEquipment.last_maintenance,
-    assignedTo: dbEquipment.assigned_to
+    assignedTo: dbEquipment.assigned_to,
+    specifications: specifications // Добавляю поле спецификации
   };
 }
 
@@ -50,15 +65,43 @@ export function adaptEquipmentToDB(
     location_id: location?.id,
     purchase_date: equipment.purchaseDate || undefined,
     last_maintenance: equipment.lastMaintenance,
-    assigned_to: equipment.assignedTo
+    assigned_to: equipment.assignedTo,
+    specifications: equipment.specifications ? { text: equipment.specifications } : undefined // Преобразуем строку в объект
   };
 }
 
 // Преобразование стека из БД в интерфейс компонента
 export function adaptStackFromDB(dbStack: StackWithEquipment): EquipmentStack {
-  const tags = dbStack.tags ? JSON.parse(dbStack.tags) : [];
+  // Only log in development mode
+  if (import.meta.env.DEV) {
+    console.log('🔄 adaptStackFromDB input:', dbStack);
+    console.log('🏷️ dbStack.tags:', dbStack.tags, 'type:', typeof dbStack.tags);
+  }
   
-  return {
+  let tags: string[] = [];
+  
+  try {
+    if (dbStack.tags && typeof dbStack.tags === 'string' && dbStack.tags.trim() !== '') {
+      const parsed = JSON.parse(dbStack.tags);
+      // Убеждаемся, что результат - это массив
+      if (Array.isArray(parsed)) {
+        tags = parsed;
+      } else {
+        if (import.meta.env.DEV) {
+          console.warn('⚠️ Tags for stack is not an array:', dbStack.uuid, parsed);
+        }
+        tags = [];
+      }
+    }
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.warn('⚠️ Failed to parse tags for stack:', dbStack.uuid, error);
+      console.warn('📝 Raw tags value:', dbStack.tags);
+    }
+    tags = [];
+  }
+  
+  const result = {
     id: dbStack.uuid,
     name: dbStack.name,
     description: dbStack.description || '',
@@ -67,6 +110,11 @@ export function adaptStackFromDB(dbStack: StackWithEquipment): EquipmentStack {
     createdBy: dbStack.created_by,
     tags
   };
+  
+  if (import.meta.env.DEV) {
+    console.log('✅ adaptStackFromDB result:', result);
+  }
+  return result;
 }
 
 // Преобразование стека из интерфейса компонента в БД
@@ -74,13 +122,24 @@ export function adaptStackToDB(
   stack: Omit<EquipmentStack, 'id'>,
   uuid?: string
 ): CreateEquipmentStack {
-  return {
+  // Only log in development mode
+  if (import.meta.env.DEV) {
+    console.log('🔄 adaptStackToDB input:', stack);
+    console.log('🏷️ stack.tags:', stack.tags);
+  }
+  
+  const result = {
     uuid: uuid || Date.now().toString(),
     name: stack.name,
     description: stack.description,
     created_by: stack.createdBy,
-    tags: stack.tags
+    tags: stack.tags && stack.tags.length > 0 ? JSON.stringify(stack.tags) : undefined
   };
+  
+  if (import.meta.env.DEV) {
+    console.log('✅ adaptStackToDB result:', result);
+  }
+  return result;
 }
 
 // Преобразование отгрузки из БД в интерфейс компонента

@@ -40,6 +40,11 @@ class BrowserDatabase {
     this.loadFromStorage();
   }
 
+  // Публичный метод для принудительного обновления данных
+  public refreshData(): void {
+    this.loadFromStorage();
+  }
+
   // Сохранение данных в localStorage
   private saveToStorage(): void {
     try {
@@ -159,7 +164,10 @@ class BrowserDatabase {
   // Подсчет записей
   count(tableName: string, condition?: (record: DatabaseRecord) => boolean): number {
     const records = this.selectAll(tableName);
-    return condition ? records.filter(condition).length : records.length;
+    if (condition) {
+      return records.filter(condition).length;
+    }
+    return records.length;
   }
 
   // Инициализация базы данных с начальными данными

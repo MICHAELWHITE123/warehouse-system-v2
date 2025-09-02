@@ -1,46 +1,9 @@
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { Download, FileText } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import { FileText } from 'lucide-react';
 import { Button } from './ui/button';
 import { Shipment } from './ShipmentList';
 import { Equipment } from './EquipmentList';
-import CyrillicToTranslit from 'cyrillic-to-translit-js';
-
-// Импортируем поддержку шрифтов
-import 'jspdf-font';
-
-// Расширяем типы jsPDF для поддержки autoTable
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: any) => jsPDF;
-    lastAutoTable: {
-      finalY: number;
-    };
-  }
-}
-
-// Функция для добавления поддержки русского языка
-function addRussianFontSupport(doc: jsPDF) {
-  try {
-    // Используем стандартный шрифт Helvetica
-    doc.setFont('helvetica', 'normal');
-    
-    // Устанавливаем кодировку для поддержки символов
-    doc.setLanguage('ru');
-    
-    console.log('Шрифт Helvetica установлен для поддержки символов');
-  } catch (error) {
-    console.warn('Ошибка при настройке шрифта:', error);
-    // Fallback к стандартному шрифту
-    doc.setFont('helvetica', 'normal');
-  }
-}
-
-// Функция для transliteration русского текста
-function transliterateRussian(text: string): string {
-  const translit = new (CyrillicToTranslit as any)();
-  return translit.transform(text, '-');
-}
 
 interface ShipmentPDFGeneratorProps {
   shipment: Shipment;
@@ -49,290 +12,204 @@ interface ShipmentPDFGeneratorProps {
 }
 
 export function ShipmentPDFGenerator({ shipment, equipment, className }: ShipmentPDFGeneratorProps) {
-  const generatePDF = () => {
-    // Создаем новый PDF документ в формате А4
-    const doc = new jsPDF('p', 'mm', 'a4');
-    
-    // Добавляем поддержку русского языка
-    addRussianFontSupport(doc);
-    
-    // Размеры страницы А4: 210 x 297 мм
-    const pageWidth = 210;
-    const pageHeight = 297;
-    const margin = 20;
-    const contentWidth = pageWidth - (margin * 2);
-    
-    let yPosition = margin;
-    
-    // Заголовок документа
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.text(transliterateRussian('ОТГРУЗОЧНЫЙ ЛИСТ'), pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 15;
-    
-    // Номер отгрузки
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`No. ${shipment.number}`, pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 20;
-    
-    // Основная информация об отгрузке
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text(transliterateRussian('Информация об отгрузке:'), margin, yPosition);
-    yPosition += 8;
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    
-    // Дата отгрузки
-    doc.text(`${transliterateRussian('Дата')}: ${new Date(shipment.date).toLocaleDateString('ru-RU')}`, margin, yPosition);
-    yPosition += 6;
-    
-    // Статус
-    doc.text(`${transliterateRussian('Статус')}: ${getStatusText(shipment.status)}`, margin, yPosition);
-    yPosition += 6;
-    
-    // Ответственный
-    doc.text(`${transliterateRussian('Ответственный')}: ${shipment.responsiblePerson}`, margin, yPosition);
-    yPosition += 6;
-    
-    // Всего позиций
-    doc.text(`${transliterateRussian('Всего позиций')}: ${shipment.totalItems}`, margin, yPosition);
-    yPosition += 15;
-    
-    // Получатель
-    doc.setFont('helvetica', 'bold');
-    doc.text(transliterateRussian('Получатель:'), margin, yPosition);
-    yPosition += 8;
-    
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${transliterateRussian('Наименование')}: ${shipment.recipient}`, margin, yPosition);
-    yPosition += 6;
-    
-    doc.text(`${transliterateRussian('Адрес')}: ${shipment.recipientAddress}`, margin, yPosition);
-    yPosition += 15;
-    
-    // Комментарии
-    if (shipment.comments) {
-      doc.setFont('helvetica', 'bold');
-      doc.text(transliterateRussian('Комментарии:'), margin, yPosition);
-      yPosition += 8;
+  const generatePDF = async () => {
+    try {
+      // Создаем HTML контент с правильной кодировкой
+      const htmlContent = createHTMLContent(shipment, equipment);
       
-      doc.setFont('helvetica', 'normal');
-      const comments = doc.splitTextToSize(shipment.comments, contentWidth);
-      doc.text(comments, margin, yPosition);
-      yPosition += (comments.length * 6) + 10;
-    }
-    
-    // Оборудование
-    if (shipment.equipment.length > 0) {
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${transliterateRussian('Оборудование')} (${shipment.equipment.length} ${transliterateRussian('позиций')}):`, margin, yPosition);
-      yPosition += 8;
+      // Создаем временный div для рендеринга
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlContent;
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.left = '-9999px';
+      tempDiv.style.top = '-9999px';
+      tempDiv.style.width = '210mm';
+      tempDiv.style.padding = '20mm';
+      tempDiv.style.fontFamily = '"Noto Sans", "Roboto", Arial, sans-serif';
+      tempDiv.style.fontSize = '12px';
+      tempDiv.style.lineHeight = '1.4';
+      tempDiv.style.color = '#000';
+      tempDiv.style.backgroundColor = '#fff';
       
-      // Проверяем, поместится ли таблица на текущей странице
-      if (yPosition + (shipment.equipment.length * 8) + 20 > pageHeight - margin) {
-        doc.addPage();
-        yPosition = margin;
-      }
+      document.body.appendChild(tempDiv);
       
-      const equipmentData = shipment.equipment.map((item, index) => [
-        index + 1,
-        item.name,
-        item.serialNumber,
-        item.quantity.toString(),
-        '□' // Чекбокс для отметки
-      ]);
-      
-      autoTable(doc, {
-        startY: yPosition,
-        head: [['No.', transliterateRussian('Наименование'), transliterateRussian('Серийный номер'), transliterateRussian('Количество'), transliterateRussian('Отметка')]],
-        body: equipmentData,
-        styles: {
-          fontSize: 9,
-          cellPadding: 2
-        },
-        headStyles: {
-          fillColor: [66, 139, 202],
-          textColor: 255,
-          fontStyle: 'bold'
-        },
-        margin: { left: margin, right: margin }
+      // Создаем canvas с помощью html2canvas
+      const canvas = await html2canvas(tempDiv, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: 210 * 3.779527559, // конвертируем mm в px (1mm = 3.779527559px)
+        height: 297 * 3.779527559
       });
       
-      yPosition = (doc as any).lastAutoTable.finalY + 10;
-    }
-    
-    // Стеки
-    if (shipment.stacks && shipment.stacks.length > 0) {
-      // Проверяем, поместится ли на текущей странице
-      if (yPosition + 30 > pageHeight - margin) {
-        doc.addPage();
-        yPosition = margin;
-      }
+      // Удаляем временный элемент
+      document.body.removeChild(tempDiv);
       
-      doc.setFont('times', 'bold');
-      doc.text(`Стеки техники (${shipment.stacks.length} стеков):`, margin, yPosition);
-      yPosition += 8;
+      // Конвертируем canvas в изображение
+      const imgData = canvas.toDataURL('image/png');
       
-      shipment.stacks.forEach((stack, stackIndex) => {
-        if (yPosition + 20 > pageHeight - margin) {
-          doc.addPage();
-          yPosition = margin;
-        }
-        
-        doc.setFont('times', 'bold');
-        doc.text(`${stackIndex + 1}. ${stack.name} (x${stack.quantity})`, margin, yPosition);
-        yPosition += 6;
-        
-        doc.setFont('times', 'normal');
-        doc.text(`Состав: ${stack.equipmentIds.length} единиц техники`, margin + 10, yPosition);
-        yPosition += 6;
-        
-        // Отображение оборудования в стеке
-        if (equipment) {
-          const stackEquipment = equipment.filter(item => stack.equipmentIds.includes(item.id));
-          stackEquipment.forEach((equip, equipIndex) => {
-            if (yPosition + 6 > pageHeight - margin) {
-              doc.addPage();
-              yPosition = margin;
-            }
-            
-            doc.text(`   ${equipIndex + 1}. ${equip.name} (${equip.serialNumber})`, margin + 20, yPosition);
-            yPosition += 4;
-          });
-        }
-        
-        yPosition += 4;
+      // Создаем PDF
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
       });
       
-      yPosition += 10;
+      // Добавляем изображение в PDF
+      const imgWidth = 210; // A4 ширина в мм
+      const imgHeight = 297; // A4 высота в мм
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      
+      // Сохраняем PDF
+      const fileName = `shipment_${shipment.number}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      alert('Ошибка при создании PDF: ' + errorMessage);
     }
-    
-    // Аренда
-    if (shipment.rental && shipment.rental.length > 0) {
-      if (yPosition + 30 > pageHeight - margin) {
-        doc.addPage();
-        yPosition = margin;
-      }
-      
-      doc.setFont('times', 'bold');
-      doc.text(`Арендованное оборудование (${shipment.rental.length} позиций):`, margin, yPosition);
-      yPosition += 8;
-      
-      const rentalData = shipment.rental.map((item, index) => [
-        index + 1,
-        item.equipment,
-        item.quantity.toString(),
-        '□'
-      ]);
-      
-      autoTable(doc, {
-        startY: yPosition,
-        head: [['№', 'Наименование', 'Количество', 'Отметка']],
-        body: rentalData,
-        styles: {
-          fontSize: 9,
-          cellPadding: 2
-        },
-        headStyles: {
-          fillColor: [66, 139, 202],
-          textColor: 255,
-          fontStyle: 'bold'
-        },
-        margin: { left: margin, right: margin }
-      });
-      
-      yPosition = (doc as any).lastAutoTable.finalY + 10;
-    }
-    
-    // Чек-лист
-    if (shipment.checklist && shipment.checklist.length > 0) {
-      if (yPosition + 30 > pageHeight - margin) {
-        doc.addPage();
-        yPosition = margin;
-      }
-      
-      doc.setFont('times', 'bold');
-      doc.text('Чек-лист:', margin, yPosition);
-      yPosition += 8;
-      
-      shipment.checklist.forEach((item) => {
-        if (yPosition + 8 > pageHeight - margin) {
-          doc.addPage();
-          yPosition = margin;
-        }
-        
-        const checkbox = item.isCompleted ? '☑' : '□';
-        doc.text(`${checkbox} ${item.title}`, margin, yPosition);
-        yPosition += 6;
-        
-        if (item.description) {
-          doc.setFontSize(8);
-          doc.text(`   ${item.description}`, margin + 10, yPosition);
-          yPosition += 4;
-          doc.setFontSize(10);
-        }
-      });
-      
-      yPosition += 10;
-    }
-    
-    // Подписи в конце
-    if (yPosition + 40 > pageHeight - margin) {
-      doc.addPage();
-      yPosition = margin;
-    }
-    
-    doc.setFont('times', 'bold');
-    doc.text('Подписи:', margin, yPosition);
-    yPosition += 15;
-    
-    // Линии для подписей
-    doc.line(margin, yPosition, margin + 60, yPosition);
-    doc.line(margin + 80, yPosition, margin + 140, yPosition);
-    doc.line(margin + 160, yPosition, margin + 220, yPosition);
-    
-    yPosition += 5;
-    
-    doc.setFont('times', 'normal');
-    doc.setFontSize(8);
-    doc.text('Отправитель', margin + 25, yPosition);
-    doc.text('Водитель', margin + 105, yPosition);
-    doc.text('Получатель', margin + 185, yPosition);
-    
-    // Дата и время создания документа
-    yPosition += 20;
-    doc.setFontSize(8);
-    doc.text(`Документ создан: ${new Date().toLocaleString('ru-RU')}`, margin, yPosition);
-    
-    // Сохраняем PDF
-    doc.save(`Отгрузочный_лист_${shipment.number}_${new Date(shipment.date).toLocaleDateString('ru-RU').replace(/\./g, '-')}.pdf`);
   };
-  
+
+  // Функция создания HTML контента
+  const createHTMLContent = (shipment: Shipment, equipment?: Equipment[]) => {
+    const safeText = (text: string) => text || '';
+    
+    return `
+      <div style="font-family: 'Noto Sans', 'Roboto', Arial, sans-serif; font-size: 12px; line-height: 1.4; color: #000;">
+        <!-- Заголовок -->
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="font-size: 24px; font-weight: bold; margin: 0 0 10px 0;">ОТГРУЗОЧНЫЙ ЛИСТ</h1>
+          <h2 style="font-size: 18px; font-weight: bold; margin: 0;">№ ${shipment.number}</h2>
+        </div>
+        
+        <!-- Основная информация -->
+        <div style="margin-bottom: 20px;">
+          <h3 style="font-size: 14px; font-weight: bold; margin: 0 0 10px 0;">Информация об отгрузке:</h3>
+          <p style="margin: 5px 0;"><strong>Дата:</strong> ${new Date(shipment.date).toLocaleDateString('ru-RU')}</p>
+          <p style="margin: 5px 0;"><strong>Статус:</strong> ${getStatusText(shipment.status)}</p>
+          <p style="margin: 5px 0;"><strong>Ответственный:</strong> ${safeText(shipment.responsiblePerson)}</p>
+          <p style="margin: 5px 0;"><strong>Всего позиций:</strong> ${shipment.totalItems}</p>
+        </div>
+        
+        <!-- Получатель -->
+        <div style="margin-bottom: 20px;">
+          <h3 style="font-size: 14px; font-weight: bold; margin: 0 0 10px 0;">Получатель:</h3>
+          <p style="margin: 5px 0;"><strong>Наименование:</strong> ${safeText(shipment.recipient)}</p>
+          ${shipment.recipientAddress ? `<p style="margin: 5px 0;"><strong>Адрес:</strong> ${safeText(shipment.recipientAddress)}</p>` : ''}
+        </div>
+        
+        <!-- Комментарии -->
+        ${shipment.comments ? `
+        <div style="margin-bottom: 20px;">
+          <h3 style="font-size: 14px; font-weight: bold; margin: 0 0 10px 0;">Комментарии:</h3>
+          <p style="margin: 5px 0; padding: 10px; background-color: #f5f5f5; border-radius: 4px;">${safeText(shipment.comments)}</p>
+        </div>
+        ` : ''}
+        
+        <!-- Список оборудования (если передано отдельно) -->
+        ${equipment && equipment.length > 0 ? `
+        <div style="margin-bottom: 20px;">
+          <h3 style="font-size: 14px; font-weight: bold; margin: 0 0 10px 0;">Дополнительное оборудование:</h3>
+          <table style="width: 100%; border-collapse: collapse; border: 1px solid #ccc; font-size: 10px;">
+            <thead>
+              <tr style="background-color: #f0f0f0;">
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">№</th>
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Наименование</th>
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Категория</th>
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Кол-во</th>
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Местоположение</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${equipment.map((item, index) => `
+                <tr>
+                  <td style="border: 1px solid #ccc; padding: 8px;">${index + 1}</td>
+                  <td style="border: 1px solid #ccc; padding: 8px;">${safeText(item.name)}</td>
+                  <td style="border: 1px solid #ccc; padding: 8px;">${safeText(item.category)}</td>
+                  <td style="border: 1px solid #ccc; padding: 8px;">1</td>
+                  <td style="border: 1px solid #ccc; padding: 8px;">${safeText(item.location)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        ` : ''}
+        
+        <!-- Список техники из отгрузочного листа -->
+        ${shipment.equipment && shipment.equipment.length > 0 ? `
+        <div style="margin-bottom: 20px;">
+          <h3 style="font-size: 14px; font-weight: bold; margin: 0 0 10px 0;">Техника в отгрузке:</h3>
+          <table style="width: 100%; border-collapse: collapse; border: 1px solid #ccc; font-size: 10px;">
+            <thead>
+              <tr style="background-color: #f0f0f0;">
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">№</th>
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Наименование</th>
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Серийный номер</th>
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Количество</th>
+                <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Отметка</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${shipment.equipment.map((item, index) => `
+                <tr>
+                  <td style="border: 1px solid #ccc; padding: 8px;">${index + 1}</td>
+                  <td style="border: 1px solid #ccc; padding: 8px;">${safeText(item.name)}</td>
+                  <td style="border: 1px solid #ccc; padding: 8px;">${safeText(item.serialNumber)}</td>
+                  <td style="border: 1px solid #ccc; padding: 8px;">${item.quantity}</td>
+                  <td style="border: 1px solid #ccc; padding: 8px;">[ ]</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        ` : ''}
+        
+        <!-- Подписи -->
+        <div style="margin-top: 40px; display: flex; justify-content: space-between;">
+          <div style="text-align: center;">
+            <div style="border-bottom: 1px solid #000; width: 150px; margin-bottom: 5px;"></div>
+            <small>Подпись отправителя</small>
+          </div>
+          <div style="text-align: center;">
+            <div style="border-bottom: 1px solid #000; width: 150px; margin-bottom: 5px;"></div>
+            <small>Подпись получателя</small>
+          </div>
+        </div>
+        
+        <!-- Дата создания -->
+        <div style="margin-top: 20px; text-align: center; font-size: 10px; color: #666;">
+          Дата создания документа: ${new Date().toLocaleDateString('ru-RU')}
+        </div>
+      </div>
+    `;
+  };
+
+  // Функция для получения текста статуса
   const getStatusText = (status: string): string => {
-    switch (status) {
-      case "pending": return "Ожидает";
-      case "in-progress": return "В работе";
-      case "in-transit": return "В пути";
-      case "delivered": return "Доставлено";
-      case "cancelled": return "Отменено";
-      default: return "Неизвестно";
-    }
+    const statusMap: { [key: string]: string } = {
+      'pending': 'Ожидает',
+      'in-progress': 'В процессе',
+      'in-transit': 'В пути',
+      'delivered': 'Доставлено',
+      'cancelled': 'Отменено'
+    };
+    return statusMap[status] || status;
   };
-  
+
   return (
-    <Button
-      onClick={generatePDF}
-      variant="outline"
-      size="sm"
-      className={`flex items-center gap-2 ${className || ''}`}
-      title="Скачать отгрузочный лист в PDF"
-    >
-      <Download className="h-4 w-4" />
-      <FileText className="h-4 w-4" />
-      PDF
-    </Button>
+    <div className={className}>
+      <Button
+        onClick={generatePDF}
+        variant="outline"
+        size="sm"
+        className="flex items-center gap-2"
+      >
+        <FileText className="h-4 w-4" />
+        Скачать PDF
+      </Button>
+    </div>
   );
 }

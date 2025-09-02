@@ -1,104 +1,122 @@
-import { Truck, Package, Users, CheckCircle2 } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { 
+  Package, 
+  Users, 
+  CheckCircle2,
+  QrCode
+} from "lucide-react";
+import { toast } from "sonner";
 import { Equipment } from "./EquipmentList";
 import { Shipment } from "./ShipmentList";
-import { useState, useEffect } from "react";
-import { toast } from "sonner";
-import { ShipmentPDFGenerator } from "./ShipmentPDFGenerator";
+import { QRScanner } from "./QRScanner";
+import { useAuth } from "../hooks/useAuth";
 
 interface ShipmentDetailsModalProps {
   shipment: Shipment | null;
   equipment?: Equipment[];
   isOpen: boolean;
   onClose: () => void;
-  onToggleLoadingStatus?: (shipment: Shipment) => void;
-  onEquipmentStatusChange?: (equipmentId: string, newStatus: string) => void;
-  // Добавляем новые пропсы для синхронизации состояния
   loadedEquipment?: Set<string>;
   loadedStacks?: Set<string>;
-  onEquipmentLoaded?: (equipmentId: string, checked: boolean) => void;
-  onStackLoaded?: (stackId: string, checked: boolean) => void;
+  onEquipmentLoadedChange?: (shipmentId: string, equipmentId: string, isLoaded: boolean) => void;
+  onStackLoadedChange?: (shipmentId: string, stackId: string, isLoaded: boolean) => void;
 }
 
 export function ShipmentDetailsModal({
   shipment,
-  equipment,
+  equipment = [],
   isOpen,
   onClose,
-  onToggleLoadingStatus,
-  onEquipmentStatusChange,
-  loadedEquipment: externalLoadedEquipment,
-  loadedStacks: externalLoadedStacks,
-  onEquipmentLoaded: externalOnEquipmentLoaded,
-  onStackLoaded: externalOnStackLoaded
+  loadedEquipment = new Set(),
+  loadedStacks = new Set(),
+  onEquipmentLoadedChange,
+  onStackLoadedChange
 }: ShipmentDetailsModalProps) {
+  // Если отгрузка не выбрана, не рендерим модальное окно
   if (!shipment) return null;
 
-  // Используем внешнее состояние, если оно передано, иначе локальное
+  const { user } = useAuth();
   const [localLoadedEquipment, setLocalLoadedEquipment] = useState<Set<string>>(new Set());
   const [localLoadedStacks, setLocalLoadedStacks] = useState<Set<string>>(new Set());
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
+  // Добавляем состояние для истории погрузки
+  const [loadingHistory, setLoadingHistory] = useState<Record<string, { user: string; timestamp: string }>>({});
 
-  // Определяем, какое состояние использовать
-  const loadedEquipment = externalLoadedEquipment || localLoadedEquipment;
-  const loadedStacks = externalLoadedStacks || localLoadedStacks;
-
-  // Инициализация состояния при открытии модального окна
+  // Инициализация состояния
   useEffect(() => {
     if (shipment) {
-      if (externalLoadedEquipment) {
-        // Если передано внешнее состояние, используем его
-        setLocalLoadedEquipment(new Set(externalLoadedEquipment));
-      } else {
-        // Иначе инициализируем локальное состояние
-        setLocalLoadedEquipment(new Set());
-      }
+      setLocalLoadedEquipment(new Set(loadedEquipment));
+      setLocalLoadedStacks(new Set(loadedStacks));
       
-      if (externalLoadedStacks) {
-        setLocalLoadedStacks(new Set(externalLoadedStacks));
-      } else {
-        setLocalLoadedStacks(new Set());
+      // Загружаем историю погрузки из localStorage
+      const savedHistory = localStorage.getItem(`loadingHistory_${shipment.id}`);
+      if (savedHistory) {
+        try {
+          const parsedHistory = JSON.parse(savedHistory);
+          setLoadingHistory(parsedHistory);
+        } catch (error) {
+          console.warn('Ошибка при загрузке истории погрузки:', error);
+        }
       }
     }
-  }, [shipment, externalLoadedEquipment, externalLoadedStacks]);
+  }, [shipment, loadedEquipment, loadedStacks]);
 
-  const handleToggleLoadingStatus = (shipment: Shipment) => {
-    if (onToggleLoadingStatus) {
-      onToggleLoadingStatus(shipment);
+  // Синхронизация локального состояния с пропсами
+  useEffect(() => {
+    if (shipment && loadedEquipment) {
+      setLocalLoadedEquipment(new Set(loadedEquipment));
     }
-  };
+  }, [shipment, loadedEquipment]);
 
-  // Обработчик изменения статуса погрузки оборудования
+  useEffect(() => {
+    if (shipment && loadedStacks) {
+      setLocalLoadedStacks(new Set(loadedStacks));
+    }
+  }, [shipment, loadedStacks]);
+
   const handleEquipmentLoaded = (equipmentId: string, isLoaded: boolean) => {
-    console.log('=== handleEquipmentLoaded ===');
-    console.log('equipmentId:', equipmentId);
-    console.log('isLoaded:', isLoaded);
+    setLocalLoadedEquipment(prev => {
+      const newSet = new Set(prev);
+      if (isLoaded) {
+        newSet.add(equipmentId);
+      } else {
+        newSet.delete(equipmentId);
+      }
+      return newSet;
+    });
     
-    if (externalOnEquipmentLoaded) {
-      // Если есть внешний обработчик, используем его
-      externalOnEquipmentLoaded(equipmentId, isLoaded);
-    } else {
-      // Иначе обновляем локальное состояние
-      setLocalLoadedEquipment(prev => {
-        const newSet = new Set(prev);
-        if (isLoaded) {
-          newSet.add(equipmentId);
-        } else {
-          newSet.delete(equipmentId);
+    // Вызываем callback для обновления состояния в родительском компоненте
+    if (onEquipmentLoadedChange) {
+      onEquipmentLoadedChange(shipment.id, equipmentId, isLoaded);
+    }
+    
+    // Сохраняем информацию о том, кто отметил оборудование
+    if (isLoaded) {
+      const newHistory = {
+        ...loadingHistory,
+        [equipmentId]: {
+          user: user?.displayName || "Неизвестный пользователь",
+          timestamp: new Date().toISOString()
         }
-        console.log('Новое состояние loadedEquipment:', Array.from(newSet));
-        return newSet;
-      });
+      };
+      setLoadingHistory(newHistory);
+      
+      // Сохраняем в localStorage
+      localStorage.setItem(`loadingHistory_${shipment.id}`, JSON.stringify(newHistory));
+    } else {
+      const newHistory = { ...loadingHistory };
+      delete newHistory[equipmentId];
+      setLoadingHistory(newHistory);
+      
+      // Сохраняем в localStorage
+      localStorage.setItem(`loadingHistory_${shipment.id}`, JSON.stringify(newHistory));
     }
-
-    // Уведомляем родительский компонент об изменении статуса
-    if (onEquipmentStatusChange) {
-      const newStatus = isLoaded ? "in-use" : "available";
-      onEquipmentStatusChange(equipmentId, newStatus);
-    }
-
-    // Показываем уведомление
+    
     toast.success(
       isLoaded 
         ? `Техника отмечена как погруженная` 
@@ -106,30 +124,44 @@ export function ShipmentDetailsModal({
     );
   };
 
-  // Обработчик изменения статуса погрузки стеков
   const handleStackLoaded = (stackId: string, isLoaded: boolean) => {
-    console.log('=== handleStackLoaded ===');
-    console.log('stackId:', stackId);
-    console.log('isLoaded:', isLoaded);
+    setLocalLoadedStacks(prev => {
+      const newSet = new Set(prev);
+      if (isLoaded) {
+        newSet.add(stackId);
+      } else {
+        newSet.delete(stackId);
+      }
+      return newSet;
+    });
     
-    if (externalOnStackLoaded) {
-      // Если есть внешний обработчик, используем его
-      externalOnStackLoaded(stackId, isLoaded);
-    } else {
-      // Иначе обновляем локальное состояние
-      setLocalLoadedStacks(prev => {
-        const newSet = new Set(prev);
-        if (isLoaded) {
-          newSet.add(stackId);
-        } else {
-          newSet.delete(stackId);
-        }
-        console.log('Новое состояние loadedStacks:', Array.from(newSet));
-        return newSet;
-      });
+    // Вызываем callback для обновления состояния в родительском компоненте
+    if (onStackLoadedChange) {
+      onStackLoadedChange(shipment.id, stackId, isLoaded);
     }
-
-    // Показываем уведомление
+    
+    // Сохраняем информацию о том, кто отметил стек
+    if (isLoaded) {
+      const newHistory = {
+        ...loadingHistory,
+        [`stack_${stackId}`]: {
+          user: user?.displayName || "Неизвестный пользователь",
+          timestamp: new Date().toISOString()
+        }
+      };
+      setLoadingHistory(newHistory);
+      
+      // Сохраняем в localStorage
+      localStorage.setItem(`loadingHistory_${shipment.id}`, JSON.stringify(newHistory));
+    } else {
+      const newHistory = { ...loadingHistory };
+      delete newHistory[`stack_${stackId}`];
+      setLoadingHistory(newHistory);
+      
+      // Сохраняем в localStorage
+      localStorage.setItem(`loadingHistory_${shipment.id}`, JSON.stringify(newHistory));
+    }
+    
     toast.success(
       isLoaded 
         ? `Стек отмечен как погруженный` 
@@ -137,14 +169,58 @@ export function ShipmentDetailsModal({
     );
   };
 
-  // Отладочная информация
-  console.log('=== ShipmentDetailsModal Debug ===');
-  console.log('shipment:', shipment);
-  console.log('shipment.equipment:', shipment.equipment);
-  console.log('shipment.stacks:', shipment.stacks);
-  console.log('shipment.rental:', shipment.rental);
-  console.log('shipment.checklist:', shipment.checklist);
-  console.log('================================');
+  // Обработчики для QR сканера
+  const handleEquipmentLoadedFromQR = (equipmentId: string, isLoaded: boolean, loadedBy: string) => {
+    handleEquipmentLoaded(equipmentId, isLoaded);
+    
+    // Сохраняем информацию о том, кто отметил оборудование
+    if (isLoaded) {
+      const newHistory = {
+        ...loadingHistory,
+        [equipmentId]: {
+          user: loadedBy,
+          timestamp: new Date().toISOString()
+        }
+      };
+      setLoadingHistory(newHistory);
+      
+      // Сохраняем в localStorage
+      localStorage.setItem(`loadingHistory_${shipment.id}`, JSON.stringify(newHistory));
+    } else {
+      const newHistory = { ...loadingHistory };
+      delete newHistory[equipmentId];
+      setLoadingHistory(newHistory);
+      
+      // Сохраняем в localStorage
+      localStorage.setItem(`loadingHistory_${shipment.id}`, JSON.stringify(newHistory));
+    }
+  };
+
+  const handleStackLoadedFromQR = (stackId: string, isLoaded: boolean, loadedBy: string) => {
+    handleStackLoaded(stackId, isLoaded);
+    
+    // Сохраняем информацию о том, кто отметил стек
+    if (isLoaded) {
+      const newHistory = {
+        ...loadingHistory,
+        [`stack_${stackId}`]: {
+          user: loadedBy,
+          timestamp: new Date().toISOString()
+        }
+      };
+      setLoadingHistory(newHistory);
+      
+      // Сохраняем в localStorage
+      localStorage.setItem(`loadingHistory_${shipment.id}`, JSON.stringify(newHistory));
+    } else {
+      const newHistory = { ...loadingHistory };
+      delete newHistory[`stack_${stackId}`];
+      setLoadingHistory(newHistory);
+      
+      // Сохраняем в localStorage
+      localStorage.setItem(`loadingHistory_${shipment.id}`, JSON.stringify(newHistory));
+    }
+  };
 
   const getEquipmentInfo = (equipmentId: string) => {
     return equipment?.find(item => item.id === equipmentId);
@@ -157,13 +233,13 @@ export function ShipmentDetailsModal({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pending":
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">Ожидает</Badge>;
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Ожидает</Badge>;
       case "in-progress":
-        return <Badge variant="default" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">В работе</Badge>;
+        return <Badge variant="default" className="bg-blue-100 text-blue-800">В работе</Badge>;
       case "in-transit":
-        return <Badge variant="default" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">В пути</Badge>;
+        return <Badge variant="default" className="bg-purple-100 text-purple-800">В пути</Badge>;
       case "delivered":
-        return <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Доставлено</Badge>;
+        return <Badge variant="default" className="bg-green-100 text-green-800">Доставлено</Badge>;
       case "cancelled":
         return <Badge variant="destructive">Отменено</Badge>;
       default:
@@ -171,171 +247,87 @@ export function ShipmentDetailsModal({
     }
   };
 
-  // Функция для расчета прогресса чек-листа
-  const getChecklistProgress = (shipment: Shipment) => {
-    if (!shipment.checklist || shipment.checklist.length === 0) {
-      return { completed: 0, total: 0, percentage: 0 };
-    }
-    
-    const completed = shipment.checklist.filter(item => item.isCompleted).length;
-    const total = shipment.checklist.length;
-    const percentage = Math.round((completed / total) * 100);
-    
-    return { completed, total, percentage };
-  };
-
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <DialogTitle className="flex items-center gap-2">
-                <Truck className="h-5 w-5" />
-                Отгрузка {shipment.number}
-              </DialogTitle>
-              <DialogDescription>
-                Подробная информация об отгрузке
-              </DialogDescription>
-            </div>
-            <ShipmentPDFGenerator 
-              shipment={shipment} 
-              equipment={equipment}
-              className="ml-4"
-            />
-          </div>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Package className="h-4 w-4 sm:h-5 sm:w-5" />
+              Отгрузка #{shipment.number}
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-6 p-1">
-          {/* Основная информация */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold text-lg mb-3">Информация об отгрузке</h3>
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Номер:</span>
-                    <span className="font-medium">{shipment.number}</span>
+          <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
+            {/* Основная информация */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Информация об отгрузке</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Номер отгрузки</p>
+                    <p className="font-medium">{shipment.number}</p>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Дата:</span>
-                    <span className="font-medium">{new Date(shipment.date).toLocaleDateString('ru-RU')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Статус:</span>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Статус</p>
                     {getStatusBadge(shipment.status)}
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Ответственный:</span>
-                    <span className="font-medium">{shipment.responsiblePerson}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Всего позиций:</span>
-                    <span className="font-medium">{shipment.totalItems}</span>
-                  </div>
-                  
-                  {/* Статус погрузки - интерактивная кнопка */}
-                  {(() => {
-                    const progress = getChecklistProgress(shipment);
-                    const isLoaded = progress.percentage === 100 || shipment.status === 'delivered' || shipment.status === 'in-transit';
-                    return (
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground">Погружено:</span>
-                        <button
-                          onClick={() => handleToggleLoadingStatus(shipment)}
-                          className={`flex items-center gap-2 px-3 py-1 rounded-md border transition-colors ${
-                            isLoaded 
-                              ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' 
-                              : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
-                          }`}
-                          title={isLoaded ? "Нажмите, чтобы отметить как не погружено" : "Нажмите, чтобы отметить как погружено"}
-                        >
-                          {isLoaded ? (
-                            <>
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
-                              <span className="font-medium">Да</span>
-                            </>
-                          ) : (
-                            <>
-                              <div className="h-4 w-4 border-2 border-gray-400 rounded-sm" />
-                              <span className="font-medium">Нет</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Информация о доставке */}
-                  {shipment.deliveredAt && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Доставлено:</span>
-                      <span className="font-medium">
-                        {new Date(shipment.deliveredAt).toLocaleDateString('ru-RU')} в{' '}
-                        {new Date(shipment.deliveredAt).toLocaleTimeString('ru-RU', { 
-                          hour: '2-digit', 
-                          minute: '2-digit' 
-                        })}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold text-lg mb-3">Получатель</h3>
-                <div className="space-y-3 text-sm">
                   <div>
-                    <span className="text-muted-foreground">Наименование:</span>
+                    <p className="text-sm font-medium text-muted-foreground">Получатель</p>
                     <p className="font-medium">{shipment.recipient}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Адрес:</span>
-                    <p className="font-medium">{shipment.recipientAddress}</p>
+                    <p className="text-sm font-medium text-muted-foreground">Дата создания</p>
+                    <p className="font-medium">{new Date(shipment.createdAt).toLocaleDateString('ru-RU')}</p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Оборудование */}
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <h3 className="font-semibold text-lg flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    Оборудование ({shipment.equipment.length} позиций)
+                  </div>
+                  {localLoadedEquipment.size > 0 && (
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 w-fit">
+                      Погружено: {localLoadedEquipment.size}/{shipment.equipment.length}
+                    </Badge>
+                  )}
+                </h3>
+                
+                {/* Кнопка QR сканера */}
+                <Button
+                  onClick={() => setIsQRScannerOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <QrCode className="h-4 w-4" />
+                  Сканировать QR
+                </Button>
               </div>
               
-              {/* Комментарии */}
-              <div>
-                <h3 className="font-semibold text-lg mb-3">Комментарии</h3>
-                <p className="text-sm">
-                  {shipment.comments || "Срочная доставка"}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Содержимое отгрузки */}
-          <div className="space-y-6">
-            {/* Оборудование - всегда отображается */}
-            <div>
-              <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Оборудование ({shipment.equipment.length} позиций)
-                {loadedEquipment.size > 0 && (
-                  <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800">
-                    Погружено: {loadedEquipment.size}/{shipment.equipment.length}
-                  </Badge>
-                )}
-              </h3>
               {shipment.equipment.length > 0 ? (
                 <div className="space-y-3">
                   {shipment.equipment.map((item, index) => {
-                    const equipmentItem = getEquipmentInfo(item.equipmentId);
-                    const isLoaded = loadedEquipment.has(item.equipmentId);
+                    const equipmentInfo = getEquipmentInfo(item.equipmentId);
+                    const isLoaded = localLoadedEquipment.has(item.equipmentId);
                     return (
-                      <div key={index} className="flex items-center gap-3 p-4 border rounded-lg bg-muted/30">
+                      <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 sm:p-4 border rounded-lg bg-muted/30">
                         <Checkbox 
                           checked={isLoaded} 
                           onCheckedChange={(checked) => handleEquipmentLoaded(item.equipmentId, checked || false)}
-                          className="mt-1" 
+                          className="mt-1 sm:mt-0"
                         />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-medium text-green-700">{item.name}</h4>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <h4 className="font-medium text-green-700 truncate">{item.name}</h4>
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="text-xs">
                                 x{item.quantity}
@@ -343,9 +335,22 @@ export function ShipmentDetailsModal({
                               <CheckCircle2 className="h-4 w-4 text-green-600" />
                             </div>
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {equipmentItem?.category} • {item.serialNumber}
-                          </p>
+                          {equipmentInfo?.serialNumber && (
+                            <p className="text-sm text-muted-foreground mt-1 break-words">
+                              Серийный номер: {equipmentInfo.serialNumber}
+                            </p>
+                          )}
+                          {/* Информация о том, кто отметил оборудование */}
+                          {isLoaded && loadingHistory[item.equipmentId] && (
+                            <div className="mt-2 p-2 bg-green-50 dark:bg-green-950 rounded border border-green-200 dark:border-green-800">
+                              <p className="text-xs text-green-700 dark:text-green-300">
+                                <strong>Отметил:</strong> {loadingHistory[item.equipmentId].user}
+                              </p>
+                              <p className="text-xs text-green-600 dark:text-green-400">
+                                <strong>Время:</strong> {new Date(loadingHistory[item.equipmentId].timestamp).toLocaleString('ru-RU')}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -359,32 +364,38 @@ export function ShipmentDetailsModal({
               )}
             </div>
 
-            {/* Стеки - всегда отображается */}
+            {/* Стеки */}
             <div>
-              <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Стеки техники ({(shipment.stacks && shipment.stacks.length) || 0} стеков)
-                {loadedStacks.size > 0 && (
-                  <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800">
-                    Погружено: {loadedStacks.size}/{(shipment.stacks && shipment.stacks.length) || 0}
-                  </Badge>
-                )}
-              </h3>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <h3 className="font-semibold text-lg flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Стеки техники ({(shipment.stacks && shipment.stacks.length) || 0} стеков)
+                  </div>
+                  {localLoadedStacks.size > 0 && (
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 w-fit">
+                      Погружено: {localLoadedStacks.size}/{(shipment.stacks && shipment.stacks.length) || 0}
+                    </Badge>
+                  )}
+                </h3>
+              </div>
+              
               {shipment.stacks && shipment.stacks.length > 0 ? (
                 <div className="space-y-4">
-                                      {shipment.stacks.map((stack, index) => {
-                      const stackEquipment = getStackEquipment(stack.equipmentIds);
-                      const isLoaded = loadedStacks.has(stack.stackId);
-                      return (
-                        <div key={index} className="border rounded-lg p-4 bg-muted/30">
-                          <div className="flex items-center gap-3 mb-4">
-                            <Checkbox 
-                              checked={isLoaded} 
-                              onCheckedChange={(checked) => handleStackLoaded(stack.stackId, checked || false)}
-                            />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <h4 className="font-medium text-green-700">{stack.name}</h4>
+                  {shipment.stacks.map((stack, index) => {
+                    const stackEquipment = getStackEquipment(stack.equipmentIds);
+                    const isLoaded = localLoadedStacks.has(stack.stackId);
+                    return (
+                      <div key={index} className="border rounded-lg p-3 sm:p-4 bg-muted/30">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+                          <Checkbox 
+                            checked={isLoaded} 
+                            onCheckedChange={(checked) => handleStackLoaded(stack.stackId, checked || false)}
+                            className="mt-1 sm:mt-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                              <h4 className="font-medium text-green-700 truncate">{stack.name}</h4>
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline" className="text-xs">
                                   x{stack.quantity}
@@ -395,17 +406,28 @@ export function ShipmentDetailsModal({
                             <p className="text-sm text-muted-foreground mt-1">
                               {stackEquipment.length} единиц техники
                             </p>
+                            {/* Информация о том, кто отметил стек */}
+                            {isLoaded && loadingHistory[`stack_${stack.stackId}`] && (
+                              <div className="mt-2 p-2 bg-green-50 dark:bg-green-950 rounded border border-green-200 dark:border-green-800">
+                                <p className="text-xs text-green-700 dark:text-green-300">
+                                  <strong>Отметил:</strong> {loadingHistory[`stack_${stack.stackId}`].user}
+                                </p>
+                                <p className="text-xs text-green-600 dark:text-green-400">
+                                  <strong>Время:</strong> {new Date(loadingHistory[`stack_${stack.stackId}`].timestamp).toLocaleString('ru-RU')}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         </div>
                         
-                        <div className="ml-6">
+                        <div className="ml-0 sm:ml-6">
                           <p className="text-sm font-medium mb-3">Состав стека:</p>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
                             {stackEquipment.map((item) => (
                               <div key={item.id} className="text-center">
-                                <div className="bg-muted rounded-lg p-3 border">
+                                <div className="bg-muted rounded-lg p-2 sm:p-3 border">
                                   <p className="text-sm font-medium truncate">{item.name.split(' ')[0]}</p>
-                                  <p className="text-xs text-muted-foreground mt-1">{item.serialNumber}</p>
+                                  <p className="text-xs text-muted-foreground mt-1 break-words">{item.serialNumber}</p>
                                 </div>
                               </div>
                             ))}
@@ -423,7 +445,7 @@ export function ShipmentDetailsModal({
               )}
             </div>
 
-            {/* Аренда - всегда отображается */}
+            {/* Аренда */}
             <div>
               <h3 className="font-semibold text-lg mb-4">
                 Аренда ({(shipment.rental && shipment.rental.length) || 0} позиций)
@@ -431,11 +453,11 @@ export function ShipmentDetailsModal({
               {shipment.rental && shipment.rental.length > 0 ? (
                 <div className="space-y-3">
                   {shipment.rental.map((item, index) => (
-                    <div key={index} className="flex items-center gap-3 p-4 border rounded-lg bg-muted/30">
-                      <Checkbox checked={true} disabled className="mt-1" />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-medium text-green-700">{item.equipment}</h4>
+                    <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 sm:p-4 border rounded-lg bg-muted/30">
+                      <Checkbox checked={true} disabled className="mt-1 sm:mt-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <h4 className="font-medium text-green-700 truncate">{item.equipment}</h4>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-xs">
                               x{item.quantity}
@@ -444,7 +466,7 @@ export function ShipmentDetailsModal({
                           </div>
                         </div>
                         {item.link && (
-                          <p className="text-sm text-muted-foreground mt-1">
+                          <p className="text-sm text-muted-foreground mt-1 break-words">
                             <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
                               Ссылка на товар
                             </a>
@@ -462,8 +484,31 @@ export function ShipmentDetailsModal({
               )}
             </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+
+          {/* Действия */}
+          <div className="flex flex-col sm:flex-row justify-end gap-3 p-3 sm:p-6 border-t">
+            <Button variant="outline" className="h-10 px-4 order-2 sm:order-1">
+              Скачать PDF
+            </Button>
+            <Button variant="outline" onClick={onClose} className="order-1 sm:order-2">
+              Закрыть
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* QR сканер */}
+      <QRScanner
+        isOpen={isQRScannerOpen}
+        onClose={() => setIsQRScannerOpen(false)}
+        shipment={shipment}
+        onEquipmentLoaded={handleEquipmentLoadedFromQR}
+        onStackLoaded={handleStackLoadedFromQR}
+        loadedEquipment={localLoadedEquipment}
+        loadedStacks={localLoadedStacks}
+      />
+    </>
   );
 }
+
+

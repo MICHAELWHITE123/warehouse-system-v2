@@ -1,6 +1,9 @@
 // Реэкспорт типов из базы данных
 export * from '../database/types';
 
+// Реэкспорт типов для системы прав доступа
+export * from './permissions';
+
 // Импорт интерфейса отгрузки из компонента (для обратной совместимости)
 import { Shipment } from "../components/ShipmentList";
 
@@ -40,7 +43,8 @@ export type ActiveView =
   | "edit-stack"
   | "edit-shipment"
   | "view-equipment"
-  | "admin";
+  | "admin"
+  | "diagnostics";
 
 // Интерфейс для подсчета по категориям/местоположениям
 export interface CountMap {

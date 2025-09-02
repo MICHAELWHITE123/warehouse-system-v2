@@ -11,7 +11,6 @@ import {
   Cpu,
   HardDrive,
   Zap,
-  Globe,
   Clock,
   RefreshCw,
   Download,
@@ -113,11 +112,7 @@ export function SystemInfo() {
     setIsRefreshing(false);
   };
 
-  const getPerformanceColor = (value: number) => {
-    if (value < 50) return "bg-green-500";
-    if (value < 80) return "bg-yellow-500";
-    return "bg-red-500";
-  };
+
 
   const getStatusBadge = (status: string) => {
     switch (status) {

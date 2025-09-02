@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Eye, Edit, Truck, Clock, CheckCircle, XCircle, Filter, Package, Users } from "lucide-react";
+import { Plus, Search, Eye, Edit, Truck, Clock, CheckCircle, XCircle, Filter, Package, Users, QrCode, CheckCircle2, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 
 import { ShipmentDetailsModal } from "./ShipmentDetailsModal";
 import { ShipmentPDFGenerator } from "./ShipmentPDFGenerator";
+import { QRScanner } from "./QRScanner";
 
 export interface ShipmentEquipment {
   equipmentId: string;
@@ -63,21 +65,19 @@ interface ShipmentListProps {
   onEdit: (shipment: Shipment) => void;
   onView: (shipment: Shipment) => void;
   onCreate: () => void;
+  onDelete?: (shipmentId: string) => void;
 }
 
 // Компонент для отображения краткой информации об оборудовании и стеках
 function ShipmentSummary({ 
   shipment, 
   loadedEquipment, 
-  loadedStacks, 
-  onEquipmentLoaded, 
-  onStackLoaded 
+  loadedStacks
 }: { 
   shipment: Shipment;
   loadedEquipment: Set<string>;
   loadedStacks: Set<string>;
-  onEquipmentLoaded: (equipmentId: string, checked: boolean) => void;
-  onStackLoaded: (stackId: string, checked: boolean) => void;
+
 }) {
   const equipmentCount = shipment.equipment.length;
   const stacksCount = shipment.stacks?.length || 0;
@@ -92,39 +92,45 @@ function ShipmentSummary({
   
   return (
     <div className="text-sm">
-      <div className="flex items-center gap-1 mb-1">
-        <Package className="h-4 w-4 text-muted-foreground" />
-        <span>Оборудование ({equipmentCount})</span>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-1 mb-1">
+        <div className="flex items-center gap-1">
+          <Package className="h-4 w-4 text-muted-foreground" />
+          <span>Оборудование ({equipmentCount})</span>
+        </div>
         {equipmentCount > 0 && (
-          <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800">
+          <Badge variant="secondary" className="bg-green-100 text-green-800 w-fit">
             Погружено: {loadedEquipment.size}/{equipmentCount}
           </Badge>
         )}
       </div>
-      <div className="text-xs text-muted-foreground">
+      <div className="text-xs text-muted-foreground break-words">
         {equipmentNames}{remainingEquipment}
       </div>
-      <div className="flex items-center gap-1 mt-2">
-        <Users className="h-4 w-4 text-muted-foreground" />
-        <span>Стеки техники ({stacksCount})</span>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-1 mt-2">
+        <div className="flex items-center gap-1">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <span>Стеки техники ({stacksCount})</span>
+        </div>
         {stacksCount > 0 && (
-          <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800">
+          <Badge variant="secondary" className="bg-green-100 text-green-800 w-fit">
             Погружено: {loadedStacks.size}/{stacksCount}
           </Badge>
         )}
       </div>
-      <div className="text-xs text-muted-foreground">
+      <div className="text-xs text-muted-foreground break-words">
         {stackNames || 'Стеки не добавлены'}
       </div>
     </div>
   );
 }
 
-export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps) {
+export function ShipmentList({ shipments, onEdit, onCreate, onDelete }: ShipmentListProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
+  const [selectedShipmentForQR, setSelectedShipmentForQR] = useState<Shipment | null>(null);
   // Изменяем структуру: храним состояние для каждой отгрузки отдельно
   const [loadedEquipmentByShipment, setLoadedEquipmentByShipment] = useState<Record<string, Set<string>>>({});
   const [loadedStacksByShipment, setLoadedStacksByShipment] = useState<Record<string, Set<string>>>({});
@@ -175,6 +181,37 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
     setLoadedStacksByShipment(initialLoadedStacks);
   }, [shipments]);
 
+  // Обновляем состояние при добавлении новых отгрузок
+  useEffect(() => {
+    setLoadedEquipmentByShipment(prev => {
+      const newState = { ...prev };
+      let hasChanges = false;
+      
+      shipments.forEach(shipment => {
+        if (!newState[shipment.id]) {
+          newState[shipment.id] = new Set();
+          hasChanges = true;
+        }
+      });
+      
+      return hasChanges ? newState : prev;
+    });
+    
+    setLoadedStacksByShipment(prev => {
+      const newState = { ...prev };
+      let hasChanges = false;
+      
+      shipments.forEach(shipment => {
+        if (!newState[shipment.id]) {
+          newState[shipment.id] = new Set();
+          hasChanges = true;
+        }
+      });
+      
+      return hasChanges ? newState : prev;
+    });
+  }, [shipments]);
+
   // Фильтрация отгрузок
   const filteredShipments = shipments.filter(shipment => {
     const matchesSearch = 
@@ -222,74 +259,95 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
   };
 
   const handleViewShipment = (shipment: Shipment) => {
-    console.log('=== handleViewShipment Debug ===');
-    console.log('clicking on shipment:', shipment);
-    console.log('shipment.equipment:', shipment.equipment);
-    console.log('shipment.stacks:', shipment.stacks);
-    console.log('shipment.rental:', shipment.rental);
-    console.log('================================');
+    if (!shipment) return;
+    
+    if (import.meta.env.DEV) {
+      console.log('📋 Viewing shipment:', {
+        id: shipment.id,
+        number: shipment.number,
+        recipient: shipment.recipient,
+        equipmentCount: shipment.equipment?.length || 0,
+        stacksCount: shipment.stacks?.length || 0
+      });
+    }
+    
     setSelectedShipment(shipment);
     setIsViewDialogOpen(true);
   };
 
-  const handleEquipmentLoaded = (shipmentId: string, equipmentId: string, checked: boolean) => {
+  // Обработчики изменения состояния загрузки
+  const handleEquipmentLoadedChange = (shipmentId: string, equipmentId: string, isLoaded: boolean) => {
     setLoadedEquipmentByShipment(prev => {
-      const currentSet = prev[shipmentId] || new Set();
-      const newSet = new Set(currentSet);
-      
-      if (checked) {
-        newSet.add(equipmentId);
-      } else {
-        newSet.delete(equipmentId);
+      const newState = { ...prev };
+      if (!newState[shipmentId]) {
+        newState[shipmentId] = new Set();
       }
       
-      const newState = {
-        ...prev,
-        [shipmentId]: newSet
-      };
+      if (isLoaded) {
+        newState[shipmentId].add(equipmentId);
+      } else {
+        newState[shipmentId].delete(equipmentId);
+      }
       
       // Сохраняем в localStorage
-      try {
-        const serialized = Object.fromEntries(
+      const serialized = JSON.stringify(
+        Object.fromEntries(
           Object.entries(newState).map(([key, value]) => [key, Array.from(value)])
-        );
-        localStorage.setItem('loadedEquipmentByShipment', JSON.stringify(serialized));
-      } catch (e) {
-        console.warn('Ошибка при сохранении состояния загрузки оборудования:', e);
-      }
+        )
+      );
+      localStorage.setItem('loadedEquipmentByShipment', serialized);
       
       return newState;
     });
   };
 
-  const handleStackLoaded = (shipmentId: string, stackId: string, checked: boolean) => {
+  const handleStackLoadedChange = (shipmentId: string, stackId: string, isLoaded: boolean) => {
     setLoadedStacksByShipment(prev => {
-      const currentSet = prev[shipmentId] || new Set();
-      const newSet = new Set(currentSet);
-      
-      if (checked) {
-        newSet.add(stackId);
-      } else {
-        newSet.delete(stackId);
+      const newState = { ...prev };
+      if (!newState[shipmentId]) {
+        newState[shipmentId] = new Set();
       }
       
-      const newState = {
-        ...prev,
-        [shipmentId]: newSet
-      };
+      if (isLoaded) {
+        newState[shipmentId].add(stackId);
+      } else {
+        newState[shipmentId].delete(stackId);
+      }
       
       // Сохраняем в localStorage
-      try {
-        const serialized = Object.fromEntries(
+      const serialized = JSON.stringify(
+        Object.fromEntries(
           Object.entries(newState).map(([key, value]) => [key, Array.from(value)])
-        );
-        localStorage.setItem('loadedStacksByShipment', JSON.stringify(serialized));
-      } catch (e) {
-        console.warn('Ошибка при сохранении состояния загрузки стеков:', e);
-      }
+        )
+      );
+      localStorage.setItem('loadedStacksByShipment', serialized);
       
       return newState;
     });
+  };
+
+  // Обработчики для QR сканера
+  const handleEquipmentLoadedFromQR = (equipmentId: string, isLoaded: boolean, _loadedBy: string) => {
+    if (selectedShipmentForQR) {
+      handleEquipmentLoadedChange(selectedShipmentForQR.id, equipmentId, isLoaded);
+    }
+  };
+
+  const handleStackLoadedFromQR = (stackId: string, isLoaded: boolean, _loadedBy: string) => {
+    if (selectedShipmentForQR) {
+      handleStackLoadedChange(selectedShipmentForQR.id, stackId, isLoaded);
+    }
+  };
+
+  const openQRScanner = (shipment: Shipment) => {
+    setSelectedShipmentForQR(shipment);
+    setIsQRScannerOpen(true);
+  };
+
+  const handleDeleteShipment = (shipment: Shipment) => {
+    if (onDelete) {
+      onDelete(shipment.id);
+    }
   };
 
   // Вычисление статистики
@@ -301,64 +359,64 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
   return (
     <div className="space-y-6">
       {/* Заголовок и кнопка создания */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Отгрузки</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Отгрузки</h1>
           <p className="text-muted-foreground mt-2">
             Управление отгрузочными листами и доставкой оборудования
           </p>
         </div>
-        <Button onClick={onCreate} className="flex items-center gap-2">
+        <Button onClick={onCreate} className="flex items-center gap-2 w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           Создать отгрузку
         </Button>
       </div>
 
       {/* Статистика */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center space-x-2">
-              <Truck className="h-5 w-5 text-blue-600" />
+              <Truck className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
               <div>
-                <p className="text-sm text-muted-foreground">Всего отгрузок</p>
-                <p className="text-2xl font-bold">{totalShipments}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Всего отгрузок</p>
+                <p className="text-lg sm:text-2xl font-bold">{totalShipments}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center space-x-2">
-              <Clock className="h-5 w-5 text-yellow-600" />
+              <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600" />
               <div>
-                <p className="text-sm text-muted-foreground">Ожидают</p>
-                <p className="text-2xl font-bold">{pendingShipments}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Ожидают</p>
+                <p className="text-lg sm:text-2xl font-bold">{pendingShipments}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center space-x-2">
-              <Truck className="h-5 w-5 text-purple-600" />
+              <Truck className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
               <div>
-                <p className="text-sm text-muted-foreground">В пути</p>
-                <p className="text-2xl font-bold">{inTransitShipments}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">В пути</p>
+                <p className="text-lg sm:text-2xl font-bold">{inTransitShipments}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center space-x-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
+              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
               <div>
-                <p className="text-sm text-muted-foreground">Доставлено</p>
-                <p className="text-2xl font-bold">{deliveredShipments}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Доставлено</p>
+                <p className="text-lg sm:text-2xl font-bold">{deliveredShipments}</p>
               </div>
             </div>
           </CardContent>
@@ -395,19 +453,19 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
       {/* Список отгрузок */}
       {filteredShipments.length === 0 ? (
         <Card>
-          <CardContent className="p-12 text-center">
-            <Truck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">
+          <CardContent className="p-6 sm:p-12 text-center">
+            <Truck className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-base sm:text-lg font-semibold mb-2">
               {shipments.length === 0 ? "Отгрузки не созданы" : "Отгрузки не найдены"}
             </h3>
-            <p className="text-muted-foreground mb-4">
+            <p className="text-muted-foreground mb-4 text-sm sm:text-base">
               {shipments.length === 0 
                 ? "Создайте первую отгрузку для отправки оборудования"
                 : "Попробуйте изменить поисковый запрос или фильтры"
               }
             </p>
             {shipments.length === 0 && (
-              <Button onClick={onCreate} className="flex items-center gap-2">
+              <Button onClick={onCreate} className="flex items-center gap-2 w-full sm:w-auto">
                 <Plus className="h-4 w-4" />
                 Создать первую отгрузку
               </Button>
@@ -419,10 +477,10 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
           {filteredShipments.map((shipment) => {
             return (
               <Card key={shipment.id} className="hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between gap-6">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex flex-col lg:flex-row items-start justify-between gap-4 lg:gap-6">
                     {/* Левая часть - основная информация */}
-                    <div className="flex items-start gap-4 flex-1">
+                    <div className="flex items-start gap-4 flex-1 w-full lg:w-auto">
                       {/* Иконка статуса */}
                       <div className="flex-shrink-0 mt-1">
                         {getStatusIcon(shipment.status)}
@@ -430,7 +488,7 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
                       
                       {/* Номер и получатель */}
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
                           <h3 className="font-semibold text-lg">{shipment.number}</h3>
                           {getStatusBadge(shipment.status)}
                         </div>
@@ -439,45 +497,63 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
                     </div>
 
                     {/* Центральная часть - статистика */}
-                    <div className="flex flex-col gap-6 flex-shrink-0">
+                    <div className="flex flex-row lg:flex-col gap-4 lg:gap-6 flex-shrink-0 w-full lg:w-auto justify-between lg:justify-start">
                       {/* Всего позиций */}
-                      <div className="text-center">
+                      <div className="text-center lg:text-left">
                         <p className="text-sm text-muted-foreground">Всего позиций</p>
                         <p className="font-medium text-lg">{shipment.totalItems}</p>
                       </div>
 
                       {/* Ответственный */}
-                      <div className="text-center">
+                      <div className="text-center lg:text-left">
                         <p className="text-sm text-muted-foreground">Ответственный</p>
                         <p className="font-medium">{shipment.responsiblePerson}</p>
+                      </div>
+
+                      {/* Статус погрузки */}
+                      <div className="text-center lg:text-left">
+                        <p className="text-sm text-muted-foreground">Погрузка</p>
+                        <div className="flex items-center gap-1 justify-center lg:justify-start">
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <span className="font-medium text-sm">
+                            {loadedEquipmentByShipment[shipment.id]?.size || 0} + {loadedStacksByShipment[shipment.id]?.size || 0}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
                     {/* Информация об оборудовании и стеках */}
-                    <div className="flex-shrink-0 min-w-[200px]">
+                    <div className="flex-shrink-0 w-full lg:w-auto lg:min-w-[200px]">
                       <ShipmentSummary 
                         shipment={shipment}
                         loadedEquipment={loadedEquipmentByShipment[shipment.id] || new Set()}
                         loadedStacks={loadedStacksByShipment[shipment.id] || new Set()}
-                        onEquipmentLoaded={(equipmentId, checked) => handleEquipmentLoaded(shipment.id, equipmentId, checked)}
-                        onStackLoaded={(stackId, checked) => handleStackLoaded(shipment.id, stackId, checked)}
                       />
                     </div>
 
                     {/* Правая часть - действия */}
-                    <div className="flex flex-col items-end gap-4 flex-shrink-0">
+                    <div className="flex flex-col items-start lg:items-end gap-4 flex-shrink-0 w-full lg:w-auto">
                       {/* Кнопки действий */}
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openQRScanner(shipment)}
+                          className="h-8 px-3 w-full sm:w-auto"
+                        >
+                          <QrCode className="h-4 w-4 mr-1" />
+                          QR
+                        </Button>
                         <ShipmentPDFGenerator 
                           shipment={shipment} 
                           equipment={[]}
-                          className="h-8 px-3"
+                          className="h-8 px-3 w-full sm:w-auto"
                         />
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleViewShipment(shipment)}
-                          className="h-8 px-3"
+                          className="h-8 px-3 w-full sm:w-auto"
                         >
                           <Eye className="h-4 w-4 mr-1" />
                           Просмотр
@@ -486,15 +562,39 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
                           variant="outline"
                           size="sm"
                           onClick={() => onEdit(shipment)}
-                          className="h-8 px-3"
+                          className="h-8 px-3 w-full sm:w-auto"
                         >
                           <Edit className="h-4 w-4 mr-1" />
                           Редактировать
                         </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-3 w-full sm:w-auto"
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Удалить
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Это действие нельзя отменить. Это удалит все данные об отгрузке "{shipment.number}".
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Отмена</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteShipment(shipment)}>Удалить</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
 
                       {/* Дата создания */}
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground w-full lg:w-auto text-center lg:text-right">
                         {new Date(shipment.createdAt).toLocaleDateString('ru-RU')}
                       </div>
                     </div>
@@ -507,16 +607,34 @@ export function ShipmentList({ shipments, onEdit, onCreate }: ShipmentListProps)
       )}
 
       {/* Модальное окно просмотра отгрузки */}
-      <ShipmentDetailsModal
-        shipment={selectedShipment}
-        equipment={[]}
-        isOpen={isViewDialogOpen}
-        onClose={() => setIsViewDialogOpen(false)}
-        loadedEquipment={selectedShipment ? loadedEquipmentByShipment[selectedShipment.id] || new Set() : undefined}
-        loadedStacks={selectedShipment ? loadedStacksByShipment[selectedShipment.id] || new Set() : undefined}
-        onEquipmentLoaded={selectedShipment ? (equipmentId, checked) => handleEquipmentLoaded(selectedShipment.id, equipmentId, checked) : undefined}
-        onStackLoaded={selectedShipment ? (stackId, checked) => handleStackLoaded(selectedShipment.id, stackId, checked) : undefined}
-      />
+      {selectedShipment && (
+        <ShipmentDetailsModal
+          shipment={selectedShipment}
+          equipment={[]}
+          isOpen={isViewDialogOpen}
+          onClose={() => setIsViewDialogOpen(false)}
+          loadedEquipment={loadedEquipmentByShipment[selectedShipment.id] || new Set()}
+          loadedStacks={loadedStacksByShipment[selectedShipment.id] || new Set()}
+          onEquipmentLoadedChange={handleEquipmentLoadedChange}
+          onStackLoadedChange={handleStackLoadedChange}
+        />
+      )}
+
+      {/* QR сканер */}
+      {selectedShipmentForQR && (
+        <QRScanner
+          isOpen={isQRScannerOpen}
+          onClose={() => {
+            setIsQRScannerOpen(false);
+            setSelectedShipmentForQR(null);
+          }}
+          shipment={selectedShipmentForQR}
+          onEquipmentLoaded={handleEquipmentLoadedFromQR}
+          onStackLoaded={handleStackLoadedFromQR}
+          loadedEquipment={loadedEquipmentByShipment[selectedShipmentForQR.id] || new Set()}
+          loadedStacks={loadedStacksByShipment[selectedShipmentForQR.id] || new Set()}
+        />
+      )}
     </div>
   );
 }

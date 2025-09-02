@@ -139,7 +139,7 @@ export interface CreateEquipmentStack {
   name: string;
   description?: string;
   created_by: string;
-  tags?: string[];
+  tags?: string; // JSON string
 }
 
 export interface CreateShipment {
@@ -174,29 +174,23 @@ export interface CreateShipmentRental {
   link?: string;
 }
 
-// Типы для обновления записей (все поля опциональны кроме id)
+// Типы для обновления записей (все поля опциональны)
 export interface UpdateCategory extends Partial<CreateCategory> {
-  id: number;
 }
 
 export interface UpdateLocation extends Partial<CreateLocation> {
-  id: number;
 }
 
 export interface UpdateEquipment extends Partial<CreateEquipment> {
-  id: number;
 }
 
 export interface UpdateEquipmentStack extends Partial<CreateEquipmentStack> {
-  id: number;
 }
 
 export interface UpdateShipment extends Partial<CreateShipment> {
-  id: number;
 }
 
 export interface UpdateShipmentChecklist extends Partial<CreateShipmentChecklist> {
-  id: number;
 }
 
 // Альтернативные типы для совместимости

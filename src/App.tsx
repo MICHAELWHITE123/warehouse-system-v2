@@ -3,6 +3,7 @@ import { Navigation } from "./components/Navigation";
 import { Dashboard } from "./components/Dashboard";
 import { EquipmentList, Equipment } from "./components/EquipmentList";
 import { EquipmentForm } from "./components/EquipmentForm";
+import { EquipmentDetails } from "./components/EquipmentDetails";
 import { CategoryManagement } from "./components/CategoryManagement";
 import { LocationManagement } from "./components/LocationManagement";
 import { StackManagement, EquipmentStack } from "./components/StackManagement";
@@ -11,15 +12,19 @@ import { ShipmentList } from "./components/ShipmentList";
 import { ShipmentForm } from "./components/ShipmentForm";
 import { AuthForm } from "./components/AuthForm";
 import { AdminPanel } from "./components/AdminPanel";
+import { SyncNotifications } from "./components/SyncNotifications";
+import { SyncStatus } from "./components/SyncStatus";
+import { Diagnostics } from "./components/Diagnostics";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
 
 // Импорты для работы с базой данных
 import { ExtendedShipment, ActiveView } from "./types";
-import { calculateStats, calculateEquipmentCountByCategory, calculateEquipmentCountByLocation } from "./utils/statistics";
+import { calculateStats } from "./utils/statistics";
 import { useTheme } from "./hooks/useTheme";
 import { useAuth } from "./hooks/useAuth";
 import { useDatabase, useEquipment, useCategories, useLocations, useStacks, useShipments, useStatistics } from "./hooks/useDatabase";
+import { useRealTimeSync } from "./hooks/useRealTimeSync";
 import { 
   adaptEquipmentFromDB, 
   adaptStackFromDB, 
@@ -32,6 +37,14 @@ import {
 } from "./adapters/databaseAdapter";
 import { stackService } from "./database/services";
 
+// Тип для realtime событий
+interface RealTimeEvent {
+  type: string;
+  action: 'create' | 'update' | 'delete';
+  data: any;
+  timestamp: string;
+}
+
 export default function App() {
   const { user, handleLogin, handleLogout } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
@@ -40,16 +53,17 @@ export default function App() {
   const { isInitialized, error: dbError } = useDatabase();
   
   // Хуки для работы с данными из БД
-  const { equipment: dbEquipment, createEquipment, updateEquipment } = useEquipment();
-  const { categories: dbCategories } = useCategories();
-  const { locations: dbLocations } = useLocations();
-  const { stacks: dbStacks, createStack, updateStack } = useStacks();
-  const { shipments: dbShipments, createShipmentWithDetails, updateShipment } = useShipments();
+  const { equipment: dbEquipment, createEquipment, updateEquipment, deleteEquipment, loadEquipment } = useEquipment();
+  const { categories: dbCategories, loadCategories } = useCategories();
+  const { locations: dbLocations, loadLocations } = useLocations();
+  const { stacks: dbStacks, createStack, updateStack, deleteStack, loadStacks } = useStacks();
+  const { shipments: dbShipments, createShipmentWithDetails, updateShipment, deleteShipment, loadShipments } = useShipments();
   const { stats: dbStats } = useStatistics();
   
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [isFormVisible, setIsFormVisible] = useState(false);
+  const [isEquipmentDetailsVisible, setIsEquipmentDetailsVisible] = useState(false); // Состояние для отображения деталей
   
   // Состояние для стеков
   const [selectedStack, setSelectedStack] = useState<EquipmentStack | null>(null);
@@ -63,21 +77,81 @@ export default function App() {
   const equipment: Equipment[] = dbEquipment.map(adaptEquipmentFromDB);
   const categories: string[] = adaptCategoriesFromDB(dbCategories);
   const locations: string[] = adaptLocationsFromDB(dbLocations);
+  
+  // Debug logging only in development mode
+  if (import.meta.env.DEV) {
+    console.log('📊 Data loaded:', {
+      equipment: equipment.length,
+      categories: categories.length,
+      locations: locations.length,
+      stacks: dbStacks.length,
+      shipments: dbShipments.length
+    });
+  }
+  
   const stacks: EquipmentStack[] = dbStacks.map(adaptStackFromDB);
-  
-  console.log('=== App.tsx Debug ===');
-  console.log('dbShipments from database:', dbShipments);
-  
   const shipments: ExtendedShipment[] = dbShipments.map(adaptShipmentFromDB);
-  
-  console.log('shipments after adaptation:', shipments);
-  console.log('=====================');
 
   // Используем статистику из БД или рассчитываем локально как fallback
   const stats = dbStats || calculateStats(equipment, stacks, shipments);
-  const equipmentCountByCategory = calculateEquipmentCountByCategory(equipment);
-  const equipmentCountByLocation = calculateEquipmentCountByLocation(equipment);
+
   const notificationCount = stats.maintenanceEquipment;
+
+  // Real-time синхронизация для автоматического обновления UI
+  const { isConnected: realtimeConnected } = useRealTimeSync({
+    onEquipmentUpdate: (event: RealTimeEvent) => {
+      console.log('🔄 Real-time equipment update received:', event);
+      // Обновляем данные оборудования при получении realtime события
+      if (loadEquipment) {
+        console.log('🔄 Refreshing equipment data...');
+        loadEquipment();
+      }
+    },
+    onShipmentUpdate: (event: RealTimeEvent) => {
+      console.log('🔄 Real-time shipment update received:', event);
+      // Обновляем данные поставок при получении realtime события
+      if (loadShipments) {
+        console.log('🔄 Refreshing shipment data...');
+        loadShipments();
+      }
+    },
+    onStackUpdate: (event: RealTimeEvent) => {
+      console.log('🔄 Real-time stack update received:', event);
+      // Обновляем данные стеков при получении realtime события
+      if (loadStacks) {
+        console.log('🔄 Refreshing stack data...');
+        loadStacks();
+      }
+    },
+    onCategoryUpdate: (event: RealTimeEvent) => {
+      console.log('🔄 Real-time category update received:', event);
+      // Обновляем данные категорий при получении realtime события
+      if (loadCategories) {
+        console.log('🔄 Refreshing category data...');
+        loadCategories();
+      }
+    },
+    onLocationUpdate: (event: RealTimeEvent) => {
+      console.log('🔄 Real-time location update received:', event);
+      // Обновляем данные локаций при получении realtime события
+      if (loadLocations) {
+        console.log('🔄 Refreshing location data...');
+        loadLocations();
+      }
+    },
+    onAnyUpdate: (event: RealTimeEvent) => {
+      console.log('🔄 Real-time update received:', event);
+      // Показываем уведомление пользователю
+      toast.success(`Данные обновлены: ${event.type}`);
+    }
+  });
+
+  // Логируем статус realtime подключения для отладки
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('🔄 Realtime connection status:', realtimeConnected ? '✅ Connected' : '❌ Disconnected');
+    }
+  }, [realtimeConnected]);
 
   // Обработчики для оборудования
   const handleAddEquipment = async (newEquipment: Omit<Equipment, 'id'>) => {
@@ -99,8 +173,20 @@ export default function App() {
         if (dbEquipmentItem) {
           const equipmentData = adaptEquipmentToDB(updatedEquipment, dbCategories, dbLocations, selectedEquipment.id);
           await updateEquipment({ ...equipmentData, id: dbEquipmentItem.id });
-          setSelectedEquipment(null);
+          
+          // Обновляем выбранное оборудование с новыми данными
+          const updatedEquipmentWithId = { ...updatedEquipment, id: selectedEquipment.id };
+          setSelectedEquipment(updatedEquipmentWithId);
+          
           setIsFormVisible(false);
+          // Возвращаемся к деталям, если пользователь был там
+          if (isEquipmentDetailsVisible) {
+            setActiveView("view-equipment");
+          } else {
+            setSelectedEquipment(null);
+            setActiveView("equipment");
+          }
+          
           toast.success("Оборудование успешно обновлено");
         }
       } catch (error) {
@@ -112,14 +198,34 @@ export default function App() {
 
   const handleViewEquipment = (item: Equipment) => {
     setSelectedEquipment(item);
-    setIsFormVisible(true);
+    setIsEquipmentDetailsVisible(true);
     setActiveView("view-equipment");
+  };
+
+  const handleEquipmentDetailsBack = () => {
+    setIsEquipmentDetailsVisible(false);
+    setSelectedEquipment(null);
+    setActiveView("equipment");
   };
 
   const handleEditEquipmentClick = (item: Equipment) => {
     setSelectedEquipment(item);
     setIsFormVisible(true);
+    setIsEquipmentDetailsVisible(false); // Скрываем детали при редактировании
     setActiveView("edit-equipment");
+  };
+
+  const handleDeleteEquipment = async (equipmentId: string) => {
+    try {
+      const dbEquipmentItem = dbEquipment.find(eq => eq.uuid === equipmentId);
+      if (dbEquipmentItem) {
+        await deleteEquipment(dbEquipmentItem.id);
+        toast.success("Оборудование успешно удалено");
+      }
+    } catch (error) {
+      toast.error("Ошибка при удалении оборудования");
+      console.error(error);
+    }
   };
 
   // Обработчики для стеков
@@ -182,6 +288,19 @@ export default function App() {
     setActiveView("edit-stack");
   };
 
+  const handleDeleteStack = async (stackId: string) => {
+    try {
+      const dbStackItem = dbStacks.find(stack => stack.uuid === stackId);
+      if (dbStackItem) {
+        await deleteStack(dbStackItem.id);
+        toast.success("Стек успешно удален");
+      }
+    } catch (error) {
+      toast.error("Ошибка при удалении стека");
+      console.error(error);
+    }
+  };
+
   const handleCreateStack = () => {
     setSelectedStack(null);
     setIsStackFormVisible(true);
@@ -202,12 +321,15 @@ export default function App() {
   // Обработчики для отгрузок
   const handleAddShipment = async (newShipment: Omit<ExtendedShipment, 'id'>) => {
     try {
-      console.log('=== handleAddShipment Debug ===');
-      console.log('newShipment from form:', newShipment);
-      console.log('newShipment.equipment:', newShipment.equipment);
-      console.log('newShipment.stacks:', newShipment.stacks);
-      console.log('newShipment.rental:', newShipment.rental);
-      console.log('newShipment.checklist:', newShipment.checklist);
+      // Debug logging only in development mode
+      if (import.meta.env.DEV) {
+        console.log('📦 Creating shipment:', {
+          number: newShipment.number,
+          recipient: newShipment.recipient,
+          equipmentCount: newShipment.equipment?.length || 0,
+          stacksCount: newShipment.stacks?.length || 0
+        });
+      }
       
       // Создаем данные для БД, включая связанные записи
       const fullShipmentData = {
@@ -227,17 +349,16 @@ export default function App() {
         checklist: newShipment.checklist
       };
       
-      console.log('fullShipmentData for DB:', fullShipmentData);
-      
       // Используем новый метод для создания отгрузки со всеми связанными данными
       await createShipmentWithDetails(fullShipmentData);
       
       setIsShipmentFormVisible(false);
       toast.success("Отгрузка успешно создана");
-      console.log('===============================');
     } catch (error) {
       toast.error("Ошибка при создании отгрузки");
-      console.error(error);
+      if (import.meta.env.DEV) {
+        console.error('❌ Failed to create shipment:', error);
+      }
     }
   };
 
@@ -267,6 +388,19 @@ export default function App() {
     setSelectedShipment(shipment);
     setIsShipmentFormVisible(true);
     setActiveView("edit-shipment");
+  };
+
+  const handleDeleteShipment = async (shipmentId: string) => {
+    try {
+      const dbShipmentItem = dbShipments.find(shipment => shipment.uuid === shipmentId);
+      if (dbShipmentItem) {
+        await deleteShipment(dbShipmentItem.id);
+        toast.success("Отгрузка успешно удалена");
+      }
+    } catch (error) {
+      toast.error("Ошибка при удалении отгрузки");
+      console.error(error);
+    }
   };
 
   const handleCreateShipment = () => {
@@ -312,21 +446,37 @@ export default function App() {
 
   const handleFormCancel = () => {
     setIsFormVisible(false);
-    setSelectedEquipment(null);
-    setActiveView("equipment");
+    if (isEquipmentDetailsVisible) {
+      // Если пользователь был в деталях, возвращаемся туда
+      setActiveView("view-equipment");
+    } else {
+      // Иначе возвращаемся к списку
+      setSelectedEquipment(null);
+      setActiveView("equipment");
+    }
   };
 
   const handleCategoriesChange = async () => {
-    // Этот метод теперь работает через компонент CategoryManagement напрямую с БД
-    console.log("CategoriesChange called but handled by CategoryManagement component");
-  };
-
-  const handleLocationsChange = async () => {
-    // Этот метод теперь работает через компонент LocationManagement напрямую с БД
-    console.log("LocationsChange called but handled by LocationManagement component");
+    // Обновляем список категорий после изменений
+    try {
+      // Принудительно обновляем данные из базы
+      window.location.reload();
+    } catch (error) {
+      console.error('Ошибка обновления категорий:', error);
+    }
   };
 
   const renderContent = () => {
+    if (isEquipmentDetailsVisible && selectedEquipment) {
+      return (
+        <EquipmentDetails
+          equipment={selectedEquipment}
+          onBack={handleEquipmentDetailsBack}
+          onEdit={handleEditEquipmentClick}
+        />
+      );
+    }
+
     if (isFormVisible) {
       return (
         <EquipmentForm
@@ -375,6 +525,7 @@ export default function App() {
             equipment={equipment}
             onEdit={handleEditEquipmentClick}
             onView={handleViewEquipment}
+            onDelete={handleDeleteEquipment}
           />
         );
       case "stacks":
@@ -385,6 +536,7 @@ export default function App() {
             onStacksChange={handleStacksChange}
             onCreateStack={handleCreateStack}
             onEditStack={handleEditStackClick}
+            onDeleteStack={handleDeleteStack}
           />
         );
       case "shipments":
@@ -394,6 +546,7 @@ export default function App() {
             onEdit={handleEditShipmentClick}
             onView={handleViewShipment}
             onCreate={handleCreateShipment}
+            onDelete={handleDeleteShipment}
           />
         );
       case "categories":
@@ -401,19 +554,14 @@ export default function App() {
           <CategoryManagement
             categories={categories}
             onCategoriesChange={handleCategoriesChange}
-            equipmentCount={equipmentCountByCategory}
           />
         );
       case "locations":
-        return (
-          <LocationManagement
-            locations={locations}
-            onLocationsChange={handleLocationsChange}
-            equipmentCount={equipmentCountByLocation}
-          />
-        );
+        return <LocationManagement />;
       case "admin":
         return user ? <AdminPanel user={user} /> : null;
+      case "diagnostics":
+        return <Diagnostics />;
       default:
         return <Dashboard stats={stats} onEquipmentSelect={handleDashboardEquipmentSelect} />;
     }
@@ -437,10 +585,10 @@ export default function App() {
   // Показываем ошибку базы данных, если есть
   if (dbError) {
     return (
-      <div className="min-h-screen bg-background transition-colors duration-300 flex items-center justify-center">
+      <div className="min-h-screen bg-background transition-colors duration-300 flex items-center justify-center p-4">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Ошибка базы данных</h1>
-          <p className="text-gray-600">{dbError}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-red-600 mb-4">Ошибка базы данных</h1>
+          <p className="text-gray-600 text-sm sm:text-base">{dbError}</p>
         </div>
         <Toaster 
           position="top-right"
@@ -453,10 +601,10 @@ export default function App() {
   // Показываем загрузку, пока база данных не инициализирована
   if (!isInitialized) {
     return (
-      <div className="min-h-screen bg-background transition-colors duration-300 flex items-center justify-center">
+      <div className="min-h-screen bg-background transition-colors duration-300 flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600">Инициализация базы данных...</p>
+          <div className="animate-spin rounded-full h-24 w-24 sm:h-32 sm:w-32 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-base sm:text-lg text-gray-600">Инициализация базы данных...</p>
         </div>
         <Toaster 
           position="top-right"
@@ -492,12 +640,16 @@ export default function App() {
       />
       
       <div className="lg:pl-64">
-        <main className="p-4 lg:p-8">
+        <main className="p-3 sm:p-4 lg:p-8">
           <div className="max-w-7xl mx-auto">
             {renderContent()}
           </div>
         </main>
       </div>
+
+      {/* Уведомления о синхронизации */}
+      <SyncNotifications />
+      <SyncStatus />
 
       <Toaster 
         position="top-right"

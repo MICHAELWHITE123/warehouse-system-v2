@@ -1,17 +1,25 @@
 import { useState, useEffect } from "react";
-import { Scanner } from "@yudiel/react-qr-scanner";
+import { QrScanner } from "@yudiel/react-qr-scanner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Alert, AlertDescription } from "./ui/alert";
-import { Camera, X, CheckCircle, AlertCircle, FileText } from "lucide-react";
+import { Camera, X, CheckCircle, AlertCircle, FileText, Package } from "lucide-react";
 import { toast } from "sonner";
 import { Equipment } from "./EquipmentList";
+import { Shipment } from "./ShipmentList";
+import { useAuth } from "../hooks/useAuth";
 
 interface QRScannerProps {
   isOpen: boolean;
   onClose: () => void;
   onScanSuccess?: (equipment: Equipment) => void;
+  // Новые пропсы для работы с отгрузками
+  shipment?: Shipment;
+  onEquipmentLoaded?: (equipmentId: string, isLoaded: boolean, loadedBy: string) => void;
+  onStackLoaded?: (stackId: string, isLoaded: boolean, loadedBy: string) => void;
+  loadedEquipment?: Set<string>;
+  loadedStacks?: Set<string>;
 }
 
 interface ScannedEquipment {
@@ -25,23 +33,34 @@ interface ScannedEquipment {
   purchaseDate: string;
 }
 
-export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
+export function QRScanner({ 
+  isOpen, 
+  onClose, 
+  onScanSuccess, 
+  shipment,
+  onEquipmentLoaded,
+  onStackLoaded,
+  loadedEquipment = new Set(),
+  loadedStacks = new Set()
+}: QRScannerProps) {
+  const { user } = useAuth();
   const [scannedData, setScannedData] = useState<ScannedEquipment | null>(null);
   const [error, setError] = useState<string>("");
   const [isScanning, setIsScanning] = useState(true);
+  const [scanMode, setScanMode] = useState<"equipment" | "shipment">("equipment");
 
   useEffect(() => {
     if (isOpen) {
       setScannedData(null);
       setError("");
       setIsScanning(true);
+      // Определяем режим сканирования на основе наличия отгрузки
+      setScanMode(shipment ? "shipment" : "equipment");
     }
-  }, [isOpen]);
+  }, [isOpen, shipment]);
 
-  const handleScan = (detectedCodes: any[]) => {
-    if (detectedCodes.length === 0) return;
-    
-    const result = detectedCodes[0].rawValue;
+  const handleScan = (result: string) => {
+    if (!result) return;
     try {
       setIsScanning(false);
       
@@ -63,11 +82,16 @@ export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
         
         setScannedData(equipment);
         setError("");
-        toast.success("QR-код успешно отсканирован!");
         
-        // Вызываем callback если он передан
-        if (onScanSuccess) {
-          onScanSuccess(equipment);
+        // Если это режим отгрузки, проверяем, есть ли оборудование в отгрузке
+        if (scanMode === "shipment" && shipment) {
+          handleShipmentScan(equipment);
+        } else {
+          toast.success("QR-код успешно отсканирован!");
+          // Вызываем callback если он передан
+          if (onScanSuccess) {
+            onScanSuccess(equipment);
+          }
         }
       } else {
         throw new Error("Неверный формат данных оборудования");
@@ -78,6 +102,62 @@ export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
       setScannedData(null);
       toast.error("Ошибка сканирования QR-кода");
     }
+  };
+
+  // Обработка сканирования в режиме отгрузки
+  const handleShipmentScan = (equipment: ScannedEquipment) => {
+    if (!shipment || !user) return;
+
+    // Проверяем, есть ли оборудование в отгрузке
+    const shipmentEquipment = shipment.equipment.find(item => 
+      item.equipmentId === equipment.id || 
+      item.serialNumber === equipment.serialNumber
+    );
+
+    if (shipmentEquipment) {
+      // Оборудование найдено в отгрузке
+      const isAlreadyLoaded = loadedEquipment.has(equipment.id);
+      
+      if (onEquipmentLoaded) {
+        onEquipmentLoaded(equipment.id, !isAlreadyLoaded, user.displayName);
+        toast.success(
+          isAlreadyLoaded 
+            ? `Оборудование "${equipment.name}" отмечено как не погруженное` 
+            : `Оборудование "${equipment.name}" отмечено как погруженное пользователем ${user.displayName}`
+        );
+      }
+      
+      setScannedData(null);
+      setIsScanning(true);
+      return;
+    }
+
+    // Проверяем, есть ли оборудование в стеках отгрузки
+    if (shipment.stacks) {
+      for (const stack of shipment.stacks) {
+        if (stack.equipmentIds.includes(equipment.id)) {
+          const isAlreadyLoaded = loadedStacks.has(stack.stackId);
+          
+          if (onStackLoaded) {
+            onStackLoaded(stack.stackId, !isAlreadyLoaded, user.displayName);
+            toast.success(
+              isAlreadyLoaded 
+                ? `Стек "${stack.name}" отмечен как не погруженный` 
+                : `Стек "${stack.name}" отмечен как погруженный пользователем ${user.displayName}`
+            );
+          }
+          
+          setScannedData(null);
+          setIsScanning(true);
+          return;
+        }
+      }
+    }
+
+    // Оборудование не найдено в отгрузке
+    toast.error(`Оборудование "${equipment.name}" не найдено в отгрузке ${shipment.number}`);
+    setScannedData(null);
+    setIsScanning(true);
   };
 
   const handleError = (error: any) => {
@@ -121,31 +201,52 @@ export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Camera className="h-5 w-5" />
-            Сканер QR-кодов
+            {scanMode === "shipment" ? "Сканер QR-кодов для отгрузки" : "Сканер QR-кодов"}
           </DialogTitle>
           <DialogDescription>
-            Наведите камеру на QR-код оборудования для сканирования
+            {scanMode === "shipment" 
+              ? `Наведите камеру на QR-код оборудования для отметки погрузки в отгрузку ${shipment?.number}`
+              : "Наведите камеру на QR-код оборудования для сканирования"
+            }
           </DialogDescription>
         </DialogHeader>
+
+        {/* Информация об отгрузке */}
+        {scanMode === "shipment" && shipment && (
+          <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-blue-800 dark:text-blue-200 text-sm">
+                <Package className="h-4 w-4" />
+                Отгрузка #{shipment.number}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="text-xs text-blue-700 dark:text-blue-300">
+                <p>Получатель: {shipment.recipient}</p>
+                <p>Оборудование: {shipment.equipment.length} позиций</p>
+                <p>Стеки: {shipment.stacks?.length || 0}</p>
+                <p>Погружено: {loadedEquipment.size + loadedStacks.size} позиций</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="space-y-4">
           {/* Области сканирования */}
           {isScanning && !scannedData && !error && (
             <div className="relative">
               <div className="aspect-square rounded-lg overflow-hidden border">
-                <Scanner
-                  onScan={handleScan}
+                <QrScanner
+                  onDecode={handleScan}
                   onError={handleError}
-                  styles={{
-                    container: {
-                      width: "100%",
-                      height: "100%"
-                    },
-                    video: {
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover"
-                    }
+                  containerStyle={{
+                    width: "100%",
+                    height: "100%"
+                  }}
+                  videoStyle={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover"
                   }}
                 />
               </div>
@@ -196,6 +297,15 @@ export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
                     </span>
                   </div>
                 </div>
+                
+                {/* Информация о пользователе для режима отгрузки */}
+                {scanMode === "shipment" && user && (
+                  <div className="pt-2 border-t border-green-200 dark:border-green-800">
+                    <p className="text-xs text-green-700 dark:text-green-300">
+                      Сканирование выполнил: <strong>{user.displayName}</strong>
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -238,6 +348,11 @@ export function QRScanner({ isOpen, onClose, onScanSuccess }: QRScannerProps) {
                     <li>Камера находится на расстоянии 10-30 см</li>
                     <li>QR-код полностью помещается в рамку</li>
                   </ul>
+                  {scanMode === "shipment" && (
+                    <p className="mt-2 font-medium text-blue-600">
+                      При сканировании оборудование автоматически отметится как погруженное
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

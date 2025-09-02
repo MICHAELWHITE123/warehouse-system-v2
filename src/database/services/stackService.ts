@@ -94,11 +94,9 @@ export class StackService {
   }
 
   // Обновить стек
-  updateStack(stack: UpdateEquipmentStack): DbEquipmentStack | null {
-    const now = new Date().toISOString();
-    const updatedStack = {
-      ...stack,
-      updated_at: now
+  updateStack(stack: UpdateEquipmentStack & { id: number }): DbEquipmentStack | null {
+    const updatedStack: UpdateEquipmentStack = {
+      ...stack
     };
 
     return this.db.update('equipment_stacks', stack.id, updatedStack) as DbEquipmentStack | null;
@@ -218,12 +216,22 @@ export class StackService {
     const originalStack = this.getStackWithEquipmentById(stackId);
     if (!originalStack) return null;
 
+    let tags: string[] = [];
+    try {
+      if (originalStack.tags && originalStack.tags.trim() !== '') {
+        tags = JSON.parse(originalStack.tags);
+      }
+    } catch (error) {
+      console.warn('Failed to parse tags for stack cloning:', stackId, error);
+      tags = [];
+    }
+
     const newStack = this.createStack({
       uuid: Date.now().toString(),
       name: newName,
       description: `Копия: ${originalStack.description || originalStack.name}`,
       created_by: originalStack.created_by,
-      tags: originalStack.tags ? JSON.parse(originalStack.tags) : []
+      tags: tags.length > 0 ? JSON.stringify(tags) : undefined
     });
 
     if (originalStack.equipment.length > 0) {

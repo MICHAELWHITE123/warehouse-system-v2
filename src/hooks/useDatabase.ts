@@ -53,9 +53,21 @@ export function useEquipment() {
 
   const createEquipment = useCallback(async (data: any) => {
     try {
+      if (import.meta.env.DEV) {
+        console.log('🔧 createEquipment called with data:', data);
+      }
       await equipmentService.createEquipment(data);
+      if (import.meta.env.DEV) {
+        console.log('✅ equipmentService.createEquipment completed');
+      }
       await loadEquipment();
+      if (import.meta.env.DEV) {
+        console.log('✅ loadEquipment completed');
+      }
     } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error('❌ createEquipment failed:', err);
+      }
       throw new Error(err instanceof Error ? err.message : 'Failed to create equipment');
     }
   }, [loadEquipment]);

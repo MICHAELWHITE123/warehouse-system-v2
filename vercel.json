@@ -2,10 +2,6 @@
   "version": 2,
   "builds": [
     {
-      "src": "server/src/index.ts",
-      "use": "@vercel/node"
-    },
-    {
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
@@ -15,20 +11,41 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/server/src/index.ts"
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
+      "src": "/(.*\\.js)",
+      "dest": "/$1"
+    },
+    {
+      "src": "/(.*\\.css)",
+      "dest": "/$1"
+    },
+    {
+      "src": "/(.*\\.ico)",
+      "dest": "/$1"
+    },
+    {
+      "src": "/(.*\\.png)",
+      "dest": "/$1"
+    },
+    {
+      "src": "/(.*\\.jpg)",
+      "dest": "/$1"
+    },
+    {
+      "src": "/(.*\\.svg)",
+      "dest": "/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "/dist/index.html"
+      "dest": "/index.html"
     }
   ],
   "env": {
-    "NODE_ENV": "production"
-  },
-  "functions": {
-    "server/src/index.ts": {
-      "maxDuration": 30
-    }
+    "VITE_SUPABASE_URL": "@vite_supabase_url",
+    "VITE_SUPABASE_ANON_KEY": "@vite_supabase_anon_key",
+    "VITE_APP_NAME": "Система учета техники на складе"
   }
 }

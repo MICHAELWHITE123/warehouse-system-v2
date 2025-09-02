@@ -13,12 +13,14 @@ import {
   FolderOpen,
   Menu,
   X,
-  Shield
+  Shield,
+  Activity
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Separator } from "./ui/separator";
+import { UserPermissions } from "../types/permissions";
 // import lightLogoImage from 'figma:asset/b40dece314fc20504e6cf04e665a418c7def043e.png';
 // import darkLogoImage from 'figma:asset/2192bd3f6c891d674f53dbe2427fa635913c50a0.png';
 
@@ -26,6 +28,7 @@ export interface User {
   username: string;
   role: string;
   displayName: string;
+  permissions?: UserPermissions;
 }
 
 interface NavigationProps {
@@ -103,6 +106,12 @@ export function Navigation({
       label: "Админ-панель",
       icon: Shield,
       description: "Панель администратора системы"
+    },
+    {
+      id: "diagnostics",
+      label: "Диагностика",
+      icon: Activity,
+      description: "Проверка состояния системы"
     }
   ];
 
