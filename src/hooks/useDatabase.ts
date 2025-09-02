@@ -373,7 +373,7 @@ export function useStatistics() {
       setLoading(true);
       setError(null);
       
-      const equipmentStats = equipmentService.getEquipmentStats();
+      const equipmentStats = await equipmentService.getEquipmentStats();
       const categoriesCount = categoryService.getAllCategories().length;
       const stackStats = stackService.getStackStats();
       const shipmentStats = shipmentService.getShipmentStats();
