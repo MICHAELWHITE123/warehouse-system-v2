@@ -15,13 +15,15 @@
 1. Перейдите на [vercel.com](https://vercel.com)
 2. Нажмите "New Project"
 3. Подключите GitHub: `MICHAELWHITE123/warehouse-system-v2`
-4. Настройте переменные окружения:
+4. **Настройте переменные окружения в Vercel Dashboard:**
 
-| Variable | Value |
-|----------|-------|
-| `VITE_SUPABASE_URL` | `https://your-project.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | `your_anon_key_here` |
-| `VITE_APP_NAME` | `Система учета техники на складе` |
+#### В Vercel Dashboard → Settings → Environment Variables добавьте:
+
+| Variable | Value | Environment |
+|----------|-------|-------------|
+| `VITE_SUPABASE_URL` | `https://your-project.supabase.co` | Production, Preview, Development |
+| `VITE_SUPABASE_ANON_KEY` | `your_anon_key_here` | Production, Preview, Development |
+| `VITE_APP_NAME` | `Система учета техники на складе` | Production, Preview, Development |
 
 ### 3. CORS в Supabase
 В Supabase Dashboard → Settings → API добавьте:
@@ -39,7 +41,7 @@ https://your-app.vercel.app
 ## 🆘 Если что-то не работает
 
 1. **Ошибки сборки** - проверьте логи в Vercel Dashboard
-2. **Ошибки Supabase** - проверьте URL и ключи
+2. **Ошибки Supabase** - проверьте URL и ключи в Environment Variables
 3. **CORS ошибки** - добавьте домен в Supabase CORS
 
 ## 📚 Документация

@@ -175,56 +175,9 @@ class SyncAdapter {
   
   // Проверка доступности API при инициализации
   private async checkApiAccessibilityOnInit(): Promise<void> {
-    try {
-      const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
-      
-      if (isApiAvailable()) {
-        const testUrl = getApiUrl('sync');
-        
-        if (testUrl && testUrl.includes('supabase.co')) {
-          try {
-            // Проверяем доступность Supabase Edge Functions через sync endpoint
-            const testResponse = await fetch(testUrl, {
-              method: 'HEAD',
-              headers: getAuthHeaders(this.deviceId)
-            });
-            
-            if (!testResponse.ok && testResponse.status !== 404) {
-              console.log('Supabase not accessible on init, switching to local mode');
-              this.syncMode = 'local';
-              return;
-            }
-          } catch (testError) {
-            console.log('Supabase accessibility test failed on init, switching to local mode:', testError);
-            this.syncMode = 'local';
-            return;
-          }
-        }
-        
-        // API доступен, устанавливаем гибридный режим
-        this.syncMode = 'hybrid';
-        try {
-          console.log('API accessible, using hybrid sync mode');
-        } catch (error) {
-          // Игнорируем ошибки console.log
-        }
-      } else {
-        // API недоступен, устанавливаем локальный режим
-        this.syncMode = 'local';
-        try {
-          console.log('API not available, using local sync mode');
-        } catch (error) {
-          // Игнорируем ошибки console.log
-        }
-      }
-    } catch (error) {
-      try {
-        console.log('API accessibility check failed on init, using local mode:', error);
-      } catch (consoleError) {
-        // Игнорируем ошибки console.log
-      }
-      this.syncMode = 'local';
-    }
+    // Отключаем API синхронизацию - используем только Supabase
+    this.syncMode = 'local';
+    console.log('API sync disabled, using local sync mode with Supabase');
   }
 
   private generateDeviceId(): string {
@@ -528,8 +481,8 @@ class SyncAdapter {
           await this.performLocalSync(operationsToSync);
         }
         
-        // Получаем операции от других устройств
-        await this.pullOperationsFromServer();
+        // API синхронизация отключена - используем только локальную
+        // await this.pullOperationsFromServer();
       } else {
         // Офлайн режим или локальный режим - только локальная синхронизация
         console.log(`Using local sync mode (${this.syncMode})`);
@@ -1066,7 +1019,8 @@ class SyncAdapter {
       if (this.syncQueue.filter(op => op.status === 'pending').length > 0) {
         await this.performSync();
       } else {
-        await this.pullOperationsFromServer();
+        // API синхронизация отключена - используем только локальную
+        // await this.pullOperationsFromServer();
       }
     }
   }
@@ -1385,149 +1339,9 @@ class SyncAdapter {
 
   // Получение операций от других устройств с сервера
   private async pullOperationsFromServer(): Promise<void> {
-    try {
-      // Если уже в локальном режиме, не пытаемся подключиться к серверу
-      if (this.syncMode === 'local') {
-        console.log('In local mode, using localStorage only');
-        await this.pullOperationsFromLocalStorage();
-        return;
-      }
-      
-      const now = Date.now();
-      if (now - this.lastSyncAttempt < this.syncRetryDelay) {
-        if (import.meta.env.DEV) {
-          console.log('⏭️ Skipping server sync - too soon after last attempt');
-        }
-        return;
-      }
-      
-      this.lastSyncAttempt = now;
-      
-      if (import.meta.env.DEV) {
-        console.log('🔄 Pulling operations from server...');
-      }
-      
-      const { getApiUrl, getAuthHeaders, isApiAvailable } = await import('../config/api');
-      
-      if (!isApiAvailable()) {
-        if (import.meta.env.DEV) {
-          console.log('⚠️ API not available, using local sync only');
-        }
-        await this.pullOperationsFromLocalStorage();
-        return;
-      }
-      
-      const apiUrl = getApiUrl(`sync?deviceId=${this.deviceId}&lastSync=${this.lastSync}`);
-      
-      if (!apiUrl) {
-        if (import.meta.env.DEV) {
-          console.log('⚠️ API URL is empty, using local sync only');
-        }
-        await this.pullOperationsFromLocalStorage();
-        return;
-      }
-      
-      if (apiUrl.includes('localhost') && window.location.hostname.includes('vercel.app')) {
-        if (import.meta.env.DEV) {
-          console.log('🌐 On Vercel, skipping server sync to localhost');
-        }
-        await this.pullOperationsFromLocalStorage();
-        return;
-      }
-      
-      // Дополнительная проверка доступности URL
-      if (apiUrl.includes('supabase.co')) {
-        try {
-          // Проверяем доступность Supabase Edge Functions через sync endpoint
-          const testResponse = await fetch(apiUrl, {
-            method: 'HEAD',
-            headers: getAuthHeaders(this.deviceId)
-          });
-          
-          if (!testResponse.ok && testResponse.status !== 404) {
-            if (import.meta.env.DEV) {
-              console.log('⚠️ Supabase URL not accessible, using local sync only');
-            }
-            await this.pullOperationsFromLocalStorage();
-            return;
-          }
-        } catch (testError) {
-          if (import.meta.env.DEV) {
-            console.log('⚠️ Supabase URL test failed, using local sync only:', testError);
-          }
-          await this.pullOperationsFromLocalStorage();
-          return;
-        }
-      }
-      
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: getAuthHeaders(this.deviceId)
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          console.log('Not authenticated, skipping server sync');
-          return;
-        }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      
-      if (result.success && result.data && result.data.length > 0) {
-        if (import.meta.env.DEV) {
-          console.log(`📥 Received ${result.data.length} operations from other devices`);
-        }
-        
-        for (const operation of result.data) {
-          await this.applyRemoteOperation({
-            id: operation.operation_id,
-            table: operation.table_name,
-            operation: operation.operation_type,
-            data: operation.data_after,
-            timestamp: new Date(operation.created_at).getTime(),
-            deviceId: operation.source_device_id,
-            userId: operation.user_id,
-            hash: this.createDataHash(operation.data_after),
-            status: 'synced',
-            retryCount: 0
-          });
-          
-          // Временно отключаем подтверждение операций из-за проблем с триггером
-          // await this.acknowledgeOperation(operation.operation_id);
-        }
-        
-        // Устанавливаем lastSync как время последней примененной операции
-        // Это предотвратит повторное применение тех же операций
-        if (import.meta.env.DEV) {
-          console.log('✅ Successfully applied operations from other devices');
-          console.log(`📅 Updated lastSync to: ${new Date(this.lastSync).toISOString()}`);
-        }
-      }
-      
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('❌ Failed to pull operations from server:', error);
-      }
-      
-      // Если ошибка связана с недоступностью URL, переключаемся на локальную синхронизацию
-      if (error instanceof Error && (
-        error.message.includes('Failed to fetch') ||
-        error.message.includes('ERR_NAME_NOT_RESOLVED') ||
-        error.message.includes('ERR_CONNECTION_REFUSED')
-      )) {
-        if (import.meta.env.DEV) {
-          console.log('🌐 Network error detected, switching to local sync');
-        }
-        this.syncMode = 'local';
-        await this.pullOperationsFromLocalStorage();
-        return;
-      }
-      
-      console.log('Falling back to local sync...');
-      await this.pullOperationsFromLocalStorage();
-    }
+    // API синхронизация отключена - используем только локальную
+    console.log('API sync disabled, using local sync only');
+    await this.pullOperationsFromLocalStorage();
   }
 
   // Fallback синхронизация через localStorage
