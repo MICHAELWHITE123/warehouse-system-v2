@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; }
+        .error { background-color: #f8d7da; }
+        .pending { background-color: #fff3cd; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .test-btn { background-color: #007bff; color: white; }
+        .sync-btn { background-color: #28a745; color: white; }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>API Тестирование</h1>
+    
+    <div class="test-section">
+        <h2>Тест API маршрутов</h2>
+        <button class="test-btn" onclick="testApi()">Тест /api/test</button>
+        <button class="sync-btn" onclick="testSync()">Тест /api/sync</button>
+        <div id="results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Статус развертывания</h2>
+        <p>Проверьте, что API маршруты развернуты на Vercel:</p>
+        <ul>
+            <li><a href="https://warehouse-system-delta.vercel.app/api/test" target="_blank">/api/test</a></li>
+            <li><a href="https://warehouse-system-delta.vercel.app/api/sync" target="_blank">/api/sync</a></li>
+        </ul>
+    </div>
+
+    <script>
+        const baseUrl = 'https://warehouse-system-delta.vercel.app';
+        
+        function addResult(message, type = 'pending') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `test-section ${type}`;
+            div.innerHTML = `
+                <strong>${new Date().toLocaleTimeString()}</strong><br>
+                ${message}
+            `;
+            results.appendChild(div);
+        }
+
+        async function testApi() {
+            addResult('Тестирую /api/test...', 'pending');
+            
+            try {
+                const response = await fetch(`${baseUrl}/api/test`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addResult(`✅ /api/test работает!<br><pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                } else {
+                    addResult(`❌ /api/test ошибка ${response.status}: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Ошибка подключения к /api/test: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSync() {
+            addResult('Тестирую /api/sync...', 'pending');
+            
+            try {
+                const testData = {
+                    operations: [
+                        {
+                            id: 'test-1',
+                            table: 'equipment',
+                            operation: 'create',
+                            data: { name: 'Test Equipment' },
+                            timestamp: Date.now(),
+                            deviceId: 'test-device',
+                            hash: 'test-hash'
+                        }
+                    ],
+                    deviceId: 'test-device',
+                    userId: 'test-user'
+                };
+
+                const response = await fetch(`${baseUrl}/api/sync`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addResult(`✅ /api/sync работает!<br><pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                } else {
+                    addResult(`❌ /api/sync ошибка ${response.status}: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Ошибка подключения к /api/sync: ${error.message}`, 'error');
+            }
+        }
+
+        // Автоматический тест при загрузке страницы
+        window.onload = function() {
+            addResult('Страница загружена. Нажмите кнопки для тестирования API.', 'pending');
+        };
+    </script>
+</body>
+</html>

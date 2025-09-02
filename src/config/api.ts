@@ -66,22 +66,26 @@ export const getApiUrl = (endpoint: string): string => {
   console.log(`🔧 API_CONFIG.BASE_URL: ${baseUrl}`);
   console.log(`🔧 window.location.hostname: ${window.location.hostname}`);
   
-  // ПРИНУДИТЕЛЬНОЕ ПЕРЕКЛЮЧЕНИЕ НА VERCEL API В PRODUCTION
+  // ПРИНУДИТЕЛЬНОЕ ПЕРЕКЛЮЧЕНИЕ НА SUPABASE EDGE FUNCTIONS В PRODUCTION
   if (window.location.hostname.includes('vercel.app')) {
-    const url = `/api/${endpoint}`;
-    console.log(`🔧 ПРИНУДИТЕЛЬНО использую Vercel API: ${url}`);
-    return url;
-  }
-  
-  // Если базовый URL пустой или не указан, используем Vercel API
-  if (!baseUrl || baseUrl.trim() === '') {
-    // На Vercel используем относительные пути к API
-    if (window.location.hostname.includes('vercel.app')) {
-      const url = `/api/${endpoint}`;
-      console.log(`🔧 Using Vercel API: ${url}`);
+    // Используем Supabase Edge Functions для синхронизации
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    if (supabaseUrl) {
+      const url = `${supabaseUrl}/functions/v1/${endpoint}`;
+      console.log(`🔧 ПРИНУДИТЕЛЬНО использую Supabase Edge Functions: ${url}`);
       return url;
     }
-    // В development используем localhost
+  }
+  
+  // Если базовый URL пустой или не указан, используем Supabase Edge Functions
+  if (!baseUrl || baseUrl.trim() === '') {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    if (supabaseUrl) {
+      const url = `${supabaseUrl}/functions/v1/${endpoint}`;
+      console.log(`🔧 Using Supabase Edge Functions: ${url}`);
+      return url;
+    }
+    // Fallback на localhost для development
     const url = `http://localhost:3001/${endpoint}`;
     console.log(`🔧 Using localhost API: ${url}`);
     return url;
@@ -135,13 +139,15 @@ export const getAuthHeaders = (deviceId?: string): Record<string, string> => {
   const token = localStorage.getItem('auth-token');
   const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   
-  // Если используем Supabase, добавляем специальные заголовки
-  if (API_CONFIG.BASE_URL && API_CONFIG.BASE_URL.includes('supabase.co')) {
+  // Если используем Supabase Edge Functions, добавляем специальные заголовки
+  if (window.location.hostname.includes('vercel.app') || 
+      (API_CONFIG.BASE_URL && API_CONFIG.BASE_URL.includes('supabase.co'))) {
     return {
       ...API_CONFIG.DEFAULT_HEADERS,
       'apikey': supabaseKey || '',
       'Authorization': `Bearer ${supabaseKey || ''}`,
-      ...(token && { 'Authorization': `Bearer ${token}` })
+      ...(token && { 'Authorization': `Bearer ${token}` }),
+      ...(deviceId && { 'X-Device-ID': deviceId })
     };
   }
   

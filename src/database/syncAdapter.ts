@@ -643,7 +643,7 @@ class SyncAdapter {
         if (response.status === 401) {
           throw new Error(`HTTP 401: Unauthorized - Authentication failed`);
         } else if (response.status === 404) {
-          throw new Error(`HTTP 404: Not Found - Server endpoint not available`);
+          throw new Error(`HTTP 404: Not Found - Supabase Edge Function not deployed. Please run 'supabase functions deploy sync'`);
         } else if (response.status >= 500) {
           throw new Error(`HTTP ${response.status}: Server error`);
         } else {

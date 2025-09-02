@@ -1,260 +1,275 @@
 import React, { useState, useEffect } from 'react';
-import { useSync } from '../hooks/useSync';
+import { syncAdapter } from '../database/syncAdapter';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import { Alert, AlertDescription } from './ui/alert';
 import { 
   RefreshCw, 
+  CheckCircle, 
+  XCircle, 
   AlertTriangle, 
+  Wifi, 
   WifiOff,
-  Server,
-  HardDrive,
-  Activity,
-  Info,
-  Settings,
-  Database
+  Database,
+  Server
 } from 'lucide-react';
 
-export const SyncStatus: React.FC = () => {
-  const { 
-    syncStatus, 
-    forceSync, 
-    restartSync,
-    forceLocalMode,
-    tryHybridMode,
-    forceServerMode,
-    getDeviceInfo
-  } = useSync();
-  
-  const [deviceInfo, setDeviceInfo] = useState<any>(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+interface SyncStatusProps {
+  className?: string;
+}
 
-  // Получаем информацию об устройстве
+export const SyncStatus: React.FC<SyncStatusProps> = ({ className }) => {
+  const [status, setStatus] = useState(syncAdapter.getSyncStatus());
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
+
   useEffect(() => {
-    if (syncStatus) {
-      setDeviceInfo(getDeviceInfo());
+    const handleStatusUpdate = () => {
+      setStatus(syncAdapter.getSyncStatus());
+    };
+
+    const handleError = (event: CustomEvent) => {
+      if (event.detail?.error) {
+        setLastError(event.detail.error);
+      }
+    };
+
+    window.addEventListener('sync-status-updated', handleStatusUpdate);
+    window.addEventListener('sync-error', handleError);
+
+    // Обновляем статус каждые 5 секунд
+    const interval = setInterval(handleStatusUpdate, 5000);
+
+    return () => {
+      window.removeEventListener('sync-status-updated', handleStatusUpdate);
+      window.removeEventListener('sync-error', handleError);
+      clearInterval(interval);
+    };
+  }, []);
+
+  const getStatusIcon = () => {
+    if (status.isSyncing) {
+      return <RefreshCw className="h-4 w-4 animate-spin" />;
     }
-  }, [syncStatus, getDeviceInfo]);
+    if (status.pendingOperations.length === 0 && status.conflicts.length === 0) {
+      return <CheckCircle className="h-4 w-4 text-green-500" />;
+    }
+    if (status.conflicts.length > 0) {
+      return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+    }
+    return <Database className="h-4 w-4 text-blue-500" />;
+  };
 
-  if (!syncStatus) {
-    return null;
-  }
+  const getStatusText = () => {
+    if (status.isSyncing) {
+      return 'Синхронизация...';
+    }
+    if (status.pendingOperations.length === 0 && status.conflicts.length === 0) {
+      return 'Синхронизировано';
+    }
+    if (status.conflicts.length > 0) {
+      return `${status.conflicts.length} конфликт(ов)`;
+    }
+    return `${status.pendingOperations.length} в очереди`;
+  };
 
-  const { isOnline, isSyncing, pendingOperations, conflicts, syncMode } = syncStatus;
+  const getStatusColor = () => {
+    if (status.isSyncing) {
+      return 'bg-blue-100 text-blue-800';
+    }
+    if (status.pendingOperations.length === 0 && status.conflicts.length === 0) {
+      return 'bg-green-100 text-green-800';
+    }
+    if (status.conflicts.length > 0) {
+      return 'bg-yellow-100 text-yellow-800';
+    }
+    return 'bg-orange-100 text-orange-800';
+  };
 
-  // Получаем иконку для режима синхронизации
-  const getSyncModeIcon = (mode: string) => {
-    switch (mode) {
-      case 'server':
-        return <Server className="w-5 h-5" />;
-      case 'local':
-        return <HardDrive className="w-5 h-5" />;
-      case 'hybrid':
-        return <Activity className="w-5 h-5" />;
-      default:
-        return <Activity className="w-5 h-5" />;
+  const handleForceSync = async () => {
+    try {
+      setLastError(null);
+      await syncAdapter.forceSync();
+    } catch (error) {
+      setLastError(error instanceof Error ? error.message : 'Неизвестная ошибка');
     }
   };
 
-  // Получаем цвет для режима синхронизации
-  const getSyncModeColor = (mode: string) => {
-    switch (mode) {
-      case 'server':
-        return 'text-blue-600 bg-blue-100';
-      case 'local':
-        return 'text-orange-600 bg-orange-100';
-      case 'hybrid':
-        return 'text-green-600 bg-green-100';
-      default:
-        return 'text-gray-600 bg-gray-100';
+  const handleRestartSync = () => {
+    try {
+      setLastError(null);
+      syncAdapter.restartSync();
+    } catch (error) {
+      setLastError(error instanceof Error ? error.message : 'Неизвестная ошибка');
     }
   };
 
-  // Получаем статус синхронизации
-  const getSyncStatus = () => {
-    if (conflicts.length > 0) return { status: 'conflict', text: 'Конфликты', color: 'text-red-600' };
-    if (pendingOperations.length > 0 && !isOnline) return { status: 'offline', text: 'Офлайн', color: 'text-orange-600' };
-    if (pendingOperations.length > 0) return { status: 'pending', text: 'Ожидание', color: 'text-yellow-600' };
-    if (isSyncing) return { status: 'syncing', text: 'Синхронизация...', color: 'text-blue-600' };
-    return { status: 'success', text: 'Синхронизировано', color: 'text-green-600' };
+  const handleForceServerMode = () => {
+    try {
+      setLastError(null);
+      syncAdapter.forceServerMode();
+    } catch (error) {
+      setLastError(error instanceof Error ? error.message : 'Неизвестная ошибка');
+    }
   };
 
-  const syncStatusInfo = getSyncStatus();
+  const formatLastSync = () => {
+    if (status.lastSync === 0) {
+      return 'Никогда';
+    }
+    return new Date(status.lastSync).toLocaleString('ru-RU');
+  };
+
+  const getErrorMessage = (error: string) => {
+    if (error.includes('404') && error.includes('Supabase Edge Function not deployed')) {
+      return {
+        title: 'Edge Function не развернута',
+        description: 'Для работы синхронизации необходимо развернуть Supabase Edge Function. Выполните команду: supabase functions deploy sync',
+        action: 'Инструкция по настройке'
+      };
+    }
+    if (error.includes('401')) {
+      return {
+        title: 'Ошибка аутентификации',
+        description: 'Проверьте правильность API ключей Supabase в настройках',
+        action: 'Проверить настройки'
+      };
+    }
+    if (error.includes('Failed to fetch')) {
+      return {
+        title: 'Ошибка сети',
+        description: 'Проверьте подключение к интернету и доступность Supabase',
+        action: 'Повторить попытку'
+      };
+    }
+    return {
+      title: 'Ошибка синхронизации',
+      description: error,
+      action: 'Повторить попытку'
+    };
+  };
 
   return (
-    <Card className="w-full">
+    <Card className={className}>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <RefreshCw className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
+        <CardTitle className="flex items-center gap-2 text-sm">
+          {getStatusIcon()}
           Статус синхронизации
+          <Badge className={`ml-auto ${getStatusColor()}`}>
+            {getStatusText()}
+          </Badge>
         </CardTitle>
       </CardHeader>
       
-      <CardContent className="space-y-4">
-        {/* Основной статус */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="font-medium">Статус:</span>
-            <Badge variant="outline" className={syncStatusInfo.color}>
-              {syncStatusInfo.text}
-            </Badge>
+      <CardContent className="space-y-3">
+        {/* Основная информация */}
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="flex items-center gap-1">
+            {status.isOnline ? (
+              <Wifi className="h-3 w-3 text-green-500" />
+            ) : (
+              <WifiOff className="h-3 w-3 text-red-500" />
+            )}
+            <span>{status.isOnline ? 'Онлайн' : 'Офлайн'}</span>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Режим:</span>
-            <Badge className={`${getSyncModeColor(syncMode)}`}>
-              {getSyncModeIcon(syncMode)}
-              <span className="ml-1 capitalize">{syncMode}</span>
-            </Badge>
+          <div className="flex items-center gap-1">
+            <Server className="h-3 w-3 text-blue-500" />
+            <span>{status.syncMode}</span>
           </div>
         </div>
 
-        {/* Сетевая информация */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center gap-2">
-            <WifiOff className={`w-4 h-4 ${isOnline ? 'text-green-600' : 'text-red-600'}`} />
-            <span className="text-sm">
-              {isOnline ? 'Онлайн' : 'Офлайн'}
-            </span>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Database className="w-4 h-4 text-blue-600" />
-            <span className="text-sm">
-              {pendingOperations.length} операций в очереди
-            </span>
-          </div>
+        <div className="text-xs text-gray-600">
+          Последняя синхронизация: {formatLastSync()}
         </div>
 
-        {/* Конфликты */}
-        {conflicts.length > 0 && (
-          <div className="flex items-center gap-2 p-3 bg-red-50 rounded-lg border border-red-200">
-            <AlertTriangle className="w-4 h-4 text-red-600" />
-            <span className="text-sm text-red-700">
-              Обнаружено {conflicts.length} конфликтов синхронизации
-            </span>
+        {/* Ошибка */}
+        {lastError && (
+          <Alert className="border-red-200 bg-red-50">
+            <XCircle className="h-4 w-4 text-red-500" />
+            <AlertDescription className="text-red-700">
+              <div className="font-medium">{getErrorMessage(lastError).title}</div>
+              <div className="text-sm mt-1">{getErrorMessage(lastError).description}</div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Детальная информация */}
+        {isExpanded && (
+          <div className="space-y-2 text-xs">
+            <div className="grid grid-cols-2 gap-2">
+              <div>Устройство: {status.deviceId.slice(0, 8)}...</div>
+              <div>Пользователь: {status.userId || 'Не указан'}</div>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-2">
+              <div>В очереди: {status.pendingOperations.length}</div>
+              <div>Конфликты: {status.conflicts.length}</div>
+              <div>Статус: {status.syncMode}</div>
+            </div>
+
+            {status.pendingOperations.length > 0 && (
+              <div className="bg-gray-50 p-2 rounded">
+                <div className="font-medium mb-1">Операции в очереди:</div>
+                {status.pendingOperations.slice(0, 3).map((op, index) => (
+                  <div key={index} className="text-gray-600">
+                    {op.operation} {op.table} (попытка {op.retryCount + 1})
+                  </div>
+                ))}
+                {status.pendingOperations.length > 3 && (
+                  <div className="text-gray-500">
+                    ...и еще {status.pendingOperations.length - 3}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Действия */}
-        <div className="flex flex-wrap gap-2">
+        {/* Кнопки управления */}
+        <div className="flex gap-2">
           <Button
             size="sm"
             variant="outline"
-            onClick={forceSync}
-            disabled={isSyncing}
+            onClick={handleForceSync}
+            disabled={status.isSyncing}
+            className="flex-1"
           >
-            <RefreshCw className={`w-4 h-4 mr-1 ${isSyncing ? 'animate-spin' : ''}`} />
+            <RefreshCw className="h-3 w-3 mr-1" />
             Синхронизировать
           </Button>
           
           <Button
             size="sm"
             variant="outline"
-            onClick={restartSync}
+            onClick={handleRestartSync}
+            disabled={status.isSyncing}
+            className="flex-1"
           >
-            <Settings className="w-4 h-4 mr-1" />
+            <RefreshCw className="h-3 w-3 mr-1" />
             Перезапустить
           </Button>
           
           <Button
             size="sm"
             variant="outline"
-            onClick={() => setShowAdvanced(!showAdvanced)}
+            onClick={() => setIsExpanded(!isExpanded)}
           >
-            <Info className="w-4 h-4 mr-1" />
-            {showAdvanced ? 'Скрыть детали' : 'Показать детали'}
+            {isExpanded ? 'Скрыть' : 'Подробности'}
           </Button>
         </div>
 
-        {/* Расширенная информация */}
-        {showAdvanced && (
-          <div className="pt-4 border-t border-gray-200 space-y-4">
-            {/* Информация об устройстве */}
-            {deviceInfo && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <h4 className="font-medium text-gray-900">Информация об устройстве</h4>
-                  <div className="text-sm space-y-1">
-                    <p><strong>ID устройства:</strong> {deviceInfo.deviceId}</p>
-                    <p><strong>Пользователь:</strong> {deviceInfo.userId || 'Не указан'}</p>
-                    <p><strong>Последняя синхронизация:</strong></p>
-                    <p className="text-gray-600">
-                      {deviceInfo.lastSync ? new Date(deviceInfo.lastSync).toLocaleString() : 'Никогда'}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <h4 className="font-medium text-gray-900">Статистика операций</h4>
-                  <div className="text-sm space-y-1">
-                    <p><strong>Ожидающие:</strong> {deviceInfo.operationsStats?.pending || 0}</p>
-                    <p><strong>Успешные:</strong> {deviceInfo.operationsStats?.synced || 0}</p>
-                    <p><strong>Неудачные:</strong> {deviceInfo.operationsStats?.failed || 0}</p>
-                    <p><strong>Всего:</strong> {deviceInfo.operationsStats?.total || 0}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Управление режимами */}
-            <div className="space-y-2">
-              <h4 className="font-medium text-gray-900">Управление режимами синхронизации</h4>
-              <div className="flex flex-wrap gap-2">
-                {syncMode === 'local' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={tryHybridMode}
-                  >
-                    <Activity className="w-4 h-4 mr-1" />
-                    Попробовать гибридный режим
-                  </Button>
-                )}
-                
-                {syncMode === 'hybrid' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={forceServerMode}
-                  >
-                    <Server className="w-4 h-4 mr-1" />
-                    Принудительно серверный режим
-                  </Button>
-                )}
-                
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={forceLocalMode}
-                >
-                  <HardDrive className="w-4 h-4 mr-1" />
-                  Принудительно локальный режим
-                </Button>
-              </div>
-            </div>
-
-            {/* Описание режимов */}
-            <div className="space-y-2">
-              <h4 className="font-medium text-gray-900">Описание режимов</h4>
-              <div className="text-sm space-y-2">
-                <div className="p-2 bg-blue-50 rounded border border-blue-200">
-                  <p className="font-medium text-blue-900">Серверный режим</p>
-                  <p className="text-blue-700">Данные синхронизируются с сервером в реальном времени. Требует стабильное интернет-соединение.</p>
-                </div>
-                
-                <div className="p-2 bg-green-50 rounded border border-green-200">
-                  <p className="font-medium text-green-900">Гибридный режим</p>
-                  <p className="text-green-700">Комбинация серверной и локальной синхронизации. Автоматически переключается между режимами.</p>
-                </div>
-                
-                <div className="p-2 bg-orange-50 rounded border border-orange-200">
-                  <p className="font-medium text-orange-900">Локальный режим</p>
-                  <p className="text-orange-700">Данные синхронизируются только между вкладками браузера. Работает без интернета.</p>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* Специальная кнопка для принудительного серверного режима */}
+        {lastError && lastError.includes('404') && (
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={handleForceServerMode}
+            className="w-full"
+          >
+            <Server className="h-3 w-3 mr-1" />
+            Принудительно подключиться к серверу
+          </Button>
         )}
       </CardContent>
     </Card>
