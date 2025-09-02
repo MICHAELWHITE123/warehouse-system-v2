@@ -2,40 +2,40 @@
 // Локальная синхронизация отключена
 
 export const DATABASE_CONFIG = {
-  // Принудительно отключаем fallback к локальному хранилищу
-  fallbackToLocal: false,
+  // Разрешаем fallback к локальному хранилищу для совместимости
+  fallbackToLocal: true,
   
-  // Режим синхронизации - только сервер
-  syncMode: 'server' as const,
+  // Режим синхронизации - гибридный (БД + локальное)
+  syncMode: 'hybrid' as const,
   
   // Принудительно отключаем локальный режим
   forceLocalMode: false,
   
   // Настройки для гибридного адаптера
   hybrid: {
-    // Отключаем fallback к локальному хранилищу
-    fallbackToLocal: false,
+    // Разрешаем fallback к локальному хранилищу
+    fallbackToLocal: true,
     
-    // Приоритет хранилищ (только БД)
-    storagePriority: ['redis', 'postgres'] as const,
+    // Приоритет хранилищ (БД в приоритете)
+    storagePriority: ['redis', 'postgres', 'local'] as const,
     
-    // Запрещаем использование локального хранилища
-    allowLocalStorage: false
+    // Разрешаем использование локального хранилища
+    allowLocalStorage: true
   },
   
   // Настройки синхронизации
   sync: {
-    // Только серверная синхронизация
-    mode: 'server' as const,
+    // Гибридная синхронизация
+    mode: 'hybrid' as const,
     
-    // Отключаем локальную синхронизацию
-    allowLocalSync: false,
+    // Разрешаем локальную синхронизацию
+    allowLocalSync: true,
     
-    // Отключаем fallback к localStorage
-    allowLocalStorageFallback: false,
+    // Разрешаем fallback к localStorage
+    allowLocalStorageFallback: true,
     
-    // Принудительно используем только сервер
-    forceServerOnly: true
+    // Приоритет серверной синхронизации
+    forceServerOnly: false
   }
 };
 

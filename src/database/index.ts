@@ -1,20 +1,28 @@
 import { browserDb, BrowserDatabase } from './browserDatabase';
+import { serviceDb, ServiceDatabase } from './serviceAdapter';
 import { DATABASE_CONFIG } from '../config/databaseConfig';
 
 let isInitialized = false;
 
 // Функция для получения экземпляра базы данных
 export function getDatabase(): BrowserDatabase {
-  // Проверяем, разрешено ли использование локального хранилища
-  if (!DATABASE_CONFIG.hybrid.allowLocalStorage) {
-    throw new Error('Local storage is disabled. Use database storage only.');
-  }
+  // Используем локальную базу данных для совместимости
+  return browserDb;
+}
+
+// Функция для получения сервисного адаптера (для будущего использования)
+export function getServiceDatabase(): ServiceDatabase {
+  return serviceDb;
+}
+
+// Функция для получения локальной базы данных (для совместимости)
+export function getLocalDatabase(): BrowserDatabase {
   return browserDb;
 }
 
 // Функция для закрытия соединения с базой данных
 export function closeDatabase() {
-  // Браузерная база автоматически сохраняется в localStorage
+  // Закрываем сервисный адаптер
   console.log('Database connection closed');
 }
 
@@ -26,17 +34,21 @@ export function withTransaction<T>(callback: (db: BrowserDatabase) => T): T {
 }
 
 // Экспортируем типы для использования в других файлах
-export type { BrowserDatabase };
+export type { BrowserDatabase, ServiceDatabase };
 
 // Инициализируем базу данных
 export async function initDatabase(): Promise<BrowserDatabase> {
   if (!isInitialized) {
-    // Проверяем конфигурацию перед инициализацией
-    if (!DATABASE_CONFIG.hybrid.allowLocalStorage) {
-      throw new Error('Local storage is disabled. Database initialization requires database connection.');
+    // Инициализируем локальную базу данных
+    await browserDb.initializeWithSeedData();
+    
+    // Также инициализируем сервисный адаптер для будущего использования
+    try {
+      await serviceDb.init();
+    } catch (error) {
+      console.warn('Service database initialization failed, using local database only:', error);
     }
     
-    await browserDb.initializeWithSeedData();
     isInitialized = true;
   }
   return browserDb;

@@ -17,7 +17,7 @@ export function useEquipmentWithSync() {
     try {
       setLoading(true);
       setError(null);
-      const data = equipmentService.getAllEquipment();
+      const data = await equipmentService.getAllEquipment();
       setEquipment(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load equipment');
