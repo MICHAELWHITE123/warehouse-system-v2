@@ -44,8 +44,8 @@
     }
   ],
   "env": {
-    "VITE_SUPABASE_URL": "@vite_supabase_url",
-    "VITE_SUPABASE_ANON_KEY": "@vite_supabase_anon_key",
+    "VITE_SUPABASE_URL": "@https://xyryukgeatmxyoxyxzql.supabase.co",
+    "VITE_SUPABASE_ANON_KEY": "@eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5cnl1a2dlYXRteHlveHl4enFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4MTgxNjksImV4cCI6MjA3MjM5NDE2OX0.rq5_7Kg_KYT8qseQFSAvZO_OxvUnkmtBhA0NeaQs76Y",
     "VITE_APP_NAME": "Система учета техники на складе"
   }
 }
